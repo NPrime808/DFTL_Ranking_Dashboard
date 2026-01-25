@@ -1,0 +1,27 @@
+# Claude Code
+.claude
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data files
+output/
+assets/
+
+# OS
+.DS_Store
+Thumbs.db
