@@ -28,6 +28,17 @@ DYNAMIC_K_PROVISIONAL_MULTIPLIER = 1.2  # K multiplier for provisional players
 TARGET_MIN_RATING = 900
 TARGET_MAX_RATING = 2800
 
+# --- Uncertainty Config (Loss-Amplifying) ---
+USE_UNCERTAINTY = True  # Enable loss-amplifying uncertainty
+UNCERTAINTY_BASE = 1.0  # Starting uncertainty (no amplification)
+UNCERTAINTY_GROWTH_RATE = 0.05  # Uncertainty growth per inactive day
+UNCERTAINTY_MAX = 1.5  # Maximum uncertainty multiplier
+UNCERTAINTY_DECAY_RATE = 0.5  # How fast uncertainty decays after active day (0-1)
+
+# --- Activity Gating Config ---
+USE_ACTIVITY_GATING = True  # Filter inactive players from rankings
+ACTIVITY_WINDOW_DAYS = 7  # Days of inactivity before player is hidden from rankings
+
 # --- Paths ---
 OUTPUT_FOLDER = Path(r"C:\Users\Nicol\DFTL_score_system\output")
 # Input file patterns
@@ -142,7 +153,41 @@ def calculate_confidence(games_played, threshold=30):
     return min(1.0, games_played / threshold)
 
 
-def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, date):
+def calculate_uncertainty(inactivity_days):
+    """
+    Calculate uncertainty multiplier based on days of inactivity.
+    Uncertainty starts at UNCERTAINTY_BASE and grows linearly with inactivity,
+    capped at UNCERTAINTY_MAX.
+
+    Returns:
+        float: Uncertainty multiplier (1.0 = no effect, higher = amplified losses)
+    """
+    if not USE_UNCERTAINTY:
+        return 1.0
+
+    return min(
+        UNCERTAINTY_MAX,
+        UNCERTAINTY_BASE + inactivity_days * UNCERTAINTY_GROWTH_RATE
+    )
+
+
+def decay_uncertainty(current_uncertainty):
+    """
+    Decay uncertainty toward base after an active day.
+    Uses exponential decay: new = base + (current - base) * (1 - decay_rate)
+
+    Returns:
+        float: New uncertainty value after decay
+    """
+    if not USE_UNCERTAINTY:
+        return 1.0
+
+    # Exponential decay toward base
+    excess = current_uncertainty - UNCERTAINTY_BASE
+    return UNCERTAINTY_BASE + excess * (1 - UNCERTAINTY_DECAY_RATE)
+
+
+def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, uncertainty, date):
     """
     Process one day's leaderboard and update ratings.
 
@@ -151,10 +196,11 @@ def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, 
         ratings: dict of player_name -> current rating
         games_played: dict of player_name -> number of games
         last_seen: dict of player_name -> last date seen
+        uncertainty: dict of player_name -> current uncertainty multiplier
         date: current date being processed
 
     Returns:
-        dict of rating changes for this day (for history tracking)
+        tuple of (rating_changes dict, uncertainty_snapshot dict for this day)
     """
     players = leaderboard_df.sort_values('rank').to_dict('records')
     n = len(players)
@@ -165,6 +211,19 @@ def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, 
         if name not in ratings:
             ratings[name] = BASELINE_RATING
             games_played[name] = 0
+            uncertainty[name] = UNCERTAINTY_BASE
+
+    # Calculate inactivity-based uncertainty for players appearing today
+    # (before we update last_seen)
+    player_uncertainty = {}
+    for p in players:
+        name = p['player_name']
+        if name in last_seen:
+            # Calculate days since last seen
+            days_inactive = (date - last_seen[name]).days
+            # Update uncertainty based on inactivity
+            uncertainty[name] = calculate_uncertainty(days_inactive)
+        player_uncertainty[name] = uncertainty[name]
 
     # Calculate max score gap for weighting
     max_gap = players[0]['score'] - players[-1]['score'] if n > 1 else 1
@@ -202,13 +261,26 @@ def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, 
             rating_changes[name_i] += delta_i
             rating_changes[name_j] += delta_j
 
-    # Apply rating changes
+    # Apply uncertainty to losses only, then apply rating changes
     for name, delta in rating_changes.items():
+        if delta < 0:
+            # Amplify losses by uncertainty
+            delta *= player_uncertainty[name]
         ratings[name] += delta
         games_played[name] += 1
         last_seen[name] = date
+        # Decay uncertainty after playing
+        uncertainty[name] = decay_uncertainty(player_uncertainty[name])
 
-    return dict(rating_changes)
+    # Store the rating changes after uncertainty modification
+    final_changes = {}
+    for name, delta in rating_changes.items():
+        if delta < 0:
+            final_changes[name] = delta * player_uncertainty[name]
+        else:
+            final_changes[name] = delta
+
+    return final_changes, player_uncertainty
 
 
 def run_elo_ranking(df):
@@ -225,6 +297,7 @@ def run_elo_ranking(df):
     ratings = {}
     games_played = defaultdict(int)
     last_seen = {}
+    uncertainty = {}  # Track uncertainty per player
 
     # Track daily history
     daily_history = []
@@ -236,16 +309,34 @@ def run_elo_ranking(df):
     for date in dates:
         day_df = df[df['date'] == date]
 
-        # Process the day
-        changes = process_daily_leaderboard(day_df, ratings, games_played, last_seen, date)
+        # Process the day (now returns uncertainty snapshot too)
+        changes, day_uncertainty = process_daily_leaderboard(
+            day_df, ratings, games_played, last_seen, uncertainty, date
+        )
+
+        # Determine which players are active on this date (played within last 7 days)
+        active_players_today = set()
+        for player, player_last_seen in last_seen.items():
+            days_since_seen = (date - player_last_seen).days
+            if days_since_seen <= ACTIVITY_WINDOW_DAYS:
+                active_players_today.add(player)
+
+        # Calculate active_rank for active players only (by rating)
+        active_ratings = [(player, ratings[player]) for player in active_players_today]
+        active_ratings.sort(key=lambda x: x[1], reverse=True)
+        active_rank_map = {player: rank + 1 for rank, (player, _) in enumerate(active_ratings)}
 
         # Record snapshot of all ratings after this day
         for player, rating in ratings.items():
+            # active_rank is None if player is not active on this date
+            active_rank = active_rank_map.get(player, None)
             daily_history.append({
                 'date': date,
                 'player_name': player,
                 'rating': rating,
-                'games_played': games_played[player]
+                'games_played': games_played[player],
+                'uncertainty': uncertainty.get(player, UNCERTAINTY_BASE),
+                'active_rank': active_rank
             })
 
     print(f"Processed {len(dates)} days, {len(ratings)} unique players")
@@ -253,24 +344,55 @@ def run_elo_ranking(df):
     # Scale final ratings using soft compression
     scaled_ratings = scale_ratings_soft(ratings, BASELINE_RATING, TARGET_MIN_RATING, TARGET_MAX_RATING)
 
+    # Determine the last date in the dataset for activity gating
+    last_date = dates[-1] if dates else None
+
     # Build final ratings DataFrame
     final_ratings = []
     for player, rating in scaled_ratings.items():
         gp = games_played[player]
+        player_last_seen = last_seen[player]
+
+        # Calculate days since last active
+        days_inactive = (last_date - player_last_seen).days if last_date else 0
+
+        # Determine if player is active (within activity window)
+        is_active = days_inactive <= ACTIVITY_WINDOW_DAYS if USE_ACTIVITY_GATING else True
+
         final_ratings.append({
             'player_name': player,
             'rating': round(rating, 2),
             'games_played': gp,
             'confidence': round(calculate_confidence(gp, DYNAMIC_K_ESTABLISHED_GAMES), 2),
-            'last_seen': last_seen[player]
+            'last_seen': player_last_seen,
+            'days_inactive': days_inactive,
+            'uncertainty': round(uncertainty.get(player, UNCERTAINTY_BASE), 3),
+            'is_active': is_active
         })
 
     final_df = pd.DataFrame(final_ratings)
-    final_df = final_df.sort_values('rating', ascending=False).reset_index(drop=True)
-    final_df['rank'] = final_df.index + 1
 
-    # Reorder columns
-    final_df = final_df[['rank', 'player_name', 'rating', 'games_played', 'confidence', 'last_seen']]
+    # Create two DataFrames: active (for display) and all (for reference)
+    all_players_df = final_df.copy()
+    all_players_df = all_players_df.sort_values('rating', ascending=False).reset_index(drop=True)
+    # Inactive players get no active_rank (null), active players get ranked among themselves
+    all_players_df['active_rank'] = None
+    active_mask = all_players_df['is_active']
+    # Rank only active players
+    active_sorted = all_players_df[active_mask].sort_values('rating', ascending=False)
+    for i, idx in enumerate(active_sorted.index):
+        all_players_df.loc[idx, 'active_rank'] = i + 1
+
+    # Filter to active players only for the main rankings
+    if USE_ACTIVITY_GATING:
+        final_df = final_df[final_df['is_active']].copy()
+
+    final_df = final_df.sort_values('rating', ascending=False).reset_index(drop=True)
+    final_df['active_rank'] = final_df.index + 1
+
+    # Reorder columns (active_rank first)
+    final_df = final_df[['active_rank', 'player_name', 'rating', 'games_played', 'confidence', 'last_seen', 'days_inactive', 'uncertainty', 'is_active']]
+    all_players_df = all_players_df[['active_rank', 'player_name', 'rating', 'games_played', 'confidence', 'last_seen', 'days_inactive', 'uncertainty', 'is_active']]
 
     # Build daily history DataFrame and scale ratings using soft compression
     history_df = pd.DataFrame(daily_history)
@@ -320,10 +442,20 @@ def run_elo_ranking(df):
         lambda gp: round(calculate_confidence(gp, DYNAMIC_K_ESTABLISHED_GAMES), 2)
     )
 
-    # Reorder columns: date, player_name, games_played, rank, score, rating, rating_change, confidence
-    history_df = history_df[['date', 'player_name', 'games_played', 'rank', 'score', 'rating', 'rating_change', 'confidence']]
+    # Round uncertainty for display
+    history_df['uncertainty'] = history_df['uncertainty'].round(3)
 
-    return final_df, history_df
+    # Calculate active_rank_change (previous active_rank - current active_rank, positive = improved)
+    # Need to handle nulls carefully (inactive periods)
+    history_df = history_df.sort_values(['player_name', 'date']).reset_index(drop=True)
+    history_df['active_rank_change'] = history_df.groupby('player_name')['active_rank'].transform(
+        lambda x: -x.diff()  # negative diff because lower rank is better
+    )
+
+    # Reorder columns: date, player_name, games_played, rank (daily), score, rating, rating_change, active_rank, active_rank_change, confidence, uncertainty
+    history_df = history_df[['date', 'player_name', 'games_played', 'rank', 'score', 'rating', 'rating_change', 'active_rank', 'active_rank_change', 'confidence', 'uncertainty']]
+
+    return final_df, history_df, all_players_df
 
 
 def process_dataset(input_pattern, output_prefix, label):
@@ -332,7 +464,7 @@ def process_dataset(input_pattern, output_prefix, label):
     input_files = sorted(OUTPUT_FOLDER.glob(input_pattern))
     if not input_files:
         print(f"Error: No files matching {input_pattern} found in {OUTPUT_FOLDER}")
-        return None, None
+        return None, None, None
 
     input_csv = input_files[-1]  # Most recent (sorted by date in filename)
     print(f"\n{'='*60}")
@@ -346,18 +478,28 @@ def process_dataset(input_pattern, output_prefix, label):
     last_date = df['date'].max().strftime('%Y%m%d')
 
     # Run Elo ranking
-    final_ratings, daily_history = run_elo_ranking(df)
+    final_ratings, daily_history, all_players = run_elo_ranking(df)
+
+    # Display activity gating info
+    if USE_ACTIVITY_GATING:
+        total_players = len(all_players)
+        active_players = len(final_ratings)
+        inactive_players = total_players - active_players
+        print(f"\n--- Activity Gating ({label}) ---")
+        print(f"Total players: {total_players}")
+        print(f"Active players (last {ACTIVITY_WINDOW_DAYS} days): {active_players}")
+        print(f"Inactive players (hidden from rankings): {inactive_players}")
 
     # Display top players
-    print(f"\n--- Top 20 Players by Elo Rating ({label}) ---")
+    print(f"\n--- Top 20 Active Players by Elo Rating ({label}) ---")
     print(final_ratings.head(20).to_string(index=False))
 
     # Display bottom players
-    print(f"\n--- Bottom 10 Players by Elo Rating ({label}) ---")
+    print(f"\n--- Bottom 10 Active Players by Elo Rating ({label}) ---")
     print(final_ratings.tail(10).to_string(index=False))
 
     # Summary stats
-    print(f"\n--- Rating Statistics ({label}) ---")
+    print(f"\n--- Rating Statistics - Active Players ({label}) ---")
     print(f"Mean rating: {final_ratings['rating'].mean():.2f}")
     print(f"Median rating: {final_ratings['rating'].median():.2f}")
     print(f"Std deviation: {final_ratings['rating'].std():.2f}")
@@ -366,41 +508,44 @@ def process_dataset(input_pattern, output_prefix, label):
 
     # Export to CSV with date in filename
     ratings_csv = OUTPUT_FOLDER / f"{output_prefix}_elo_ratings_{last_date}.csv"
+    all_ratings_csv = OUTPUT_FOLDER / f"{output_prefix}_elo_ratings_all_{last_date}.csv"
     history_csv = OUTPUT_FOLDER / f"{output_prefix}_elo_history_{last_date}.csv"
 
     final_ratings.to_csv(ratings_csv, index=False)
+    all_players.to_csv(all_ratings_csv, index=False)
     daily_history.to_csv(history_csv, index=False)
 
     print(f"\n--- Exported CSV files ({label}) ---")
-    print(f"Final ratings: {ratings_csv}")
+    print(f"Active ratings: {ratings_csv}")
+    print(f"All ratings (including inactive): {all_ratings_csv}")
     print(f"Daily history: {history_csv}")
 
-    return final_ratings, daily_history
+    return final_ratings, daily_history, all_players
 
 
 def main():
     results = {}
 
     # Process steam demo data
-    demo_ratings, demo_history = process_dataset(
+    demo_ratings, demo_history, demo_all = process_dataset(
         STEAM_DEMO_PATTERN, "steam_demo", "Steam Demo"
     )
     if demo_ratings is not None:
-        results['steam_demo'] = (demo_ratings, demo_history)
+        results['steam_demo'] = (demo_ratings, demo_history, demo_all)
 
     # Process early access data
-    ea_ratings, ea_history = process_dataset(
+    ea_ratings, ea_history, ea_all = process_dataset(
         EARLY_ACCESS_PATTERN, "early_access", "Early Access"
     )
     if ea_ratings is not None:
-        results['early_access'] = (ea_ratings, ea_history)
+        results['early_access'] = (ea_ratings, ea_history, ea_all)
 
     # Process full data
-    full_ratings, full_history = process_dataset(
+    full_ratings, full_history, full_all = process_dataset(
         FULL_PATTERN, "full", "Full"
     )
     if full_ratings is not None:
-        results['full'] = (full_ratings, full_history)
+        results['full'] = (full_ratings, full_history, full_all)
 
     return results
 
