@@ -19,8 +19,8 @@ env/
 *.swo
 
 # Data files
-output/
-assets/
+# output/
+# assets/
 
 # OS
 .DS_Store
