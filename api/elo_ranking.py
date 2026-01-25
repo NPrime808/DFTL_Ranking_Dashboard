@@ -255,8 +255,11 @@ def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, 
             k_j = get_dynamic_k(games_played[name_j])
 
             # Rating updates (player i won, player j lost)
+            # Winner gains based on their expected score
             delta_i = k_i * weight * (1 - e_i)
-            delta_j = k_j * weight * (0 - e_i)
+            # Loser loses based on THEIR expected score (1 - e_i), not the winner's
+            # delta_j = k_j * (actual_j - expected_j) = k_j * (0 - (1 - e_i)) = k_j * (e_i - 1)
+            delta_j = k_j * weight * (e_i - 1)
 
             rating_changes[name_i] += delta_i
             rating_changes[name_j] += delta_j
