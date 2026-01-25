@@ -13,6 +13,22 @@ K_FACTOR = 180  # Elo K-factor (higher = faster rating changes)
 # Normalize K by number of opponents (29) to prevent rating explosion
 # Each player faces 29 opponents per day, so effective K per comparison is lower
 K_NORMALIZED = K_FACTOR / 29
+
+# --- Elo Model Selection ---
+# "pairwise": Original model - 29 separate comparisons per player per day
+# "daily_result": New model - single update based on rank vs expected rank
+ELO_MODEL = "pairwise"  # Change to "daily_result" to use daily result model
+
+# Daily Result Model config
+DAILY_K_FACTOR = 32  # K-factor for daily result model (similar to chess)
+DAILY_K_NEW_MULTIPLIER = 2.0  # Multiplier for new players
+DAILY_K_PROVISIONAL_MULTIPLIER = 1.5  # Multiplier for provisional players
+
+# Logarithmic Scaling - compresses large daily swings
+# Addresses: "one bad day = one penalty, not 17 penalties"
+USE_LOG_SCALING = True
+LOG_SCALE_FACTOR = 30  # Controls compression strength (higher = less compression)
+
 USE_SCORE_GAP_WEIGHTING = True  # Weight updates by score difference
 USE_RATIO_BASED_WEIGHTING = True  # Use score ratio (logarithmic) instead of linear gap
 RATIO_CAP = 10  # Score ratio at which weight reaches maximum (10x = dominant performance)
@@ -153,6 +169,123 @@ def calculate_confidence(games_played, threshold=30):
     return min(1.0, games_played / threshold)
 
 
+def get_daily_k(games_played):
+    """
+    Calculate K-factor for daily result model based on games played.
+    """
+    if not USE_DYNAMIC_K:
+        return DAILY_K_FACTOR
+
+    if games_played < DYNAMIC_K_NEW_PLAYER_GAMES:
+        return DAILY_K_FACTOR * DAILY_K_NEW_MULTIPLIER
+    elif games_played < DYNAMIC_K_ESTABLISHED_GAMES:
+        return DAILY_K_FACTOR * DAILY_K_PROVISIONAL_MULTIPLIER
+    else:
+        return DAILY_K_FACTOR
+
+
+def process_daily_result_model(leaderboard_df, ratings, games_played, last_seen, uncertainty, date):
+    """
+    Process one day's leaderboard using the Daily Result Model.
+
+    Instead of 29 pairwise comparisons, each player gets ONE Elo update
+    based on how their actual rank compared to their expected rank.
+
+    Key insight: Ranking 18th when expected 3rd is ONE bad day, not 17 losses.
+
+    Args:
+        leaderboard_df: DataFrame with columns [player_name, rank, score] for one day
+        ratings: dict of player_name -> current rating
+        games_played: dict of player_name -> number of games
+        last_seen: dict of player_name -> last date seen
+        uncertainty: dict of player_name -> current uncertainty multiplier
+        date: current date being processed
+
+    Returns:
+        tuple of (rating_changes dict, uncertainty_snapshot dict for this day)
+    """
+    players = leaderboard_df.sort_values('rank').to_dict('records')
+    n = len(players)
+
+    # Initialize new players
+    for p in players:
+        name = p['player_name']
+        if name not in ratings:
+            ratings[name] = BASELINE_RATING
+            games_played[name] = 0
+            uncertainty[name] = UNCERTAINTY_BASE
+
+    # Calculate inactivity-based uncertainty for players appearing today
+    player_uncertainty = {}
+    for p in players:
+        name = p['player_name']
+        if name in last_seen:
+            days_inactive = (date - last_seen[name]).days
+            uncertainty[name] = calculate_uncertainty(days_inactive)
+        player_uncertainty[name] = uncertainty[name]
+
+    # Step 1: Calculate expected rank for each player based on current Elo
+    # When players have the same Elo, they share the average of their positions
+    # This handles the cold-start problem where everyone starts at 1500
+    players_with_elo = [(p['player_name'], ratings[p['player_name']]) for p in players]
+    players_sorted_by_elo = sorted(players_with_elo, key=lambda x: x[1], reverse=True)
+
+    # Handle ties: players with same Elo share average rank
+    expected_rank = {}
+    i = 0
+    while i < len(players_sorted_by_elo):
+        # Find all players with the same Elo
+        current_elo = players_sorted_by_elo[i][1]
+        j = i
+        while j < len(players_sorted_by_elo) and players_sorted_by_elo[j][1] == current_elo:
+            j += 1
+        # Players from index i to j-1 have the same Elo
+        # Their expected rank is the average of positions (i+1) to j
+        avg_rank = (i + 1 + j) / 2  # average of (i+1, i+2, ..., j)
+        for k in range(i, j):
+            expected_rank[players_sorted_by_elo[k][0]] = avg_rank
+        i = j
+
+    # Step 2: Get actual ranks
+    actual_rank = {p['player_name']: p['rank'] for p in players}
+
+    # Step 3: Calculate single Elo update per player
+    rating_changes = {}
+
+    for p in players:
+        name = p['player_name']
+        expected = expected_rank[name]
+        actual = actual_rank[name]
+
+        # Performance: positive = beat expectations, negative = underperformed
+        # Normalized to roughly [-1, +1] range
+        # Example: expected 3rd, got 18th -> (3 - 18) / 29 = -0.52
+        # Example: expected 20th, got 5th -> (20 - 5) / 29 = +0.52
+        performance = (expected - actual) / (n - 1)
+
+        # Get K-factor based on experience
+        k = get_daily_k(games_played[name])
+
+        # Calculate base rating change
+        delta = k * performance
+
+        # Apply uncertainty amplification to losses only
+        if delta < 0:
+            delta *= player_uncertainty[name]
+
+        rating_changes[name] = delta
+
+    # Apply rating changes
+    for name, delta in rating_changes.items():
+        ratings[name] += delta
+        games_played[name] += 1
+        last_seen[name] = date
+        # Decay uncertainty after playing
+        uncertainty[name] = decay_uncertainty(player_uncertainty[name])
+
+    return rating_changes, player_uncertainty
+
+
 def calculate_uncertainty(inactivity_days):
     """
     Calculate uncertainty multiplier based on days of inactivity.
@@ -264,6 +397,18 @@ def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, 
             rating_changes[name_i] += delta_i
             rating_changes[name_j] += delta_j
 
+    # Apply logarithmic scaling to compress large daily swings
+    # This addresses: "one bad day = one penalty, not 17 penalties"
+    # Formula: compressed = sign(x) * scale * log(1 + |x|/scale)
+    if USE_LOG_SCALING:
+        import math
+        for name in rating_changes:
+            raw_delta = rating_changes[name]
+            if raw_delta != 0:
+                sign = 1 if raw_delta > 0 else -1
+                compressed = sign * LOG_SCALE_FACTOR * math.log(1 + abs(raw_delta) / LOG_SCALE_FACTOR)
+                rating_changes[name] = compressed
+
     # Apply uncertainty to losses only, then apply rating changes
     for name, delta in rating_changes.items():
         if delta < 0:
@@ -307,15 +452,20 @@ def run_elo_ranking(df):
 
     # Process each date chronologically
     dates = sorted(df['date'].unique())
-    print(f"Processing {len(dates)} days of leaderboard data...")
+    print(f"Processing {len(dates)} days of leaderboard data using '{ELO_MODEL}' model...")
 
     for date in dates:
         day_df = df[df['date'] == date]
 
-        # Process the day (now returns uncertainty snapshot too)
-        changes, day_uncertainty = process_daily_leaderboard(
-            day_df, ratings, games_played, last_seen, uncertainty, date
-        )
+        # Process the day using selected model
+        if ELO_MODEL == "daily_result":
+            changes, day_uncertainty = process_daily_result_model(
+                day_df, ratings, games_played, last_seen, uncertainty, date
+            )
+        else:  # pairwise (original)
+            changes, day_uncertainty = process_daily_leaderboard(
+                day_df, ratings, games_played, last_seen, uncertainty, date
+            )
 
         # Determine which players are active on this date (played within last 7 days)
         active_players_today = set()
