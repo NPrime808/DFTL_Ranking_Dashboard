@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -358,11 +358,24 @@ def main():
                 player_stats['top_10s_rate'] = (player_stats['top_10s'] / player_stats['total_games'] * 100).round(1)
                 player_stats = player_stats.drop(columns=['total_games'])
 
-                # Calculate best active rank from history
-                df_history_filtered = df_history[df_history['date'].dt.date <= selected_ranking_date]
-                best_active_ranks = df_history_filtered.groupby('player_name')['active_rank'].min().reset_index()
-                best_active_ranks.columns = ['player_name', 'best_active_rank']
-                player_stats = player_stats.merge(best_active_ranks, on='player_name', how='left')
+                # Calculate Last 7: average daily rank over last 7 games
+                last7_data = []
+                for player in df_rankings_to_display['player_name'].unique():
+                    player_games = df_leaderboard_filtered[
+                        df_leaderboard_filtered['player_name'] == player
+                    ].sort_values('date', ascending=False).head(7)
+
+                    if len(player_games) > 0:
+                        avg_last7 = player_games['rank'].mean()
+                        last7_data.append({
+                            'player_name': player,
+                            'last_7': round(avg_last7, 1)
+                        })
+                    else:
+                        last7_data.append({'player_name': player, 'last_7': None})
+
+                df_last7 = pd.DataFrame(last7_data)
+                player_stats = player_stats.merge(df_last7, on='player_name', how='left')
 
                 # Merge stats with rankings
                 df_rankings_display = df_rankings_to_display.merge(player_stats, on='player_name', how='left')
@@ -371,7 +384,7 @@ def main():
                 has_days_inactive = 'days_inactive' in df_rankings_display.columns
 
                 # Select columns to display
-                display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'best_active_rank']
+                display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7']
                 if has_days_inactive:
                     display_cols.append('days_inactive')
 
@@ -391,7 +404,7 @@ def main():
                     "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
                     "top_10s_rate": st.column_config.NumberColumn("Top 10s Rate %", format="%.1f"),
                     "avg_daily_rank": st.column_config.NumberColumn("Avg Daily Rank", format="%.1f"),
-                    "best_active_rank": st.column_config.NumberColumn("Best Active Rank", format="%d")
+                    "last_7": st.column_config.NumberColumn("Last 7", format="%.1f", help="Average daily rank over last 7 games")
                 }
                 if has_days_inactive:
                     column_config["days_inactive"] = st.column_config.NumberColumn("Days Inactive", format="%d")
@@ -449,6 +462,25 @@ def main():
             player_stats['top_10s_rate'] = (player_stats['top_10s'] / player_stats['total_games'] * 100).round(1)
             player_stats = player_stats.drop(columns=['total_games'])
 
+            # Calculate Last 7: average daily rank over last 7 games
+            last7_data = []
+            for player in df_ratings_to_display['player_name'].unique():
+                player_games = df_leaderboard[
+                    df_leaderboard['player_name'] == player
+                ].sort_values('date', ascending=False).head(7)
+
+                if len(player_games) > 0:
+                    avg_last7 = player_games['rank'].mean()
+                    last7_data.append({
+                        'player_name': player,
+                        'last_7': round(avg_last7, 1)
+                    })
+                else:
+                    last7_data.append({'player_name': player, 'last_7': None})
+
+            df_last7 = pd.DataFrame(last7_data)
+            player_stats = player_stats.merge(df_last7, on='player_name', how='left')
+
             # Merge stats with ratings
             df_ratings_display = df_ratings_to_display.merge(player_stats, on='player_name', how='left')
 
@@ -457,7 +489,7 @@ def main():
             has_days_inactive = 'days_inactive' in df_ratings_display.columns
 
             # Select columns to display (use active_rank instead of rank)
-            display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_seen']
+            display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'last_seen']
             if has_days_inactive:
                 display_cols.insert(-1, 'days_inactive')
             if has_uncertainty and show_inactive:
@@ -473,6 +505,7 @@ def main():
                 "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
                 "top_10s_rate": st.column_config.NumberColumn("Top 10s Rate %", format="%.1f"),
                 "avg_daily_rank": st.column_config.NumberColumn("Avg Daily Rank", format="%.1f"),
+                "last_7": st.column_config.NumberColumn("Last 7", format="%.1f", help="Average daily rank over last 7 games"),
                 "last_seen": st.column_config.DateColumn("Last Seen", format="YYYY-MM-DD")
             }
             if has_days_inactive:
@@ -491,7 +524,7 @@ def main():
 
     # --- Tab 4: Player History ---
     with tab4:
-        st.header(f"Player History (last update: {max_date})")
+        st.header(f"Player Tracker (last update: {max_date})")
 
         if df_history is not None:
             # Player selector (single selection) - no default
@@ -592,7 +625,7 @@ def main():
 
     # --- Tab 5: Active Rank History ---
     with tab5:
-        st.header(f"Active Rank History (last update: {max_date})")
+        st.header(f"Active Top 10 Elo History (last update: {max_date})")
 
         if df_history is not None and 'active_rank' in df_history.columns:
             # Use pre-computed active_rank from history data
@@ -795,8 +828,6 @@ def main():
                                 f'{player2} Daily Rank': int(p2_rank),
                                 f'{player1} Score': int(p1_data['score']),
                                 f'{player2} Score': int(p2_data['score']),
-                                f'{player1} Elo Δ': round(p1_elo_change, 2) if winner else None,
-                                f'{player2} Elo Δ': round(p2_elo_change, 2) if winner else None,
                             }
 
                             # Add active rank if available
@@ -815,7 +846,7 @@ def main():
 
                         # Summary statistics
                         st.subheader("Head-to-Head Summary")
-                        col1, col2, col3, col4, col5, col6 = st.columns(6)
+                        col1, col2, col3, col4 = st.columns(4)
 
                         with col1:
                             st.metric("Common Games", len(common_dates))
@@ -826,40 +857,6 @@ def main():
                         with col4:
                             ties = len(common_dates) - p1_wins - p2_wins
                             st.metric("Ties", ties)
-                        with col5:
-                            st.metric(f"{player1} Net Elo", f"{total_p1_elo:+.1f}")
-                        with col6:
-                            st.metric(f"{player2} Net Elo", f"{total_p2_elo:+.1f}")
-
-                        # Elo prediction accuracy
-                        if total_games > 0:
-                            higher_elo_wins = p1_higher_elo_wins + p2_higher_elo_wins
-                            elo_accuracy = (higher_elo_wins / total_games) * 100
-
-                            st.subheader("Elo Prediction Analysis")
-                            col1, col2 = st.columns(2)
-
-                            with col1:
-                                st.metric(
-                                    "Higher Elo Player Won",
-                                    f"{higher_elo_wins} / {total_games}",
-                                    f"{elo_accuracy:.1f}% accuracy"
-                                )
-
-                            with col2:
-                                # Calculate expected win rate based on average Elo difference
-                                avg_p1_elo = df_p1_played[df_p1_played['date'].dt.date.isin(common_dates)]['rating'].mean()
-                                avg_p2_elo = df_p2_played[df_p2_played['date'].dt.date.isin(common_dates)]['rating'].mean()
-                                elo_diff = avg_p1_elo - avg_p2_elo
-                                # Elo expected win probability: 1 / (1 + 10^(-diff/400))
-                                expected_p1_win_rate = 1 / (1 + 10 ** (-elo_diff / 400))
-                                actual_p1_win_rate = p1_wins / total_games if total_games > 0 else 0.5
-
-                                st.metric(
-                                    f"{player1} Expected Win Rate",
-                                    f"{expected_p1_win_rate:.1%}",
-                                    f"Actual: {actual_p1_win_rate:.1%}"
-                                )
 
                         # Display the duel table
                         st.subheader("Game-by-Game Comparison")
@@ -872,8 +869,6 @@ def main():
                             f"{player2} Daily Rank": st.column_config.NumberColumn(f"{player2} Daily Rank", format="%d"),
                             f"{player1} Score": st.column_config.NumberColumn(f"{player1} Score", format="%d"),
                             f"{player2} Score": st.column_config.NumberColumn(f"{player2} Score", format="%d"),
-                            f"{player1} Elo Δ": st.column_config.NumberColumn(f"{player1} Elo Δ", format="%+.2f"),
-                            f"{player2} Elo Δ": st.column_config.NumberColumn(f"{player2} Elo Δ", format="%+.2f"),
                             f"{player1} Active Rank": st.column_config.NumberColumn(f"{player1} Active Rank", format="%d"),
                             f"{player2} Active Rank": st.column_config.NumberColumn(f"{player2} Active Rank", format="%d"),
                             f"{player1} Elo": st.column_config.NumberColumn(f"{player1} Elo", format="%.1f"),
