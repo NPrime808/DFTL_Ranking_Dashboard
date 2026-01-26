@@ -374,11 +374,9 @@ def main():
                     wins=('rank', lambda x: (x == 1).sum()),
                     top_10s=('rank', lambda x: (x <= 10).sum()),
                     avg_daily_rank=('rank', 'mean'),
-                    consistency=('rank', 'std'),  # Lower = more consistent
                     total_games=('rank', 'count')
                 ).reset_index()
                 player_stats['avg_daily_rank'] = player_stats['avg_daily_rank'].round(1)
-                player_stats['consistency'] = player_stats['consistency'].round(1)
                 player_stats['win_rate'] = (player_stats['wins'] / player_stats['total_games'] * 100).round(1)
                 player_stats['top_10s_rate'] = (player_stats['top_10s'] / player_stats['total_games'] * 100).round(1)
                 player_stats = player_stats.drop(columns=['total_games'])
@@ -428,12 +426,17 @@ def main():
                     else:
                         days_since_win = None  # Never won
 
+                    # Consistency (last 14 games only)
+                    last14_games = player_games.head(14)
+                    consistency = last14_games['rank'].std() if len(last14_games) >= 2 else None
+
                     advanced_stats.append({
                         'player_name': player,
                         'last_7': round(avg_last7, 1) if avg_last7 else None,
                         'trend': trend,
                         'peak_rating': round(peak_rating, 1) if peak_rating else None,
-                        'days_since_win': days_since_win
+                        'days_since_win': days_since_win,
+                        'consistency': round(consistency, 1) if consistency else None
                     })
 
                 df_advanced = pd.DataFrame(advanced_stats)
@@ -446,7 +449,7 @@ def main():
                 has_days_inactive = 'days_inactive' in df_rankings_display.columns
 
                 # Select columns to display
-                display_cols = ['active_rank', 'player_name', 'rating', 'trend', 'peak_rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency', 'days_since_win']
+                display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency']
                 if has_days_inactive:
                     display_cols.append('days_inactive')
 
@@ -460,8 +463,6 @@ def main():
                     "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
                     "player_name": st.column_config.TextColumn("Player"),
                     "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                    "trend": st.column_config.TextColumn("Trend", help="↑ Improving, → Stable, ↓ Declining (last 7 vs previous 7 games)"),
-                    "peak_rating": st.column_config.NumberColumn("Peak", format="%.1f", help="All-time highest rating"),
                     "games_played": st.column_config.NumberColumn("Games", format="%d"),
                     "wins": st.column_config.NumberColumn("Wins", format="%d"),
                     "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
@@ -469,8 +470,7 @@ def main():
                     "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
                     "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
                     "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average daily rank over last 7 games"),
-                    "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of daily ranks (lower = more consistent)"),
-                    "days_since_win": st.column_config.NumberColumn("Last Win", format="%d", help="Days since last 1st place finish")
+                    "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of daily ranks over last 14 games (lower = more consistent)")
                 }
                 if has_days_inactive:
                     column_config["days_inactive"] = st.column_config.NumberColumn("Inactive", format="%d")
@@ -658,12 +658,24 @@ def main():
                         recent_ranks = all_ranks[-7:] if len(all_ranks) >= 7 else all_ranks
                         recent_avg = sum(recent_ranks) / len(recent_ranks)
 
+                        # Calculate win rate and top 10 rate
+                        total_games = len(all_ranks)
+                        win_rate = (total_wins / total_games * 100) if total_games > 0 else 0
+                        top_10s_rate = (total_top_10s / total_games * 100) if total_games > 0 else 0
+
+                        # Calculate consistency (last 14 games)
+                        last_14_ranks = all_ranks[-14:] if len(all_ranks) >= 2 else all_ranks
+                        consistency = np.std(last_14_ranks) if len(last_14_ranks) >= 2 else None
+
                         cumulative_stats.append({
                             'date': row['date'],
                             'wins': total_wins,
                             'top_10s': total_top_10s,
                             'avg_daily_rank': round(avg_daily_rank, 1),
-                            'last_7': round(recent_avg, 1)
+                            'last_7': round(recent_avg, 1),
+                            'win_rate': round(win_rate, 1),
+                            'top_10s_rate': round(top_10s_rate, 1),
+                            'consistency': round(consistency, 1) if consistency else None
                         })
 
                     df_cumulative = pd.DataFrame(cumulative_stats)
@@ -681,16 +693,42 @@ def main():
                     # Determine if active_rank column exists
                     has_active_rank = 'active_rank' in df_player_display.columns
 
-                    # Select columns for display
+                    # Select columns for display (aligned with Tab 1)
                     display_cols = ['date', 'rank', 'score', 'rating', 'rating_change']
                     if has_active_rank:
                         display_cols.append('active_rank')
-                    display_cols.extend(['games_played', 'wins', 'top_10s', 'avg_daily_rank', 'last_7'])
+                    display_cols.extend(['games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency'])
 
                     # Sort by date descending (most recent first)
                     df_player_display = df_player_display.sort_values('date', ascending=False)
 
-                    # Rating trajectory chart
+                    column_config = {
+                        "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
+                        "rank": st.column_config.NumberColumn("Daily Rank", format="%d"),
+                        "score": st.column_config.NumberColumn("Score", format="%d"),
+                        "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
+                        "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f"),
+                        "games_played": st.column_config.NumberColumn("Games", format="%d"),
+                        "wins": st.column_config.NumberColumn("Wins", format="%d"),
+                        "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
+                        "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
+                        "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
+                        "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
+                        "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average daily rank over last 7 games"),
+                        "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of daily ranks over last 14 games (lower = more consistent)")
+                    }
+                    if has_active_rank:
+                        column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
+
+                    # Table first
+                    st.dataframe(
+                        df_player_display[display_cols],
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config=column_config
+                    )
+
+                    # Rating trajectory chart below table
                     df_chart = df_player_display.sort_values('date')  # Ascending for chart
                     fig_rating = px.line(
                         df_chart,
@@ -722,28 +760,6 @@ def main():
                         hovertemplate=f"Peak: {peak_row['rating']:.0f}<extra></extra>"
                     )
                     st.plotly_chart(fig_rating, use_container_width=True)
-
-                    column_config = {
-                        "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
-                        "rank": st.column_config.NumberColumn("Daily Rank", format="%d"),
-                        "score": st.column_config.NumberColumn("Score", format="%d"),
-                        "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                        "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f"),
-                        "games_played": st.column_config.NumberColumn("Ranked Games", format="%d"),
-                        "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                        "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
-                        "avg_daily_rank": st.column_config.NumberColumn("Avg Daily Rank", format="%.1f"),
-                        "last_7": st.column_config.NumberColumn("Recent Avg", format="%.1f", help="Average daily rank over last 7 games")
-                    }
-                    if has_active_rank:
-                        column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
-
-                    st.dataframe(
-                        df_player_display[display_cols],
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config=column_config
-                    )
                 else:
                     st.info(f"No history data available for {selected_player}.")
             else:
@@ -762,48 +778,42 @@ def main():
             # Filter to top 10 active ranks only
             df_top10 = df_history_active[df_history_active['active_rank'] <= 10].copy()
 
-            # Bump Chart - shows rank movement over time
-            # Get players who have been in top 10 in the last 14 days for cleaner visualization
-            recent_dates = sorted(df_top10['date'].unique())[-14:]
-            df_bump = df_top10[df_top10['date'].isin(recent_dates)].copy()
+            # Elo #1 evolution chart - shows who held #1 over time (all history)
+            df_rank1 = df_top10[df_top10['active_rank'] == 1].copy()
+            df_rank1 = df_rank1.sort_values('date')
 
-            if not df_bump.empty:
-                # Get players who appear frequently in top 10 (at least 3 days)
-                player_counts = df_bump['player_name'].value_counts()
-                frequent_players = player_counts[player_counts >= 3].index.tolist()
-                df_bump_filtered = df_bump[df_bump['player_name'].isin(frequent_players)]
+            st.subheader("Elo Rank #1 History")
 
-                if not df_bump_filtered.empty:
-                    fig_bump = px.line(
-                        df_bump_filtered,
-                        x='date',
-                        y='active_rank',
-                        color='player_name',
-                        markers=True,
-                        labels={'date': 'Date', 'active_rank': 'Elo Rank', 'player_name': 'Player'}
+            if not df_rank1.empty:
+                # Get all unique players who held #1
+                all_rank1_players = df_rank1['player_name'].unique().tolist()
+
+                fig_rank1 = px.line(
+                    df_rank1,
+                    x='date',
+                    y='player_name',
+                    markers=True,
+                    labels={'date': 'Date', 'player_name': 'Elo #1'},
+                    category_orders={'player_name': all_rank1_players}
+                )
+                fig_rank1.update_traces(
+                    line=dict(shape='hv'),  # Step line
+                    marker=dict(size=8),
+                    hovertemplate='%{y}<br>%{x|%Y-%m-%d}<extra></extra>'
+                )
+                fig_rank1.update_layout(
+                    height=max(200, len(all_rank1_players) * 25),  # Dynamic height based on player count
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    showlegend=False,
+                    yaxis_title=None,
+                    xaxis_title=None,
+                    yaxis=dict(
+                        tickmode='array',
+                        tickvals=all_rank1_players,
+                        ticktext=all_rank1_players
                     )
-                    fig_bump.update_layout(
-                        height=400,
-                        yaxis=dict(
-                            autorange='reversed',  # Rank 1 at top
-                            dtick=1,
-                            range=[10.5, 0.5]
-                        ),
-                        legend=dict(
-                            orientation="h",
-                            yanchor="bottom",
-                            y=1.02,
-                            xanchor="right",
-                            x=1
-                        ),
-                        margin=dict(l=20, r=20, t=60, b=20),
-                        hovermode='x unified'
-                    )
-                    fig_bump.update_traces(
-                        hovertemplate='%{fullData.name}: #%{y}<extra></extra>'
-                    )
-                    st.plotly_chart(fig_bump, use_container_width=True)
-                    st.caption("Showing players with 3+ top-10 appearances in last 14 days")
+                )
+                st.plotly_chart(fig_rank1, use_container_width=True)
 
             # Pivot to get ranks as columns for table
             df_pivot = df_top10.pivot(
