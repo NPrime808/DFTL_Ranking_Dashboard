@@ -8,11 +8,19 @@ if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
 # --- CONFIG ---
-BASELINE_RATING = 1500
+BASELINE_RATING = 1500  # Starting rating for all new players (above floor to allow differentiation)
 K_FACTOR = 180  # Elo K-factor (higher = faster rating changes)
 # Normalize K by number of opponents (29) to prevent rating explosion
 # Each player faces 29 opponents per day, so effective K per comparison is lower
 K_NORMALIZED = K_FACTOR / 29
+
+# --- Rating Floor Config ---
+# Hard floor: players can never go below this rating
+# Soft zone: winners get reduced gains when beating players near the floor
+# This prevents inflation while protecting bottom-30 players from unfair punishment
+RATING_FLOOR = 1000
+FLOOR_SOFT_ZONE = 100  # Ratings from FLOOR to FLOOR+SOFT_ZONE get reduced winner gains
+# At floor: winner gains 0%, at floor+soft_zone: winner gains 100%
 
 # --- Elo Model Selection ---
 # "pairwise": Original model - 29 separate comparisons per player per day
@@ -41,7 +49,7 @@ DYNAMIC_K_NEW_MULTIPLIER = 1.5  # K multiplier for new players
 DYNAMIC_K_PROVISIONAL_MULTIPLIER = 1.2  # K multiplier for provisional players
 
 # Target rating bounds (soft targets for asymmetric scaling)
-TARGET_MIN_RATING = 900
+TARGET_MIN_RATING = 1000  # Matches RATING_FLOOR
 TARGET_MAX_RATING = 2800
 
 # --- Uncertainty Config (Loss-Amplifying) ---
@@ -54,6 +62,7 @@ UNCERTAINTY_DECAY_RATE = 0.5  # How fast uncertainty decays after active day (0-
 # --- Activity Gating Config ---
 USE_ACTIVITY_GATING = True  # Filter inactive players from rankings
 ACTIVITY_WINDOW_DAYS = 7  # Days of inactivity before player is hidden from rankings
+MIN_GAMES_FOR_RANKING = 7  # Minimum games required to appear in rankings
 
 # --- Paths ---
 OUTPUT_FOLDER = Path(r"C:\Users\Nicol\DFTL_score_system\output")
@@ -278,6 +287,11 @@ def process_daily_result_model(leaderboard_df, ratings, games_played, last_seen,
     # Apply rating changes
     for name, delta in rating_changes.items():
         ratings[name] += delta
+
+        # Apply floor clamping: never go below the rating floor
+        if ratings[name] < RATING_FLOOR:
+            ratings[name] = RATING_FLOOR
+
         games_played[name] += 1
         last_seen[name] = date
         # Decay uncertainty after playing
@@ -318,6 +332,28 @@ def decay_uncertainty(current_uncertainty):
     # Exponential decay toward base
     excess = current_uncertainty - UNCERTAINTY_BASE
     return UNCERTAINTY_BASE + excess * (1 - UNCERTAINTY_DECAY_RATE)
+
+
+def calculate_floor_factor(loser_rating):
+    """
+    Calculate the floor factor for winner gains when beating a near-floor player.
+
+    This prevents rating inflation by reducing/eliminating gains when beating
+    players who are at or near the rating floor.
+
+    Args:
+        loser_rating: The rating of the losing player
+
+    Returns:
+        float: Factor from 0.0 (at floor) to 1.0 (at floor + soft_zone or above)
+    """
+    if loser_rating >= RATING_FLOOR + FLOOR_SOFT_ZONE:
+        return 1.0  # Full gains
+    elif loser_rating <= RATING_FLOOR:
+        return 0.0  # No gains for beating floor players
+    else:
+        # Linear interpolation in the soft zone
+        return (loser_rating - RATING_FLOOR) / FLOOR_SOFT_ZONE
 
 
 def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, uncertainty, date):
@@ -390,6 +426,12 @@ def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, 
             # Rating updates (player i won, player j lost)
             # Winner gains based on their expected score
             delta_i = k_i * weight * (1 - e_i)
+
+            # Apply floor factor: reduce winner gains when beating near-floor players
+            # This prevents inflation from floor-clamped losses
+            floor_factor = calculate_floor_factor(r_j)
+            delta_i *= floor_factor
+
             # Loser loses based on THEIR expected score (1 - e_i), not the winner's
             # delta_j = k_j * (actual_j - expected_j) = k_j * (0 - (1 - e_i)) = k_j * (e_i - 1)
             delta_j = k_j * weight * (e_i - 1)
@@ -415,6 +457,11 @@ def process_daily_leaderboard(leaderboard_df, ratings, games_played, last_seen, 
             # Amplify losses by uncertainty
             delta *= player_uncertainty[name]
         ratings[name] += delta
+
+        # Apply floor clamping: never go below the rating floor
+        if ratings[name] < RATING_FLOOR:
+            ratings[name] = RATING_FLOOR
+
         games_played[name] += 1
         last_seen[name] = date
         # Decay uncertainty after playing
@@ -467,11 +514,11 @@ def run_elo_ranking(df):
                 day_df, ratings, games_played, last_seen, uncertainty, date
             )
 
-        # Determine which players are active on this date (played within last 7 days)
+        # Determine which players are active on this date (played within last 7 days AND have minimum games)
         active_players_today = set()
         for player, player_last_seen in last_seen.items():
             days_since_seen = (date - player_last_seen).days
-            if days_since_seen <= ACTIVITY_WINDOW_DAYS:
+            if days_since_seen <= ACTIVITY_WINDOW_DAYS and games_played[player] >= MIN_GAMES_FOR_RANKING:
                 active_players_today.add(player)
 
         # Calculate active_rank for active players only (by rating)
@@ -509,8 +556,8 @@ def run_elo_ranking(df):
         # Calculate days since last active
         days_inactive = (last_date - player_last_seen).days if last_date else 0
 
-        # Determine if player is active (within activity window)
-        is_active = days_inactive <= ACTIVITY_WINDOW_DAYS if USE_ACTIVITY_GATING else True
+        # Determine if player is active (within activity window AND has minimum games)
+        is_active = (days_inactive <= ACTIVITY_WINDOW_DAYS and gp >= MIN_GAMES_FOR_RANKING) if USE_ACTIVITY_GATING else True
 
         final_ratings.append({
             'player_name': player,
