@@ -712,8 +712,12 @@ def process_dataset(input_pattern, output_prefix, label):
     atomic_write_csv(daily_history, history_csv, index=False)
 
     # Clean up old output files (keep only the newest)
-    cleanup_old_files(f"{output_prefix}_elo_ratings_*.csv", keep_file=ratings_csv, folder=OUTPUT_FOLDER)
+    # Note: cleanup _all_ files first, then use exclude pattern for regular ratings
     cleanup_old_files(f"{output_prefix}_elo_ratings_all_*.csv", keep_file=all_ratings_csv, folder=OUTPUT_FOLDER)
+    # Manually cleanup non-_all_ rating files to avoid matching _all_ files
+    for f in OUTPUT_FOLDER.glob(f"{output_prefix}_elo_ratings_*.csv"):
+        if '_all_' not in f.name and f.resolve() != ratings_csv.resolve():
+            f.unlink()
     cleanup_old_files(f"{output_prefix}_elo_history_*.csv", keep_file=history_csv, folder=OUTPUT_FOLDER)
 
     logger.info(f"Exported CSV files ({label}):")
