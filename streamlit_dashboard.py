@@ -141,17 +141,6 @@ def main():
                 help="Download the full daily leaderboard data"
             )
 
-        # Export ratings data
-        if df_ratings is not None:
-            csv_ratings = df_ratings.to_csv(index=False)
-            st.download_button(
-                label="Download Elo Ratings CSV",
-                data=csv_ratings,
-                file_name=f"{dataset_prefix}_elo_ratings.csv",
-                mime="text/csv",
-                help="Download current Elo ratings for active players"
-            )
-
     # Use full date range
     df_filtered = df_leaderboard.copy()
 
@@ -502,7 +491,7 @@ def main():
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("View History", key="tab1_view_history", disabled=quick_select_player is None):
                         st.session_state.selected_player_for_history = quick_select_player
-                        st.info(f"Go to the **Player Tracker** tab to see {quick_select_player}'s history.")
+                        st.info(f"Click the **Player Tracker** tab above to see {quick_select_player}'s history.")
         elif df_ratings is not None:
             # Fallback if no history data with active_rank
             st.warning("Historical rankings not available. Showing current rankings only.")
@@ -646,7 +635,7 @@ def main():
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("View History", key="tab1_view_history_fallback", disabled=quick_select_player2 is None):
                     st.session_state.selected_player_for_history = quick_select_player2
-                    st.info(f"Go to the **Player Tracker** tab to see {quick_select_player2}'s history.")
+                    st.info(f"Click the **Player Tracker** tab above to see {quick_select_player2}'s history.")
         else:
             st.warning("Ratings data not available.")
 
@@ -654,13 +643,13 @@ def main():
     with tab4:
 
         if df_history is not None:
-            # Determine default player from session state (if set from rankings tab)
+            # Check if player was pre-selected from rankings tab
+            preselected_player = st.session_state.get('selected_player_for_history')
+
+            # Determine default index
             default_index = None
-            if st.session_state.selected_player_for_history:
-                try:
-                    default_index = all_players.index(st.session_state.selected_player_for_history)
-                except ValueError:
-                    default_index = None
+            if preselected_player and preselected_player in all_players:
+                default_index = all_players.index(preselected_player)
 
             # Player selector (single selection)
             selected_player = st.selectbox(
@@ -670,10 +659,6 @@ def main():
                 placeholder="Choose a player...",
                 key="tab4_player_select"
             )
-
-            # Clear session state after using it
-            if st.session_state.selected_player_for_history:
-                st.session_state.selected_player_for_history = None
 
             if selected_player:
                 # Filter history for selected player
@@ -1161,7 +1146,7 @@ def main():
         with st.expander("What is Elo rating?", expanded=True):
             st.markdown("""
             **Elo** is a rating system originally designed for chess that measures relative skill levels.
-            In DFTL, we use a modified Elo system that compares players based on their daily leaderboard performance.
+            Here, we use a modified Elo system that compares players based on their daily leaderboard performance.
 
             - **Starting Rating**: All players begin at **1500** (the baseline)
             - **Rating Range**: Typically between **900** (low) and **2800** (high)
@@ -1211,10 +1196,9 @@ def main():
             |------|------------|
             | **Avg Rank** | Your average daily leaderboard position |
             | **Recent** | Average daily rank over your last 7 games |
-            | **Consistency** | Std deviation of ranks (lower = more consistent) |
+            | **Consistency** | Std deviation of ranks over last 14 games (lower = more consistent) |
             | **Inactive** | Days since last appearance |
             | **Daily Rank** | Your position on a specific day's leaderboard |
-            | **Score** | Points earned on that day in DFTL |
             | **Rating Change** | How much your Elo changed that day |
             """)
 
