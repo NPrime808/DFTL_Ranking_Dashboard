@@ -1,3 +1,5 @@
+import math
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -328,33 +330,6 @@ def main():
                         st.metric("Median Rating", f"{df_active['rating'].median():.1f}")
                     else:
                         st.metric("Median Rating", "N/A")
-
-                # Rating Distribution Chart
-                with st.expander("📊 Rating Distribution", expanded=False):
-                    if not df_active.empty:
-                        fig_dist = px.histogram(
-                            df_active,
-                            x='rating',
-                            nbins=20,
-                            labels={'rating': 'Elo Rating', 'count': 'Players'},
-                            color_discrete_sequence=['#636EFA']
-                        )
-                        fig_dist.update_layout(
-                            showlegend=False,
-                            height=300,
-                            margin=dict(l=20, r=20, t=30, b=20),
-                            xaxis_title="Rating",
-                            yaxis_title="Players"
-                        )
-                        fig_dist.add_vline(
-                            x=df_active['rating'].median(),
-                            line_dash="dash",
-                            line_color="orange",
-                            annotation_text=f"Median: {df_active['rating'].median():.0f}"
-                        )
-                        st.plotly_chart(fig_dist, use_container_width=True)
-                    else:
-                        st.info("No active players to display distribution.")
 
                 # All players table
                 st.subheader("Elo Ranking Leaderboard")
@@ -976,7 +951,6 @@ def main():
                                 # Calculate score weight (ratio-based) - winner's score / loser's score
                                 p1_score = p1_data['score']
                                 p2_score = p2_data['score']
-                                import math
                                 if p1_won and p2_score > 0:
                                     ratio = p1_score / p2_score
                                     log_ratio = math.log2(max(ratio, 1.0))
@@ -1036,6 +1010,44 @@ def main():
                         with col4:
                             ties = len(common_dates) - p1_wins - p2_wins
                             st.metric("Ties", ties)
+
+                        # Win distribution pie chart
+                        if len(common_dates) > 0:
+                            pie_data = pd.DataFrame({
+                                'Result': [player1, player2, 'Tie'],
+                                'Count': [p1_wins, p2_wins, ties]
+                            })
+                            # Filter out zero values
+                            pie_data = pie_data[pie_data['Count'] > 0]
+
+                            # WCAG-compliant, colorblind-safe colors with high contrast
+                            fig_pie = px.pie(
+                                pie_data,
+                                values='Count',
+                                names='Result',
+                                hole=0.4,
+                                color_discrete_sequence=['#3B82F6', '#F59E0B', '#10B981']  # Blue, Amber, Emerald
+                            )
+                            fig_pie.update_traces(
+                                textposition='inside',
+                                textinfo='percent+value',
+                                textfont=dict(color='white', size=14),
+                                hovertemplate='%{label}: %{value} wins<extra></extra>'
+                            )
+                            fig_pie.update_layout(
+                                height=250,
+                                margin=dict(l=20, r=20, t=20, b=20),
+                                showlegend=True,
+                                legend=dict(
+                                    orientation="h",
+                                    yanchor="bottom",
+                                    y=-0.1,
+                                    xanchor="center",
+                                    x=0.5,
+                                    font=dict(size=12)
+                                )
+                            )
+                            st.plotly_chart(fig_pie, use_container_width=True)
 
                         # Display the duel table
                         st.subheader("Game-by-Game Comparison")
