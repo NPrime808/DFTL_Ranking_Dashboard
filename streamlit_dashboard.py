@@ -80,10 +80,6 @@ def get_available_datasets():
 
 # --- Main App ---
 def main():
-    # Initialize session state for player navigation
-    if 'selected_player_for_history' not in st.session_state:
-        st.session_state.selected_player_for_history = None
-
     # Title
     st.title("🎮 DFTL Ranking Dashboard")
     st.markdown("---")
@@ -490,7 +486,8 @@ def main():
                 with col_button:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("View History", key="tab1_view_history", disabled=quick_select_player is None):
-                        st.session_state.selected_player_for_history = quick_select_player
+                        # Directly set the Player Tracker selectbox value
+                        st.session_state.tab4_player_select = quick_select_player
                         st.info(f"Click the **Player Tracker** tab above to see {quick_select_player}'s history.")
         elif df_ratings is not None:
             # Fallback if no history data with active_rank
@@ -634,7 +631,8 @@ def main():
             with col_button:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("View History", key="tab1_view_history_fallback", disabled=quick_select_player2 is None):
-                    st.session_state.selected_player_for_history = quick_select_player2
+                    # Directly set the Player Tracker selectbox value
+                    st.session_state.tab4_player_select = quick_select_player2
                     st.info(f"Click the **Player Tracker** tab above to see {quick_select_player2}'s history.")
         else:
             st.warning("Ratings data not available.")
@@ -643,19 +641,12 @@ def main():
     with tab4:
 
         if df_history is not None:
-            # Check if player was pre-selected from rankings tab
-            preselected_player = st.session_state.get('selected_player_for_history')
-
-            # Determine default index
-            default_index = None
-            if preselected_player and preselected_player in all_players:
-                default_index = all_players.index(preselected_player)
-
             # Player selector (single selection)
+            # Note: Value can be pre-set from Elo Rankings tab via session state key
             selected_player = st.selectbox(
                 "Select a player",
                 options=all_players,
-                index=default_index,
+                index=None,
                 placeholder="Choose a player...",
                 key="tab4_player_select"
             )
