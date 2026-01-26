@@ -34,6 +34,14 @@ FLOOR_SOFT_ZONE = 100  # Soft zone for reduced winner gains
 TARGET_MIN_RATING = 1000
 TARGET_MAX_RATING = 2800
 
+# --- Hybrid Compression Configuration ---
+# Set USE_HYBRID_COMPRESSION = True to use the two-zone compression model
+# - Logarithmic compression toward SOFT_TARGET (hard but achievable)
+# - Tanh compression toward HARD_CEILING (theoretical maximum)
+USE_HYBRID_COMPRESSION = True
+SOFT_TARGET = 2700   # Hard-but-achievable rating (log compression zone)
+HARD_CEILING = 3000  # Theoretical maximum (tanh asymptote)
+
 # --- Dynamic K Configuration ---
 USE_DYNAMIC_K = True
 DYNAMIC_K_NEW_PLAYER_GAMES = 10

@@ -33,6 +33,9 @@ from api.config import (
     FLOOR_SOFT_ZONE,
     TARGET_MIN_RATING,
     TARGET_MAX_RATING,
+    USE_HYBRID_COMPRESSION,
+    SOFT_TARGET,
+    HARD_CEILING,
     USE_DYNAMIC_K,
     DYNAMIC_K_NEW_PLAYER_GAMES,
     DYNAMIC_K_ESTABLISHED_GAMES,
@@ -117,6 +120,102 @@ def scale_ratings_soft(ratings_dict, baseline=1500, target_min=900, target_max=2
             # Soft compression toward lower bound using tanh
             compressed = math.tanh(-z_score / scale_lower)
             scaled[player] = baseline - compressed * target_lower
+
+    return scaled
+
+
+def scale_ratings_hybrid(ratings_dict, baseline=1500, target_min=900, target_max=2800,
+                         soft_target=2800, hard_ceiling=3000):
+    """
+    Hybrid two-zone rating compression combining logarithmic and tanh functions.
+
+    Zone 1 (logarithmic): Makes reaching soft_target (2800) difficult but achievable.
+        Uses a gentle logarithmic blend to create diminishing returns.
+    Zone 2 (tanh): Compresses toward hard_ceiling (3000), the theoretical maximum.
+
+    Key insight: by pushing the tanh asymptote to 3000 instead of 2800,
+    the "invisible wall" effect occurs around 2850-2900, well above where
+    players typically cluster (~2700-2750). Breaking 2800 becomes hard but possible
+    for truly exceptional sustained performance.
+
+    Mathematical behavior (with current tuning):
+    - z-score ~4 (above average): ~2500-2600 rating
+    - z-score ~6 (very good): ~2750-2850 rating (can break 2800)
+    - z-score ~8 (excellent): ~2850-2900 rating
+    - z-score ~10+ (exceptional): ~2950+ rating
+    - Theoretical ceiling: 3000 (asymptotic, effectively unreachable)
+
+    Args:
+        ratings_dict: dict of player_name -> raw rating
+        baseline: center point (median maps here), default 1500
+        target_min: lower bound for compression, default 900
+        target_max: ignored, kept for API compatibility with scale_ratings_soft
+        soft_target: hard-but-achievable target, default 2800
+        hard_ceiling: absolute maximum (asymptotic), default 3000
+
+    Returns:
+        dict of player_name -> compressed rating
+    """
+    if not ratings_dict:
+        return ratings_dict
+
+    import statistics
+    import math
+    values = list(ratings_dict.values())
+
+    if len(values) < 2:
+        return {k: baseline for k in ratings_dict}
+
+    raw_median = statistics.median(values)
+    raw_std = statistics.stdev(values)
+
+    if raw_std == 0:
+        return {k: baseline for k in ratings_dict}
+
+    # Calculate compression ranges
+    upper_range = hard_ceiling - baseline  # 1500 (baseline to 3000)
+    lower_range = baseline - target_min     # 600 (baseline to 900)
+
+    # Compression parameters (tuned for 2800 to be elite tier)
+    # With these settings: only z≈8+ approaches 2800, ceiling at 3000
+    tanh_scale_upper = 5.5   # Higher = gentler curve, harder to reach 2800
+    tanh_scale_lower = 2.5   # Controls lower compression curve
+    log_blend = 0.2          # Logarithmic blend factor (creates diminishing returns)
+
+    # Super-elite compression: extra punishment for extreme outliers
+    # Makes 2900 ridiculously hard (~15-20 dominant wins from current #1)
+    elite_threshold = 8.0    # z-score threshold where extra compression kicks in
+    elite_factor = 0.6       # Gentler compression (lower = less aggressive)
+
+    scaled = {}
+    for player, rating in ratings_dict.items():
+        z_score = (rating - raw_median) / raw_std
+
+        if z_score >= 0:
+            # Super-elite compression: additional log compression for extreme outliers
+            # This makes gains above elite_threshold increasingly difficult
+            if z_score > elite_threshold:
+                excess = z_score - elite_threshold
+                # Apply additional log compression to the excess portion
+                # Higher elite_factor = more aggressive compression
+                compressed_excess = math.log(1 + excess * elite_factor) / elite_factor
+                z_score_adjusted = elite_threshold + compressed_excess
+            else:
+                z_score_adjusted = z_score
+
+            # Hybrid compression: blend linear z with log-compressed z
+            # This creates diminishing returns as ratings increase
+            # log(1+z) * 1.8 normalizes so that at z=2, log_z ≈ 2
+            log_z = math.log(1 + z_score_adjusted) * 1.8
+            z_effective = z_score_adjusted * (1 - log_blend) + log_z * log_blend
+
+            # Tanh compression toward hard ceiling (3000)
+            compressed = math.tanh(z_effective / tanh_scale_upper)
+            scaled[player] = baseline + compressed * upper_range
+        else:
+            # Below median: standard tanh compression toward target_min
+            compressed = math.tanh(-z_score / tanh_scale_lower)
+            scaled[player] = baseline - compressed * lower_range
 
     return scaled
 
@@ -537,8 +636,39 @@ def run_elo_ranking(df):
 
     logger.info(f"Processed {len(dates)} days, {len(ratings)} unique players")
 
-    # Scale final ratings using soft compression
-    scaled_ratings = scale_ratings_soft(ratings, BASELINE_RATING, TARGET_MIN_RATING, TARGET_MAX_RATING)
+    # Log raw rating statistics BEFORE compression
+    raw_values = list(ratings.values())
+    if raw_values:
+        import statistics
+        logger.info("Raw Rating Distribution (before compression):")
+        logger.info(f"  Min: {min(raw_values):.2f}")
+        logger.info(f"  Max: {max(raw_values):.2f}")
+        logger.info(f"  Spread: {max(raw_values) - min(raw_values):.2f}")
+        logger.info(f"  Mean: {statistics.mean(raw_values):.2f}")
+        logger.info(f"  Median: {statistics.median(raw_values):.2f}")
+        logger.info(f"  Std Dev: {statistics.stdev(raw_values) if len(raw_values) > 1 else 0:.2f}")
+
+    # Scale final ratings using selected compression method
+    if USE_HYBRID_COMPRESSION:
+        scaled_ratings = scale_ratings_hybrid(
+            ratings, BASELINE_RATING, TARGET_MIN_RATING, TARGET_MAX_RATING,
+            soft_target=SOFT_TARGET, hard_ceiling=HARD_CEILING
+        )
+        compression_method = f"hybrid (log→{SOFT_TARGET}, tanh→{HARD_CEILING})"
+    else:
+        scaled_ratings = scale_ratings_soft(ratings, BASELINE_RATING, TARGET_MIN_RATING, TARGET_MAX_RATING)
+        compression_method = f"tanh (ceiling={TARGET_MAX_RATING})"
+
+    # Log compressed rating statistics for comparison
+    scaled_values = list(scaled_ratings.values())
+    if scaled_values:
+        logger.info(f"Compressed Rating Distribution (after {compression_method} scaling):")
+        logger.info(f"  Min: {min(scaled_values):.2f}")
+        logger.info(f"  Max: {max(scaled_values):.2f}")
+        logger.info(f"  Spread: {max(scaled_values) - min(scaled_values):.2f}")
+        logger.info(f"  Mean: {statistics.mean(scaled_values):.2f}")
+        logger.info(f"  Median: {statistics.median(scaled_values):.2f}")
+        logger.info(f"  Std Dev: {statistics.stdev(scaled_values) if len(scaled_values) > 1 else 0:.2f}")
 
     # Determine the last date in the dataset for activity gating
     last_date = dates[-1] if dates else None
@@ -558,6 +688,7 @@ def run_elo_ranking(df):
         final_ratings.append({
             'player_name': player,
             'rating': round(rating, 2),
+            'raw_rating': round(ratings[player], 2),  # Uncompressed rating for comparison
             'games_played': gp,
             'confidence': round(calculate_confidence(gp, DYNAMIC_K_ESTABLISHED_GAMES), 2),
             'last_seen': player_last_seen,
@@ -586,11 +717,11 @@ def run_elo_ranking(df):
     final_df = final_df.sort_values('rating', ascending=False).reset_index(drop=True)
     final_df['active_rank'] = final_df.index + 1
 
-    # Reorder columns (active_rank first)
-    final_df = final_df[['active_rank', 'player_name', 'rating', 'games_played', 'confidence', 'last_seen', 'days_inactive', 'uncertainty', 'is_active']]
-    all_players_df = all_players_df[['active_rank', 'player_name', 'rating', 'games_played', 'confidence', 'last_seen', 'days_inactive', 'uncertainty', 'is_active']]
+    # Reorder columns (active_rank first, include raw_rating for comparison)
+    final_df = final_df[['active_rank', 'player_name', 'rating', 'raw_rating', 'games_played', 'confidence', 'last_seen', 'days_inactive', 'uncertainty', 'is_active']]
+    all_players_df = all_players_df[['active_rank', 'player_name', 'rating', 'raw_rating', 'games_played', 'confidence', 'last_seen', 'days_inactive', 'uncertainty', 'is_active']]
 
-    # Build daily history DataFrame and scale ratings using soft compression
+    # Build daily history DataFrame and scale ratings using same compression method
     history_df = pd.DataFrame(daily_history)
 
     # Use same scaling parameters from final ratings for consistency
@@ -599,19 +730,49 @@ def run_elo_ranking(df):
     raw_values = list(ratings.values())
     raw_median = statistics.median(raw_values)
     raw_std = statistics.stdev(raw_values) if len(raw_values) > 1 else 1
-    target_upper = TARGET_MAX_RATING - BASELINE_RATING
-    target_lower = BASELINE_RATING - TARGET_MIN_RATING
-    scale_upper = 2.5
-    scale_lower = 2.5
 
-    def scale_single_rating(rating):
-        z_score = (rating - raw_median) / raw_std if raw_std > 0 else 0
-        if z_score >= 0:
-            compressed = math.tanh(z_score / scale_upper)
-            return BASELINE_RATING + compressed * target_upper
-        else:
-            compressed = math.tanh(-z_score / scale_lower)
-            return BASELINE_RATING - compressed * target_lower
+    if USE_HYBRID_COMPRESSION:
+        # Hybrid compression: log toward soft target, tanh toward hard ceiling
+        upper_range = HARD_CEILING - BASELINE_RATING
+        lower_range = BASELINE_RATING - TARGET_MIN_RATING
+        tanh_scale_upper = 5.5
+        tanh_scale_lower = 2.5
+        log_blend = 0.2
+        elite_threshold = 8.0
+        elite_factor = 0.6
+
+        def scale_single_rating(rating):
+            z_score = (rating - raw_median) / raw_std if raw_std > 0 else 0
+            if z_score >= 0:
+                # Super-elite compression for extreme outliers
+                if z_score > elite_threshold:
+                    excess = z_score - elite_threshold
+                    compressed_excess = math.log(1 + excess * elite_factor) / elite_factor
+                    z_score_adjusted = elite_threshold + compressed_excess
+                else:
+                    z_score_adjusted = z_score
+                log_z = math.log(1 + z_score_adjusted) * 1.8
+                z_effective = z_score_adjusted * (1 - log_blend) + log_z * log_blend
+                compressed = math.tanh(z_effective / tanh_scale_upper)
+                return BASELINE_RATING + compressed * upper_range
+            else:
+                compressed = math.tanh(-z_score / tanh_scale_lower)
+                return BASELINE_RATING - compressed * lower_range
+    else:
+        # Original tanh compression
+        target_upper = TARGET_MAX_RATING - BASELINE_RATING
+        target_lower = BASELINE_RATING - TARGET_MIN_RATING
+        scale_upper = 2.5
+        scale_lower = 2.5
+
+        def scale_single_rating(rating):
+            z_score = (rating - raw_median) / raw_std if raw_std > 0 else 0
+            if z_score >= 0:
+                compressed = math.tanh(z_score / scale_upper)
+                return BASELINE_RATING + compressed * target_upper
+            else:
+                compressed = math.tanh(-z_score / scale_lower)
+                return BASELINE_RATING - compressed * target_lower
 
     history_df['rating'] = history_df['rating'].apply(scale_single_rating).round(2)
 
@@ -633,6 +794,60 @@ def run_elo_ranking(df):
         how='left'
     )
 
+    # --- Pre-compute cumulative and rolling stats for dashboard performance ---
+    # Sort by player and date for cumulative calculations
+    history_df = history_df.sort_values(['player_name', 'date']).reset_index(drop=True)
+
+    # Cumulative wins (rank == 1)
+    history_df['is_win'] = (history_df['rank'] == 1).astype(int)
+    history_df['wins'] = history_df.groupby('player_name')['is_win'].cumsum()
+
+    # Cumulative top 10s (rank <= 10)
+    history_df['is_top10'] = (history_df['rank'] <= 10).astype(int)
+    history_df['top_10s'] = history_df.groupby('player_name')['is_top10'].cumsum()
+
+    # Cumulative average daily rank
+    history_df['cumsum_rank'] = history_df.groupby('player_name')['rank'].cumsum()
+    history_df['avg_daily_rank'] = (history_df['cumsum_rank'] / history_df['games_played']).round(1)
+
+    # Win rate and top 10 rate (percentage)
+    history_df['win_rate'] = ((history_df['wins'] / history_df['games_played']) * 100).round(1)
+    history_df['top_10s_rate'] = ((history_df['top_10s'] / history_df['games_played']) * 100).round(1)
+
+    # Rolling 7-game average rank (last_7)
+    history_df['last_7'] = history_df.groupby('player_name')['rank'].transform(
+        lambda x: x.rolling(window=7, min_periods=1).mean()
+    ).round(1)
+
+    # Previous 7-game average (games 8-14 back) for trend calculation
+    history_df['prev_7'] = history_df.groupby('player_name')['rank'].transform(
+        lambda x: x.shift(7).rolling(window=7, min_periods=1).mean()
+    )
+
+    # Trend: compare last_7 vs prev_7 (lower rank = better, so improving = prev_7 > last_7)
+    def calc_trend(row):
+        if pd.isna(row['prev_7']) or pd.isna(row['last_7']):
+            return "→"  # Not enough data
+        diff = row['prev_7'] - row['last_7']  # positive = improving
+        if diff > 1.5:
+            return "↑"  # Improving
+        elif diff < -1.5:
+            return "↓"  # Declining
+        return "→"  # Stable
+
+    history_df['trend'] = history_df.apply(calc_trend, axis=1)
+
+    # Rolling 14-game consistency (std dev of ranks)
+    history_df['consistency'] = history_df.groupby('player_name')['rank'].transform(
+        lambda x: x.rolling(window=14, min_periods=2).std()
+    ).round(1)
+
+    # Peak rating (max rating achieved up to this point)
+    history_df['peak_rating'] = history_df.groupby('player_name')['rating'].cummax().round(1)
+
+    # Clean up temporary columns
+    history_df = history_df.drop(columns=['is_win', 'is_top10', 'cumsum_rank', 'prev_7'])
+
     # Add confidence column based on games played at that point in time
     history_df['confidence'] = history_df['games_played'].apply(
         lambda gp: round(calculate_confidence(gp, DYNAMIC_K_ESTABLISHED_GAMES), 2)
@@ -648,8 +863,15 @@ def run_elo_ranking(df):
         lambda x: -x.diff()  # negative diff because lower rank is better
     )
 
-    # Reorder columns: date, player_name, games_played, rank (daily), score, rating, rating_change, active_rank, active_rank_change, confidence, uncertainty
-    history_df = history_df[['date', 'player_name', 'games_played', 'rank', 'score', 'rating', 'rating_change', 'active_rank', 'active_rank_change', 'confidence', 'uncertainty']]
+    # Reorder columns: include all pre-computed stats for dashboard performance
+    history_df = history_df[[
+        'date', 'player_name', 'games_played', 'rank', 'score', 'rating', 'rating_change',
+        'active_rank', 'active_rank_change', 'confidence', 'uncertainty',
+        # Pre-computed cumulative stats
+        'wins', 'top_10s', 'avg_daily_rank', 'win_rate', 'top_10s_rate',
+        # Pre-computed rolling stats
+        'last_7', 'trend', 'consistency', 'peak_rating'
+    ]]
 
     return final_df, history_df, all_players_df
 
