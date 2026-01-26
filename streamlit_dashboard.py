@@ -1,12 +1,13 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 from pathlib import Path
 from datetime import datetime, timedelta
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="DFTL Leaderboard & Elo Ratings",
+    page_title="DFTL Ranking Dashboard",
     page_icon="🎮",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -78,7 +79,7 @@ def get_available_datasets():
 # --- Main App ---
 def main():
     # Title
-    st.title("🎮 DFTL Daily Leaderboard & Elo Ratings")
+    st.title("🎮 DFTL Ranking Dashboard")
     st.markdown("---")
 
     # Check for available datasets
@@ -89,7 +90,7 @@ def main():
 
     # --- Sidebar ---
     with st.sidebar:
-        st.header("🔧 Filters")
+        st.header("📊 Dataset")
 
         # Dataset selector
         dataset_label = st.selectbox(
@@ -117,7 +118,7 @@ def main():
 
         st.markdown("---")
         st.caption(f"Data range: {min_date} to {max_date}")
-        st.caption(f"Total ranked players: {len(all_players)}")
+        st.caption(f"Players in Dataset: {len(all_players)}")
 
     # Use full date range
     df_filtered = df_leaderboard.copy()
@@ -127,18 +128,17 @@ def main():
 
     # Create tabs
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "🏅 Current & Past Elo Rankings",
+        "🏅 Elo Rankings",
         "📈 Elo Rating History",
         "📊 Daily Leaderboard",
         "👤 Player Tracker",
-        "🏆 Active Top 10 Elo",
+        "🏆 Top 10 History",
         "⚔️ Player Duel",
         "❓ FAQ"
     ])
 
     # --- Tab 3: Daily Leaderboard ---
     with tab3:
-        st.header(f"Daily Leaderboard (last update: {max_date})")
 
         # Date selector for specific day
         available_dates = sorted(df_filtered['date'].dt.date.unique(), reverse=True)
@@ -184,7 +184,7 @@ def main():
                     "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f")
                 }
                 if 'active_rank' in df_day.columns:
-                    column_config["active_rank"] = st.column_config.NumberColumn("Active Rank", format="%d")
+                    column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
 
                 st.dataframe(
                     df_day[display_cols],
@@ -197,7 +197,6 @@ def main():
 
     # --- Tab 2: Elo Rating History ---
     with tab2:
-        st.header(f"Elo Rating History (last update: {max_date})")
 
         if df_history is not None and df_ratings is not None:
             # Get top 10 players by rating as default
@@ -205,9 +204,10 @@ def main():
 
             # Player filter (above graph)
             selected_players = st.multiselect(
-                "Select players (default: top 10 by rating)",
+                "Select players to compare",
                 options=all_players,
-                default=top_players_default
+                default=top_players_default,
+                placeholder="Default: top 10 by rating"
             )
 
             if selected_players:
@@ -278,12 +278,8 @@ def main():
             # Date picker for historical rankings
             available_dates = sorted(df_history['date'].dt.date.unique(), reverse=True)
 
-            # Check if viewing current (latest) date (use default for header)
-            # We'll update this after the date picker
-            st.header("Elo Rankings")
-
             selected_ranking_date = st.date_input(
-                "Select date for rankings",
+                "Select date",
                 value=available_dates[0],  # Default to most recent
                 min_value=available_dates[-1],
                 max_value=available_dates[0],
@@ -316,7 +312,7 @@ def main():
                 with col1:
                     st.metric("Active Players", active_count)
                 with col2:
-                    st.metric("Inactive Players", inactive_count)
+                    st.metric("Hidden Players", inactive_count)
                 with col3:
                     if not df_active.empty:
                         st.metric("Highest Rating", f"{df_active['rating'].max():.1f}")
@@ -333,11 +329,38 @@ def main():
                     else:
                         st.metric("Median Rating", "N/A")
 
+                # Rating Distribution Chart
+                with st.expander("📊 Rating Distribution", expanded=False):
+                    if not df_active.empty:
+                        fig_dist = px.histogram(
+                            df_active,
+                            x='rating',
+                            nbins=20,
+                            labels={'rating': 'Elo Rating', 'count': 'Players'},
+                            color_discrete_sequence=['#636EFA']
+                        )
+                        fig_dist.update_layout(
+                            showlegend=False,
+                            height=300,
+                            margin=dict(l=20, r=20, t=30, b=20),
+                            xaxis_title="Rating",
+                            yaxis_title="Players"
+                        )
+                        fig_dist.add_vline(
+                            x=df_active['rating'].median(),
+                            line_dash="dash",
+                            line_color="orange",
+                            annotation_text=f"Median: {df_active['rating'].median():.0f}"
+                        )
+                        st.plotly_chart(fig_dist, use_container_width=True)
+                    else:
+                        st.info("No active players to display distribution.")
+
                 # All players table
-                st.subheader("Ranked Players")
+                st.subheader("Elo Ranking Leaderboard")
 
                 # Toggle to show inactive players
-                show_inactive = st.toggle("Show inactive players (no activity in last 7 days)", value=False)
+                show_inactive = st.toggle("Show Hidden Players", value=False, help="Players inactive >7 days or with <7 ranked games")
 
                 # Determine which data to display
                 if show_inactive:
@@ -351,31 +374,70 @@ def main():
                     wins=('rank', lambda x: (x == 1).sum()),
                     top_10s=('rank', lambda x: (x <= 10).sum()),
                     avg_daily_rank=('rank', 'mean'),
+                    consistency=('rank', 'std'),  # Lower = more consistent
                     total_games=('rank', 'count')
                 ).reset_index()
                 player_stats['avg_daily_rank'] = player_stats['avg_daily_rank'].round(1)
+                player_stats['consistency'] = player_stats['consistency'].round(1)
                 player_stats['win_rate'] = (player_stats['wins'] / player_stats['total_games'] * 100).round(1)
                 player_stats['top_10s_rate'] = (player_stats['top_10s'] / player_stats['total_games'] * 100).round(1)
                 player_stats = player_stats.drop(columns=['total_games'])
 
-                # Calculate Last 7: average daily rank over last 7 games
-                last7_data = []
+                # Get history data filtered to selected date for peak rating
+                df_history_filtered = df_history[df_history['date'].dt.date <= selected_ranking_date]
+
+                # Calculate advanced metrics per player
+                advanced_stats = []
                 for player in df_rankings_to_display['player_name'].unique():
                     player_games = df_leaderboard_filtered[
                         df_leaderboard_filtered['player_name'] == player
-                    ].sort_values('date', ascending=False).head(7)
+                    ].sort_values('date', ascending=False)
 
-                    if len(player_games) > 0:
-                        avg_last7 = player_games['rank'].mean()
-                        last7_data.append({
-                            'player_name': player,
-                            'last_7': round(avg_last7, 1)
-                        })
+                    player_history = df_history_filtered[
+                        df_history_filtered['player_name'] == player
+                    ]
+
+                    # Last 7 avg
+                    last7_games = player_games.head(7)
+                    avg_last7 = last7_games['rank'].mean() if len(last7_games) > 0 else None
+
+                    # Previous 7 avg (games 8-14)
+                    prev7_games = player_games.iloc[7:14] if len(player_games) > 7 else pd.DataFrame()
+                    avg_prev7 = prev7_games['rank'].mean() if len(prev7_games) > 0 else None
+
+                    # Trend: compare last 7 vs previous 7 (lower rank = better, so improving = last7 < prev7)
+                    if avg_last7 is not None and avg_prev7 is not None:
+                        diff = avg_prev7 - avg_last7  # positive = improving
+                        if diff > 1.5:
+                            trend = "↑"  # Improving
+                        elif diff < -1.5:
+                            trend = "↓"  # Declining
+                        else:
+                            trend = "→"  # Stable
                     else:
-                        last7_data.append({'player_name': player, 'last_7': None})
+                        trend = "→"  # Not enough data
 
-                df_last7 = pd.DataFrame(last7_data)
-                player_stats = player_stats.merge(df_last7, on='player_name', how='left')
+                    # Peak rating
+                    peak_rating = player_history['rating'].max() if not player_history.empty else None
+
+                    # Days since last win
+                    win_games = player_games[player_games['rank'] == 1]
+                    if not win_games.empty:
+                        last_win_date = win_games.iloc[0]['date'].date()
+                        days_since_win = (selected_ranking_date - last_win_date).days
+                    else:
+                        days_since_win = None  # Never won
+
+                    advanced_stats.append({
+                        'player_name': player,
+                        'last_7': round(avg_last7, 1) if avg_last7 else None,
+                        'trend': trend,
+                        'peak_rating': round(peak_rating, 1) if peak_rating else None,
+                        'days_since_win': days_since_win
+                    })
+
+                df_advanced = pd.DataFrame(advanced_stats)
+                player_stats = player_stats.merge(df_advanced, on='player_name', how='left')
 
                 # Merge stats with rankings
                 df_rankings_display = df_rankings_to_display.merge(player_stats, on='player_name', how='left')
@@ -384,7 +446,7 @@ def main():
                 has_days_inactive = 'days_inactive' in df_rankings_display.columns
 
                 # Select columns to display
-                display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7']
+                display_cols = ['active_rank', 'player_name', 'rating', 'trend', 'peak_rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency', 'days_since_win']
                 if has_days_inactive:
                     display_cols.append('days_inactive')
 
@@ -395,19 +457,23 @@ def main():
                 )
 
                 column_config = {
-                    "active_rank": st.column_config.NumberColumn("Active Rank", format="%d"),
+                    "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
                     "player_name": st.column_config.TextColumn("Player"),
                     "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                    "games_played": st.column_config.NumberColumn("Ranked Games", format="%d"),
+                    "trend": st.column_config.TextColumn("Trend", help="↑ Improving, → Stable, ↓ Declining (last 7 vs previous 7 games)"),
+                    "peak_rating": st.column_config.NumberColumn("Peak", format="%.1f", help="All-time highest rating"),
+                    "games_played": st.column_config.NumberColumn("Games", format="%d"),
                     "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                    "win_rate": st.column_config.NumberColumn("Win Rate %", format="%.1f"),
+                    "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
                     "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
-                    "top_10s_rate": st.column_config.NumberColumn("Top 10s Rate %", format="%.1f"),
-                    "avg_daily_rank": st.column_config.NumberColumn("Avg Daily Rank", format="%.1f"),
-                    "last_7": st.column_config.NumberColumn("Last 7", format="%.1f", help="Average daily rank over last 7 games")
+                    "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
+                    "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
+                    "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average daily rank over last 7 games"),
+                    "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of daily ranks (lower = more consistent)"),
+                    "days_since_win": st.column_config.NumberColumn("Last Win", format="%d", help="Days since last 1st place finish")
                 }
                 if has_days_inactive:
-                    column_config["days_inactive"] = st.column_config.NumberColumn("Days Inactive", format="%d")
+                    column_config["days_inactive"] = st.column_config.NumberColumn("Inactive", format="%d")
 
                 st.dataframe(
                     df_rankings_display[display_cols],
@@ -417,7 +483,6 @@ def main():
                 )
         elif df_ratings is not None:
             # Fallback if no history data with active_rank
-            st.header(f"Current Elo Rankings (last update: {max_date})")
             st.warning("Historical rankings not available. Showing current rankings only.")
 
             # Activity gating info
@@ -438,8 +503,32 @@ def main():
             with col5:
                 st.metric("Median Rating", f"{df_ratings['rating'].median():.1f}")
 
+            # Rating Distribution Chart
+            with st.expander("📊 Rating Distribution", expanded=False):
+                fig_dist = px.histogram(
+                    df_ratings,
+                    x='rating',
+                    nbins=20,
+                    labels={'rating': 'Elo Rating', 'count': 'Players'},
+                    color_discrete_sequence=['#636EFA']
+                )
+                fig_dist.update_layout(
+                    showlegend=False,
+                    height=300,
+                    margin=dict(l=20, r=20, t=30, b=20),
+                    xaxis_title="Rating",
+                    yaxis_title="Players"
+                )
+                fig_dist.add_vline(
+                    x=df_ratings['rating'].median(),
+                    line_dash="dash",
+                    line_color="orange",
+                    annotation_text=f"Median: {df_ratings['rating'].median():.0f}"
+                )
+                st.plotly_chart(fig_dist, use_container_width=True)
+
             # Toggle to show inactive players
-            show_inactive = st.toggle("Show inactive players (no activity in last 7 days)", value=False)
+            show_inactive = st.toggle("Show Hidden Players", value=False, help="Players inactive >7 days or with <7 ranked games")
 
             # Determine which ratings to display
             if show_inactive and df_ratings_all is not None:
@@ -448,7 +537,7 @@ def main():
                 df_ratings_to_display = df_ratings.copy()
 
             # All players table
-            st.subheader("Ranked Players")
+            st.subheader("Elo Ranking Leaderboard")
 
             # Calculate player stats from leaderboard data
             player_stats = df_leaderboard.groupby('player_name').agg(
@@ -496,20 +585,20 @@ def main():
                 display_cols.insert(-1, 'uncertainty')
 
             column_config = {
-                "active_rank": st.column_config.NumberColumn("Active Rank", format="%d"),
+                "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
                 "player_name": st.column_config.TextColumn("Player"),
                 "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                "games_played": st.column_config.NumberColumn("Ranked Games", format="%d"),
+                "games_played": st.column_config.NumberColumn("Games", format="%d"),
                 "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                "win_rate": st.column_config.NumberColumn("Win Rate %", format="%.1f"),
+                "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
                 "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
-                "top_10s_rate": st.column_config.NumberColumn("Top 10s Rate %", format="%.1f"),
-                "avg_daily_rank": st.column_config.NumberColumn("Avg Daily Rank", format="%.1f"),
-                "last_7": st.column_config.NumberColumn("Last 7", format="%.1f", help="Average daily rank over last 7 games"),
+                "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
+                "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
+                "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average daily rank over last 7 games"),
                 "last_seen": st.column_config.DateColumn("Last Seen", format="YYYY-MM-DD")
             }
             if has_days_inactive:
-                column_config["days_inactive"] = st.column_config.NumberColumn("Days Inactive", format="%d")
+                column_config["days_inactive"] = st.column_config.NumberColumn("Inactive", format="%d")
             if has_uncertainty:
                 column_config["uncertainty"] = st.column_config.NumberColumn("Uncertainty", format="%.2f")
 
@@ -524,7 +613,6 @@ def main():
 
     # --- Tab 4: Player History ---
     with tab4:
-        st.header(f"Player Tracker (last update: {max_date})")
 
         if df_history is not None:
             # Player selector (single selection) - no default
@@ -550,25 +638,32 @@ def main():
                         df_leaderboard['player_name'] == selected_player
                     ].sort_values('date')
 
-                    # Calculate cumulative wins, podiums, top 10s for each date
+                    # Calculate cumulative wins, top 10s, avg rank, and recent avg for each date
                     cumulative_stats = []
                     total_wins = 0
-                    total_podiums = 0
                     total_top_10s = 0
+                    all_ranks = []
 
                     for _, row in df_player_leaderboard.iterrows():
                         if row['rank'] == 1:
                             total_wins += 1
-                        if row['rank'] <= 3:
-                            total_podiums += 1
                         if row['rank'] <= 10:
                             total_top_10s += 1
+                        all_ranks.append(row['rank'])
+
+                        # Calculate cumulative average daily rank
+                        avg_daily_rank = sum(all_ranks) / len(all_ranks)
+
+                        # Calculate recent avg (last 7 games)
+                        recent_ranks = all_ranks[-7:] if len(all_ranks) >= 7 else all_ranks
+                        recent_avg = sum(recent_ranks) / len(recent_ranks)
 
                         cumulative_stats.append({
                             'date': row['date'],
                             'wins': total_wins,
-                            'podiums': total_podiums,
-                            'top_10s': total_top_10s
+                            'top_10s': total_top_10s,
+                            'avg_daily_rank': round(avg_daily_rank, 1),
+                            'last_7': round(recent_avg, 1)
                         })
 
                     df_cumulative = pd.DataFrame(cumulative_stats)
@@ -586,29 +681,62 @@ def main():
                     # Determine if active_rank column exists
                     has_active_rank = 'active_rank' in df_player_display.columns
 
-                    # Select columns for display (use active_rank from history data)
-                    display_cols = ['player_name', 'date', 'rank', 'score', 'rating', 'rating_change']
+                    # Select columns for display
+                    display_cols = ['date', 'rank', 'score', 'rating', 'rating_change']
                     if has_active_rank:
                         display_cols.append('active_rank')
-                    display_cols.extend(['games_played', 'wins', 'podiums', 'top_10s'])
+                    display_cols.extend(['games_played', 'wins', 'top_10s', 'avg_daily_rank', 'last_7'])
 
                     # Sort by date descending (most recent first)
                     df_player_display = df_player_display.sort_values('date', ascending=False)
 
+                    # Rating trajectory chart
+                    df_chart = df_player_display.sort_values('date')  # Ascending for chart
+                    fig_rating = px.line(
+                        df_chart,
+                        x='date',
+                        y='rating',
+                        markers=True,
+                        labels={'date': 'Date', 'rating': 'Elo Rating'}
+                    )
+                    fig_rating.update_layout(
+                        height=250,
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        showlegend=False
+                    )
+                    fig_rating.add_hline(
+                        y=1500,
+                        line_dash="dash",
+                        line_color="gray",
+                        annotation_text="Baseline"
+                    )
+                    # Add peak rating marker
+                    peak_idx = df_chart['rating'].idxmax()
+                    peak_row = df_chart.loc[peak_idx]
+                    fig_rating.add_scatter(
+                        x=[peak_row['date']],
+                        y=[peak_row['rating']],
+                        mode='markers',
+                        marker=dict(size=12, color='gold', symbol='star'),
+                        name='Peak',
+                        hovertemplate=f"Peak: {peak_row['rating']:.0f}<extra></extra>"
+                    )
+                    st.plotly_chart(fig_rating, use_container_width=True)
+
                     column_config = {
-                        "player_name": st.column_config.TextColumn("Player"),
                         "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
                         "rank": st.column_config.NumberColumn("Daily Rank", format="%d"),
                         "score": st.column_config.NumberColumn("Score", format="%d"),
-                        "rating": st.column_config.NumberColumn("Elo Rating", format="%.1f"),
+                        "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
                         "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f"),
                         "games_played": st.column_config.NumberColumn("Ranked Games", format="%d"),
                         "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                        "podiums": st.column_config.NumberColumn("Podiums", format="%d"),
-                        "top_10s": st.column_config.NumberColumn("Top 10s", format="%d")
+                        "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
+                        "avg_daily_rank": st.column_config.NumberColumn("Avg Daily Rank", format="%.1f"),
+                        "last_7": st.column_config.NumberColumn("Recent Avg", format="%.1f", help="Average daily rank over last 7 games")
                     }
                     if has_active_rank:
-                        column_config["active_rank"] = st.column_config.NumberColumn("Active Rank", format="%d")
+                        column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
 
                     st.dataframe(
                         df_player_display[display_cols],
@@ -625,7 +753,6 @@ def main():
 
     # --- Tab 5: Active Rank History ---
     with tab5:
-        st.header(f"Active Top 10 Elo History (last update: {max_date})")
 
         if df_history is not None and 'active_rank' in df_history.columns:
             # Use pre-computed active_rank from history data
@@ -635,15 +762,58 @@ def main():
             # Filter to top 10 active ranks only
             df_top10 = df_history_active[df_history_active['active_rank'] <= 10].copy()
 
-            # Pivot to get ranks as columns
+            # Bump Chart - shows rank movement over time
+            # Get players who have been in top 10 in the last 14 days for cleaner visualization
+            recent_dates = sorted(df_top10['date'].unique())[-14:]
+            df_bump = df_top10[df_top10['date'].isin(recent_dates)].copy()
+
+            if not df_bump.empty:
+                # Get players who appear frequently in top 10 (at least 3 days)
+                player_counts = df_bump['player_name'].value_counts()
+                frequent_players = player_counts[player_counts >= 3].index.tolist()
+                df_bump_filtered = df_bump[df_bump['player_name'].isin(frequent_players)]
+
+                if not df_bump_filtered.empty:
+                    fig_bump = px.line(
+                        df_bump_filtered,
+                        x='date',
+                        y='active_rank',
+                        color='player_name',
+                        markers=True,
+                        labels={'date': 'Date', 'active_rank': 'Elo Rank', 'player_name': 'Player'}
+                    )
+                    fig_bump.update_layout(
+                        height=400,
+                        yaxis=dict(
+                            autorange='reversed',  # Rank 1 at top
+                            dtick=1,
+                            range=[10.5, 0.5]
+                        ),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.02,
+                            xanchor="right",
+                            x=1
+                        ),
+                        margin=dict(l=20, r=20, t=60, b=20),
+                        hovermode='x unified'
+                    )
+                    fig_bump.update_traces(
+                        hovertemplate='%{fullData.name}: #%{y}<extra></extra>'
+                    )
+                    st.plotly_chart(fig_bump, use_container_width=True)
+                    st.caption("Showing players with 3+ top-10 appearances in last 14 days")
+
+            # Pivot to get ranks as columns for table
             df_pivot = df_top10.pivot(
                 index='date',
                 columns='active_rank',
                 values='player_name'
             ).reset_index()
 
-            # Rename columns
-            df_pivot.columns = ['Date'] + [f'Rank {int(i)}' for i in df_pivot.columns[1:]]
+            # Rename columns to indicate Elo rankings
+            df_pivot.columns = ['Date'] + [f'Elo #{int(i)}' for i in df_pivot.columns[1:]]
 
             # Sort by date descending (most recent first)
             df_pivot = df_pivot.sort_values('Date', ascending=False)
@@ -653,7 +823,7 @@ def main():
                 "Date": st.column_config.DateColumn("Date", format="YYYY-MM-DD")
             }
             for i in range(1, 11):
-                col_name = f'Rank {i}'
+                col_name = f'Elo #{i}'
                 if col_name in df_pivot.columns:
                     column_config[col_name] = st.column_config.TextColumn(col_name)
 
@@ -668,7 +838,6 @@ def main():
 
     # --- Tab 6: Player Duel ---
     with tab6:
-        st.header(f"Player Duel (last update: {max_date})")
 
         if df_history is not None:
             col_p1, col_p2 = st.columns(2)
@@ -849,7 +1018,7 @@ def main():
                         col1, col2, col3, col4 = st.columns(4)
 
                         with col1:
-                            st.metric("Common Games", len(common_dates))
+                            st.metric("Matchups", len(common_dates))
                         with col2:
                             st.metric(f"{player1} Wins", p1_wins)
                         with col3:
@@ -869,8 +1038,8 @@ def main():
                             f"{player2} Daily Rank": st.column_config.NumberColumn(f"{player2} Daily Rank", format="%d"),
                             f"{player1} Score": st.column_config.NumberColumn(f"{player1} Score", format="%d"),
                             f"{player2} Score": st.column_config.NumberColumn(f"{player2} Score", format="%d"),
-                            f"{player1} Active Rank": st.column_config.NumberColumn(f"{player1} Active Rank", format="%d"),
-                            f"{player2} Active Rank": st.column_config.NumberColumn(f"{player2} Active Rank", format="%d"),
+                            f"{player1} Active Rank": st.column_config.NumberColumn(f"{player1} Elo Rank", format="%d"),
+                            f"{player2} Active Rank": st.column_config.NumberColumn(f"{player2} Elo Rank", format="%d"),
                             f"{player1} Elo": st.column_config.NumberColumn(f"{player1} Elo", format="%.1f"),
                             f"{player2} Elo": st.column_config.NumberColumn(f"{player2} Elo", format="%.1f"),
                         }
@@ -888,8 +1057,7 @@ def main():
 
     # --- Tab 7: FAQ ---
     with tab7:
-        st.header("Frequently Asked Questions")
-        st.info("FAQ content coming soon.")
+        st.caption("FAQ content coming soon.")
 
 
 if __name__ == "__main__":
