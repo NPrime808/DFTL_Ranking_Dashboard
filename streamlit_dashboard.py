@@ -16,55 +16,65 @@ st.set_page_config(
 )
 
 # --- Design System ---
-# Color Palette (consistent with config.toml theme)
-COLORS = {
-    # Primary brand colors
+# Theme-aware color palette (works with both light and dark modes)
+# Accent colors are the same in both themes, only text/background colors differ
+
+# Static accent colors (theme-independent)
+ACCENT_COLORS = {
     "primary": "#FF6B6B",       # Coral red - primary accent
     "primary_light": "#FF8E8E",
     "primary_dark": "#E55555",
-    # Background colors (from config.toml)
-    "bg_dark": "#0E1117",
-    "bg_card": "#262730",
-    "bg_hover": "#3D3D4D",
-    # Text colors
-    "text_primary": "#FAFAFA",
-    "text_secondary": "#B0B0B0",
-    "text_muted": "#808080",
-    # Semantic colors
     "success": "#10B981",       # Green - positive changes
     "warning": "#F59E0B",       # Amber - neutral/caution
     "danger": "#EF4444",        # Red - negative changes
     "info": "#3B82F6",          # Blue - informational
-    # Chart colors (ordered for visual distinction)
     "chart_palette": [
         "#FF6B6B", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6",
         "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1"
     ],
 }
 
-# Plotly chart template for consistency
-PLOTLY_TEMPLATE = {
-    "layout": {
-        "paper_bgcolor": "rgba(0,0,0,0)",
-        "plot_bgcolor": "rgba(0,0,0,0)",
-        "font": {"color": COLORS["text_primary"], "family": "sans-serif"},
-        "title": {"font": {"size": 16, "color": COLORS["text_primary"]}},
-        "xaxis": {
-            "gridcolor": "rgba(128,128,128,0.2)",
-            "linecolor": "rgba(128,128,128,0.3)",
-            "tickfont": {"color": COLORS["text_secondary"]},
-        },
-        "yaxis": {
-            "gridcolor": "rgba(128,128,128,0.2)",
-            "linecolor": "rgba(128,128,128,0.3)",
-            "tickfont": {"color": COLORS["text_secondary"]},
-        },
-        "legend": {"font": {"color": COLORS["text_secondary"]}},
-        "colorway": COLORS["chart_palette"],
-    }
+# Theme-specific colors
+DARK_THEME = {
+    "bg_primary": "#0E1117",
+    "bg_secondary": "#262730",
+    "bg_hover": "#3D3D4D",
+    "text_primary": "#FAFAFA",
+    "text_secondary": "#B0B0B0",
+    "text_muted": "#808080",
 }
 
-# Custom CSS for visual hierarchy and spacing (theme-aware)
+LIGHT_THEME = {
+    "bg_primary": "#FFFFFF",
+    "bg_secondary": "#F0F2F6",
+    "bg_hover": "#E0E2E6",
+    "text_primary": "#262730",
+    "text_secondary": "#555555",
+    "text_muted": "#888888",
+}
+
+
+def get_theme_colors():
+    """Get the current theme colors based on user's theme preference."""
+    # Streamlit 1.44+ provides st.context.theme for runtime theme detection
+    try:
+        # Check if we're in dark mode
+        is_dark = st.get_option("theme.base") == "dark"
+    except Exception:
+        # Default to dark if detection fails
+        is_dark = True
+
+    theme = DARK_THEME if is_dark else LIGHT_THEME
+    return {**ACCENT_COLORS, **theme}
+
+
+# For backwards compatibility, create a COLORS alias
+# This is evaluated once at module load, so charts use consistent colors
+COLORS = {**ACCENT_COLORS, **DARK_THEME}  # Default to dark theme for static references
+
+# Custom CSS for visual hierarchy and spacing
+# Colors are now handled by Streamlit's native dual-theme system (config.toml)
+# This CSS adds only non-color styling: typography, spacing, borders
 CUSTOM_CSS = """
 <style>
 /* ===== Typography Hierarchy ===== */
@@ -92,9 +102,8 @@ CUSTOM_CSS = """
     padding-top: 1.5rem;
 }
 
-/* Metric card improvements - theme aware */
+/* ===== Metric Cards ===== */
 [data-testid="stMetric"] {
-    background-color: var(--secondary-background-color);
     border: 1px solid rgba(255, 107, 107, 0.25);
     border-radius: 8px;
     padding: 1rem;
@@ -105,7 +114,6 @@ CUSTOM_CSS = """
     font-weight: 500 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
-    opacity: 0.7;
 }
 
 [data-testid="stMetric"] [data-testid="stMetricValue"] {
@@ -119,16 +127,14 @@ CUSTOM_CSS = """
     overflow: hidden;
 }
 
-/* Table header styling - theme aware */
 .stDataFrame thead th {
     font-weight: 600 !important;
     text-transform: uppercase !important;
     font-size: 0.75rem !important;
     letter-spacing: 0.05em !important;
-    padding: 0.75rem 1rem !important;
 }
 
-/* ===== Sidebar Styling ===== */
+/* ===== Sidebar ===== */
 [data-testid="stSidebar"] .stMarkdown hr {
     border-color: rgba(255, 107, 107, 0.2);
     margin: 1.5rem 0;
@@ -137,18 +143,15 @@ CUSTOM_CSS = """
 /* ===== Tab Styling ===== */
 .stTabs [data-baseweb="tab-list"] {
     gap: 0.5rem;
-    background-color: transparent;
 }
 
 .stTabs [data-baseweb="tab"] {
-    background-color: transparent;
     border-radius: 6px 6px 0 0;
     padding: 0.75rem 1rem;
     font-weight: 500;
 }
 
 .stTabs [aria-selected="true"] {
-    background-color: rgba(255, 107, 107, 0.15) !important;
     border-bottom: 2px solid #FF6B6B !important;
 }
 
@@ -160,98 +163,90 @@ CUSTOM_CSS = """
 }
 
 .stButton > button:hover {
-    border-color: #FF6B6B;
-    color: #FF6B6B;
+    border-color: #FF6B6B !important;
 }
 
-/* ===== Toggle Styling ===== */
+/* ===== Toggle ===== */
 [data-testid="stToggle"] label span {
     font-weight: 500 !important;
 }
 
-/* ===== Expander Styling ===== */
+/* ===== Expander ===== */
 .streamlit-expanderHeader {
     font-weight: 600 !important;
 }
 
-/* ===== Select boxes ===== */
-[data-testid="stSelectbox"] label {
-    font-weight: 500 !important;
-    opacity: 0.8;
+[data-testid="stExpander"] {
+    border-color: rgba(255, 107, 107, 0.2) !important;
 }
 
-/* ===== Date input ===== */
+/* ===== Form Labels ===== */
+[data-testid="stSelectbox"] label,
 [data-testid="stDateInput"] label {
     font-weight: 500 !important;
-    opacity: 0.8;
 }
 
-/* ===== Spacing utilities ===== */
+/* ===== Spacing ===== */
 .block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
 }
 
-/* Reduce spacing between elements */
 .element-container {
     margin-bottom: 0.5rem;
 }
 
-/* ===== Divider styling ===== */
+/* ===== Dividers ===== */
 .main hr {
     border-color: rgba(255, 107, 107, 0.2);
     margin: 1.5rem 0;
-}
-
-/* ===== Caption styling ===== */
-.stCaption {
-    opacity: 0.6;
 }
 </style>
 """
 
 
 def apply_plotly_style(fig):
-    """Apply consistent styling to Plotly figures."""
+    """Apply consistent styling to Plotly figures (theme-aware)."""
+    colors = get_theme_colors()
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=COLORS["text_primary"], family="sans-serif"),
+        font=dict(color=colors["text_primary"], family="sans-serif"),
         xaxis=dict(
             gridcolor="rgba(128,128,128,0.2)",
             linecolor="rgba(128,128,128,0.3)",
-            tickfont=dict(color=COLORS["text_secondary"]),
+            tickfont=dict(color=colors["text_secondary"]),
         ),
         yaxis=dict(
             gridcolor="rgba(128,128,128,0.2)",
             linecolor="rgba(128,128,128,0.3)",
-            tickfont=dict(color=COLORS["text_secondary"]),
+            tickfont=dict(color=colors["text_secondary"]),
         ),
-        legend=dict(font=dict(color=COLORS["text_secondary"])),
+        legend=dict(font=dict(color=colors["text_secondary"])),
     )
     return fig
 
 
 def format_rating_change(value):
-    """Format rating change with color indicator."""
+    """Format rating change with color indicator (uses accent colors - theme-independent)."""
     if pd.isna(value):
         return ""
     if value > 0:
-        return f"<span style='color: {COLORS['success']}'>+{value:.1f}</span>"
+        return f"<span style='color: {ACCENT_COLORS['success']}'>+{value:.1f}</span>"
     elif value < 0:
-        return f"<span style='color: {COLORS['danger']}'>{value:.1f}</span>"
+        return f"<span style='color: {ACCENT_COLORS['danger']}'>{value:.1f}</span>"
     else:
-        return f"<span style='color: {COLORS['text_muted']}'>{value:.1f}</span>"
+        return f"<span style='color: #888888'>{value:.1f}</span>"  # Neutral gray works in both themes
 
 
 def format_trend(trend):
-    """Format trend indicator with color."""
+    """Format trend indicator with color (uses accent colors - theme-independent)."""
     if trend == "↑":
-        return f"<span style='color: {COLORS['success']}; font-size: 1.25rem;'>↑</span>"
+        return f"<span style='color: {ACCENT_COLORS['success']}; font-size: 1.25rem;'>↑</span>"
     elif trend == "↓":
-        return f"<span style='color: {COLORS['danger']}; font-size: 1.25rem;'>↓</span>"
+        return f"<span style='color: {ACCENT_COLORS['danger']}; font-size: 1.25rem;'>↓</span>"
     else:
-        return f"<span style='color: {COLORS['text_muted']}; font-size: 1.25rem;'>→</span>"
+        return f"<span style='color: #888888; font-size: 1.25rem;'>→</span>"  # Neutral gray works in both themes
 
 
 # --- Constants ---
@@ -322,9 +317,24 @@ def main():
     # Inject custom CSS
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-    # Title with subtitle
-    st.title("🎮 DFTL Ranking Dashboard")
-    st.caption("Track Elo ratings, compare players, and analyze performance trends")
+    # Title with logo (using HTML for proper vertical alignment)
+    import base64
+    logo_path = Path(__file__).parent / "images" / "dftl_logo.png"
+    if logo_path.exists():
+        with open(logo_path, "rb") as f:
+            logo_b64 = base64.b64encode(f.read()).decode()
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 0.5rem;">
+            <img src="data:image/png;base64,{logo_b64}" style="width: 120px; height: auto;">
+            <div>
+                <h1 style="margin: 0; padding: 0; font-size: 2.5rem; font-weight: 700;">DFTL Ranking Dashboard</h1>
+                <p style="margin: 0.25rem 0 0 0; opacity: 0.7; font-size: 1rem;">Track Elo ratings, compare players, and analyze performance trends</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.title("DFTL Ranking Dashboard")
+        st.caption("Track Elo ratings, compare players, and analyze performance trends")
     st.markdown("---")
 
     # Check for available datasets
@@ -622,7 +632,7 @@ def main():
                     x='rating',
                     nbins=20,
                     labels={'rating': 'Elo Rating', 'count': 'Players'},
-                    color_discrete_sequence=[COLORS["primary"]]
+                    color_discrete_sequence=[ACCENT_COLORS["primary"]]
                 )
                 apply_plotly_style(fig_dist)
                 fig_dist.update_layout(
@@ -635,9 +645,9 @@ def main():
                 fig_dist.add_vline(
                     x=df_ratings['rating'].median(),
                     line_dash="dash",
-                    line_color=COLORS["warning"],
+                    line_color=ACCENT_COLORS["warning"],
                     annotation_text=f"Median: {df_ratings['rating'].median():.0f}",
-                    annotation_font_color=COLORS["warning"]
+                    annotation_font_color=ACCENT_COLORS["warning"]
                 )
                 st.plotly_chart(fig_dist, use_container_width=True)
 
@@ -816,7 +826,7 @@ def main():
                         y='rating',
                         markers=True,
                         labels={'date': 'Date', 'rating': 'Elo Rating'},
-                        color_discrete_sequence=[COLORS["primary"]]
+                        color_discrete_sequence=[ACCENT_COLORS["primary"]]
                     )
                     apply_plotly_style(fig_rating)
                     fig_rating.update_layout(
@@ -827,9 +837,9 @@ def main():
                     fig_rating.add_hline(
                         y=1500,
                         line_dash="dash",
-                        line_color=COLORS["text_muted"],
+                        line_color="#888888",
                         annotation_text="Baseline",
-                        annotation_font_color=COLORS["text_muted"]
+                        annotation_font_color="#888888"
                     )
                     # Add peak rating marker
                     peak_idx = df_chart['rating'].idxmax()
@@ -838,7 +848,7 @@ def main():
                         x=[peak_row['date']],
                         y=[peak_row['rating']],
                         mode='markers',
-                        marker=dict(size=12, color=COLORS["warning"], symbol='star'),
+                        marker=dict(size=12, color=ACCENT_COLORS["warning"], symbol='star'),
                         name='Peak',
                         hovertemplate=f"Peak: {peak_row['rating']:.0f}<extra></extra>"
                     )
@@ -878,11 +888,11 @@ def main():
                     markers=True,
                     labels={'date': 'Date', 'player_name': 'Elo #1'},
                     category_orders={'player_name': all_rank1_players},
-                    color_discrete_sequence=[COLORS["primary"]]
+                    color_discrete_sequence=[ACCENT_COLORS["primary"]]
                 )
                 fig_rank1.update_traces(
-                    line=dict(shape='hv', color=COLORS["primary"]),  # Step line
-                    marker=dict(size=8, color=COLORS["primary"]),
+                    line=dict(shape='hv', color=ACCENT_COLORS["primary"]),  # Step line
+                    marker=dict(size=8, color=ACCENT_COLORS["primary"]),
                     hovertemplate='%{y}<br>%{x|%Y-%m-%d}<extra></extra>'
                 )
                 apply_plotly_style(fig_rank1)
@@ -896,7 +906,7 @@ def main():
                         tickmode='array',
                         tickvals=all_rank1_players,
                         ticktext=all_rank1_players,
-                        tickfont=dict(color=COLORS["text_secondary"])
+                        tickfont=dict(color="#888888")
                     )
                 )
                 st.plotly_chart(fig_rank1, use_container_width=True)
@@ -1148,24 +1158,24 @@ def main():
                         else:
                             last_winner = "Tie"
 
-                        # Display encounter badges
+                        # Display encounter badges (theme-aware using CSS variables)
                         col_first, col_last = st.columns(2)
                         with col_first:
                             st.markdown(f"""
-                            <div style="background: linear-gradient(135deg, {COLORS['bg_card']} 0%, rgba(59,130,246,0.2) 100%);
-                                        border: 1px solid {COLORS['info']}; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: {COLORS['text_secondary']}; margin-bottom: 0.25rem;">First Encounter</div>
-                                <div style="font-size: 1.25rem; font-weight: 700; color: {COLORS['text_primary']};">{first_date.strftime('%Y-%m-%d')}</div>
-                                <div style="font-size: 0.875rem; color: {COLORS['info']};">Winner: {first_winner}</div>
+                            <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.2) 100%);
+                                        border: 1px solid {ACCENT_COLORS['info']}; border-radius: 8px; padding: 1rem; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">First Encounter</div>
+                                <div style="font-size: 1.25rem; font-weight: 700;">{first_date.strftime('%Y-%m-%d')}</div>
+                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['info']};">Winner: {first_winner}</div>
                             </div>
                             """, unsafe_allow_html=True)
                         with col_last:
                             st.markdown(f"""
-                            <div style="background: linear-gradient(135deg, {COLORS['bg_card']} 0%, rgba(255,107,107,0.2) 100%);
-                                        border: 1px solid {COLORS['primary']}; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: {COLORS['text_secondary']}; margin-bottom: 0.25rem;">Last Encounter</div>
-                                <div style="font-size: 1.25rem; font-weight: 700; color: {COLORS['text_primary']};">{last_date.strftime('%Y-%m-%d')}</div>
-                                <div style="font-size: 0.875rem; color: {COLORS['primary']};">Winner: {last_winner}</div>
+                            <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.2) 100%);
+                                        border: 1px solid {ACCENT_COLORS['primary']}; border-radius: 8px; padding: 1rem; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">Last Encounter</div>
+                                <div style="font-size: 1.25rem; font-weight: 700;">{last_date.strftime('%Y-%m-%d')}</div>
+                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['primary']};">Winner: {last_winner}</div>
                             </div>
                             """, unsafe_allow_html=True)
 
@@ -1189,7 +1199,7 @@ def main():
                             color='player',
                             markers=True,
                             labels={'date': 'Date', 'rating': 'Elo Rating', 'player': 'Player'},
-                            color_discrete_map={player1: COLORS["info"], player2: COLORS["warning"]}
+                            color_discrete_map={player1: ACCENT_COLORS["info"], player2: ACCENT_COLORS["warning"]}
                         )
                         fig_elo.update_traces(
                             hovertemplate='%{fullData.name}: %{y:.0f}<extra></extra>'
@@ -1204,16 +1214,16 @@ def main():
                                 y=1.02,
                                 xanchor="center",
                                 x=0.5,
-                                font=dict(color=COLORS["text_secondary"])
+                                font=dict(color="#888888")
                             ),
                             margin=dict(l=20, r=20, t=40, b=20)
                         )
                         fig_elo.add_hline(
                             y=1500,
                             line_dash="dash",
-                            line_color=COLORS["text_muted"],
+                            line_color="#888888",
                             annotation_text="Baseline",
-                            annotation_font_color=COLORS["text_muted"]
+                            annotation_font_color="#888888"
                         )
                         st.plotly_chart(fig_elo, use_container_width=True)
 
@@ -1245,7 +1255,7 @@ def main():
                             color='player',
                             markers=True,
                             labels={'date': 'Date', 'score': 'Score', 'player': 'Player'},
-                            color_discrete_map={player1: COLORS["info"], player2: COLORS["warning"]}
+                            color_discrete_map={player1: ACCENT_COLORS["info"], player2: ACCENT_COLORS["warning"]}
                         )
                         fig_score.update_traces(
                             hovertemplate='%{fullData.name}: %{y:,.0f}<extra></extra>'
@@ -1260,7 +1270,7 @@ def main():
                                 y=1.02,
                                 xanchor="center",
                                 x=0.5,
-                                font=dict(color=COLORS["text_secondary"])
+                                font=dict(color="#888888")
                             ),
                             margin=dict(l=20, r=20, t=40, b=20)
                         )
@@ -1281,7 +1291,7 @@ def main():
                                 values='Count',
                                 names='Result',
                                 hole=0.4,
-                                color_discrete_sequence=[COLORS["info"], COLORS["warning"], COLORS["success"]]
+                                color_discrete_sequence=[ACCENT_COLORS["info"], ACCENT_COLORS["warning"], ACCENT_COLORS["success"]]
                             )
                             fig_pie.update_traces(
                                 textposition='inside',
@@ -1300,7 +1310,7 @@ def main():
                                     y=-0.1,
                                     xanchor="center",
                                     x=0.5,
-                                    font=dict(size=12, color=COLORS["text_secondary"])
+                                    font=dict(size=12, color="#888888")
                                 )
                             )
                             st.plotly_chart(fig_pie, use_container_width=True)
