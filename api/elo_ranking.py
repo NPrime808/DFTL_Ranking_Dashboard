@@ -1,75 +1,71 @@
-import pandas as pd
-from pathlib import Path
-from collections import defaultdict
+"""
+Elo Ranking System for DFTL
+
+This module computes Elo ratings from daily leaderboard data using a pairwise
+comparison model. It supports multiple datasets and includes features like:
+- Dynamic K-factor based on games played
+- Uncertainty amplification for inactive players
+- Activity gating to filter inactive players from rankings
+- Soft rating compression to prevent extreme values
+
+Usage:
+    python -m api.elo_ranking
+    OR
+    python api/elo_ranking.py
+"""
+
 import sys
+from pathlib import Path
+
+# Add project root to path for direct script execution
+_project_root = str(Path(__file__).parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+import pandas as pd
+from collections import defaultdict
+
+from api.config import (
+    OUTPUT_FOLDER,
+    BASELINE_RATING,
+    K_NORMALIZED,
+    RATING_FLOOR,
+    FLOOR_SOFT_ZONE,
+    TARGET_MIN_RATING,
+    TARGET_MAX_RATING,
+    USE_DYNAMIC_K,
+    DYNAMIC_K_NEW_PLAYER_GAMES,
+    DYNAMIC_K_ESTABLISHED_GAMES,
+    DYNAMIC_K_NEW_MULTIPLIER,
+    DYNAMIC_K_PROVISIONAL_MULTIPLIER,
+    USE_UNCERTAINTY,
+    UNCERTAINTY_BASE,
+    UNCERTAINTY_GROWTH_RATE,
+    UNCERTAINTY_MAX,
+    UNCERTAINTY_DECAY_RATE,
+    USE_ACTIVITY_GATING,
+    ACTIVITY_WINDOW_DAYS,
+    MIN_GAMES_FOR_RANKING,
+    ELO_MODEL,
+    USE_LOG_SCALING,
+    LOG_SCALE_FACTOR,
+    USE_SCORE_GAP_WEIGHTING,
+    USE_RATIO_BASED_WEIGHTING,
+    RATIO_CAP,
+    DAILY_K_FACTOR,
+    DAILY_K_NEW_MULTIPLIER,
+    DAILY_K_PROVISIONAL_MULTIPLIER,
+    EARLY_ACCESS_PATTERN,
+    FULL_PATTERN,
+)
+from api.utils import setup_logging, cleanup_old_files, atomic_write_csv
+
+# --- Module Logger ---
+logger = setup_logging(__name__)
 
 # Fix Windows console encoding for Unicode characters
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
-
-# --- CONFIG ---
-BASELINE_RATING = 1500  # Starting rating for all new players (above floor to allow differentiation)
-K_FACTOR = 180  # Elo K-factor (higher = faster rating changes)
-# Normalize K by number of opponents (29) to prevent rating explosion
-# Each player faces 29 opponents per day, so effective K per comparison is lower
-K_NORMALIZED = K_FACTOR / 29
-
-# --- Rating Floor Config ---
-# Hard floor: players can never go below this rating
-# Soft zone: winners get reduced gains when beating players near the floor
-# This prevents inflation while protecting bottom-30 players from unfair punishment
-RATING_FLOOR = 1000
-FLOOR_SOFT_ZONE = 100  # Ratings from FLOOR to FLOOR+SOFT_ZONE get reduced winner gains
-# At floor: winner gains 0%, at floor+soft_zone: winner gains 100%
-
-# --- Elo Model Selection ---
-# "pairwise": Original model - 29 separate comparisons per player per day
-# "daily_result": New model - single update based on rank vs expected rank
-ELO_MODEL = "pairwise"  # Change to "daily_result" to use daily result model
-
-# Daily Result Model config
-DAILY_K_FACTOR = 32  # K-factor for daily result model (similar to chess)
-DAILY_K_NEW_MULTIPLIER = 2.0  # Multiplier for new players
-DAILY_K_PROVISIONAL_MULTIPLIER = 1.5  # Multiplier for provisional players
-
-# Logarithmic Scaling - compresses large daily swings
-# Addresses: "one bad day = one penalty, not 17 penalties"
-USE_LOG_SCALING = True
-LOG_SCALE_FACTOR = 30  # Controls compression strength (higher = less compression)
-
-USE_SCORE_GAP_WEIGHTING = True  # Weight updates by score difference
-USE_RATIO_BASED_WEIGHTING = True  # Use score ratio (logarithmic) instead of linear gap
-RATIO_CAP = 10  # Score ratio at which weight reaches maximum (10x = dominant performance)
-USE_DYNAMIC_K = True  # Adjust K based on games played (new players adjust faster)
-
-# Dynamic K thresholds
-DYNAMIC_K_NEW_PLAYER_GAMES = 10  # Games until "provisional" period ends
-DYNAMIC_K_ESTABLISHED_GAMES = 30  # Games until fully "established"
-DYNAMIC_K_NEW_MULTIPLIER = 1.5  # K multiplier for new players
-DYNAMIC_K_PROVISIONAL_MULTIPLIER = 1.2  # K multiplier for provisional players
-
-# Target rating bounds (soft targets for asymmetric scaling)
-TARGET_MIN_RATING = 1000  # Matches RATING_FLOOR
-TARGET_MAX_RATING = 2800
-
-# --- Uncertainty Config (Loss-Amplifying) ---
-USE_UNCERTAINTY = True  # Enable loss-amplifying uncertainty
-UNCERTAINTY_BASE = 1.0  # Starting uncertainty (no amplification)
-UNCERTAINTY_GROWTH_RATE = 0.05  # Uncertainty growth per inactive day
-UNCERTAINTY_MAX = 1.5  # Maximum uncertainty multiplier
-UNCERTAINTY_DECAY_RATE = 0.5  # How fast uncertainty decays after active day (0-1)
-
-# --- Activity Gating Config ---
-USE_ACTIVITY_GATING = True  # Filter inactive players from rankings
-ACTIVITY_WINDOW_DAYS = 7  # Days of inactivity before player is hidden from rankings
-MIN_GAMES_FOR_RANKING = 7  # Minimum games required to appear in rankings
-
-# --- Paths ---
-OUTPUT_FOLDER = Path(r"C:\Users\Nicol\DFTL_score_system\output")
-# Input file patterns
-STEAM_DEMO_PATTERN = "steam_demo_leaderboard_*.csv"
-EARLY_ACCESS_PATTERN = "early_access_leaderboard_*.csv"
-FULL_PATTERN = "full_leaderboard_*.csv"
 
 
 def expected_score(rating_a, rating_b):
@@ -499,7 +495,7 @@ def run_elo_ranking(df):
 
     # Process each date chronologically
     dates = sorted(df['date'].unique())
-    print(f"Processing {len(dates)} days of leaderboard data using '{ELO_MODEL}' model...")
+    logger.info(f"Processing {len(dates)} days of leaderboard data using '{ELO_MODEL}' model...")
 
     for date in dates:
         day_df = df[df['date'] == date]
@@ -539,7 +535,7 @@ def run_elo_ranking(df):
                 'active_rank': active_rank
             })
 
-    print(f"Processed {len(dates)} days, {len(ratings)} unique players")
+    logger.info(f"Processed {len(dates)} days, {len(ratings)} unique players")
 
     # Scale final ratings using soft compression
     scaled_ratings = scale_ratings_soft(ratings, BASELINE_RATING, TARGET_MIN_RATING, TARGET_MAX_RATING)
@@ -663,16 +659,16 @@ def process_dataset(input_pattern, output_prefix, label):
     # Find the most recent file matching the pattern
     input_files = sorted(OUTPUT_FOLDER.glob(input_pattern))
     if not input_files:
-        print(f"Error: No files matching {input_pattern} found in {OUTPUT_FOLDER}")
+        logger.error(f"No files matching {input_pattern} found in {OUTPUT_FOLDER}")
         return None, None, None
 
     input_csv = input_files[-1]  # Most recent (sorted by date in filename)
-    print(f"\n{'='*60}")
-    print(f"Processing {label} data")
-    print(f"{'='*60}")
-    print(f"Loading data from {input_csv}")
+    logger.info("=" * 60)
+    logger.info(f"Processing {label} data")
+    logger.info("=" * 60)
+    logger.info(f"Loading data from {input_csv}")
     df = pd.read_csv(input_csv, parse_dates=['date'])
-    print(f"Loaded {len(df)} rows, {df['date'].nunique()} unique dates")
+    logger.info(f"Loaded {len(df)} rows, {df['date'].nunique()} unique dates")
 
     # Get the date from the data for output filenames
     last_date = df['date'].max().strftime('%Y%m%d')
@@ -685,53 +681,51 @@ def process_dataset(input_pattern, output_prefix, label):
         total_players = len(all_players)
         active_players = len(final_ratings)
         inactive_players = total_players - active_players
-        print(f"\n--- Activity Gating ({label}) ---")
-        print(f"Total players: {total_players}")
-        print(f"Active players (last {ACTIVITY_WINDOW_DAYS} days): {active_players}")
-        print(f"Inactive players (hidden from rankings): {inactive_players}")
+        logger.info(f"Activity Gating ({label}):")
+        logger.info(f"  Total players: {total_players}")
+        logger.info(f"  Active players (last {ACTIVITY_WINDOW_DAYS} days): {active_players}")
+        logger.info(f"  Inactive players (hidden from rankings): {inactive_players}")
 
     # Display top players
-    print(f"\n--- Top 20 Active Players by Elo Rating ({label}) ---")
-    print(final_ratings.head(20).to_string(index=False))
+    logger.info(f"Top 20 Active Players by Elo Rating ({label}):")
+    logger.info("\n" + final_ratings.head(20).to_string(index=False))
 
     # Display bottom players
-    print(f"\n--- Bottom 10 Active Players by Elo Rating ({label}) ---")
-    print(final_ratings.tail(10).to_string(index=False))
+    logger.info(f"Bottom 10 Active Players by Elo Rating ({label}):")
+    logger.info("\n" + final_ratings.tail(10).to_string(index=False))
 
     # Summary stats
-    print(f"\n--- Rating Statistics - Active Players ({label}) ---")
-    print(f"Mean rating: {final_ratings['rating'].mean():.2f}")
-    print(f"Median rating: {final_ratings['rating'].median():.2f}")
-    print(f"Std deviation: {final_ratings['rating'].std():.2f}")
-    print(f"Min rating: {final_ratings['rating'].min():.2f}")
-    print(f"Max rating: {final_ratings['rating'].max():.2f}")
+    logger.info(f"Rating Statistics - Active Players ({label}):")
+    logger.info(f"  Mean rating: {final_ratings['rating'].mean():.2f}")
+    logger.info(f"  Median rating: {final_ratings['rating'].median():.2f}")
+    logger.info(f"  Std deviation: {final_ratings['rating'].std():.2f}")
+    logger.info(f"  Min rating: {final_ratings['rating'].min():.2f}")
+    logger.info(f"  Max rating: {final_ratings['rating'].max():.2f}")
 
     # Export to CSV with date in filename
     ratings_csv = OUTPUT_FOLDER / f"{output_prefix}_elo_ratings_{last_date}.csv"
     all_ratings_csv = OUTPUT_FOLDER / f"{output_prefix}_elo_ratings_all_{last_date}.csv"
     history_csv = OUTPUT_FOLDER / f"{output_prefix}_elo_history_{last_date}.csv"
 
-    final_ratings.to_csv(ratings_csv, index=False)
-    all_players.to_csv(all_ratings_csv, index=False)
-    daily_history.to_csv(history_csv, index=False)
+    atomic_write_csv(final_ratings, ratings_csv, index=False)
+    atomic_write_csv(all_players, all_ratings_csv, index=False)
+    atomic_write_csv(daily_history, history_csv, index=False)
 
-    print(f"\n--- Exported CSV files ({label}) ---")
-    print(f"Active ratings: {ratings_csv}")
-    print(f"All ratings (including inactive): {all_ratings_csv}")
-    print(f"Daily history: {history_csv}")
+    # Clean up old output files (keep only the newest)
+    cleanup_old_files(f"{output_prefix}_elo_ratings_*.csv", keep_file=ratings_csv, folder=OUTPUT_FOLDER)
+    cleanup_old_files(f"{output_prefix}_elo_ratings_all_*.csv", keep_file=all_ratings_csv, folder=OUTPUT_FOLDER)
+    cleanup_old_files(f"{output_prefix}_elo_history_*.csv", keep_file=history_csv, folder=OUTPUT_FOLDER)
+
+    logger.info(f"Exported CSV files ({label}):")
+    logger.info(f"  Active ratings: {ratings_csv}")
+    logger.info(f"  All ratings (including inactive): {all_ratings_csv}")
+    logger.info(f"  Daily history: {history_csv}")
 
     return final_ratings, daily_history, all_players
 
 
 def main():
     results = {}
-
-    # Process steam demo data
-    demo_ratings, demo_history, demo_all = process_dataset(
-        STEAM_DEMO_PATTERN, "steam_demo", "Steam Demo"
-    )
-    if demo_ratings is not None:
-        results['steam_demo'] = (demo_ratings, demo_history, demo_all)
 
     # Process early access data
     ea_ratings, ea_history, ea_all = process_dataset(
