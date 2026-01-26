@@ -15,6 +15,245 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- Design System ---
+# Color Palette (consistent with config.toml theme)
+COLORS = {
+    # Primary brand colors
+    "primary": "#FF6B6B",       # Coral red - primary accent
+    "primary_light": "#FF8E8E",
+    "primary_dark": "#E55555",
+    # Background colors (from config.toml)
+    "bg_dark": "#0E1117",
+    "bg_card": "#262730",
+    "bg_hover": "#3D3D4D",
+    # Text colors
+    "text_primary": "#FAFAFA",
+    "text_secondary": "#B0B0B0",
+    "text_muted": "#808080",
+    # Semantic colors
+    "success": "#10B981",       # Green - positive changes
+    "warning": "#F59E0B",       # Amber - neutral/caution
+    "danger": "#EF4444",        # Red - negative changes
+    "info": "#3B82F6",          # Blue - informational
+    # Chart colors (ordered for visual distinction)
+    "chart_palette": [
+        "#FF6B6B", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6",
+        "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1"
+    ],
+}
+
+# Plotly chart template for consistency
+PLOTLY_TEMPLATE = {
+    "layout": {
+        "paper_bgcolor": "rgba(0,0,0,0)",
+        "plot_bgcolor": "rgba(0,0,0,0)",
+        "font": {"color": COLORS["text_primary"], "family": "sans-serif"},
+        "title": {"font": {"size": 16, "color": COLORS["text_primary"]}},
+        "xaxis": {
+            "gridcolor": "rgba(128,128,128,0.2)",
+            "linecolor": "rgba(128,128,128,0.3)",
+            "tickfont": {"color": COLORS["text_secondary"]},
+        },
+        "yaxis": {
+            "gridcolor": "rgba(128,128,128,0.2)",
+            "linecolor": "rgba(128,128,128,0.3)",
+            "tickfont": {"color": COLORS["text_secondary"]},
+        },
+        "legend": {"font": {"color": COLORS["text_secondary"]}},
+        "colorway": COLORS["chart_palette"],
+    }
+}
+
+# Custom CSS for visual hierarchy and spacing (theme-aware)
+CUSTOM_CSS = """
+<style>
+/* ===== Typography Hierarchy ===== */
+.main h1 {
+    font-size: 2.25rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.025em !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.main h2 {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 1rem !important;
+}
+
+.main h3 {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+}
+
+/* ===== Section Containers ===== */
+.stTabs [data-baseweb="tab-panel"] {
+    padding-top: 1.5rem;
+}
+
+/* Metric card improvements - theme aware */
+[data-testid="stMetric"] {
+    background-color: var(--secondary-background-color);
+    border: 1px solid rgba(255, 107, 107, 0.25);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+[data-testid="stMetric"] label {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    opacity: 0.7;
+}
+
+[data-testid="stMetric"] [data-testid="stMetricValue"] {
+    font-size: 1.75rem !important;
+    font-weight: 700 !important;
+}
+
+/* ===== Data Tables ===== */
+.stDataFrame {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Table header styling - theme aware */
+.stDataFrame thead th {
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.05em !important;
+    padding: 0.75rem 1rem !important;
+}
+
+/* ===== Sidebar Styling ===== */
+[data-testid="stSidebar"] .stMarkdown hr {
+    border-color: rgba(255, 107, 107, 0.2);
+    margin: 1.5rem 0;
+}
+
+/* ===== Tab Styling ===== */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0.5rem;
+    background-color: transparent;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background-color: transparent;
+    border-radius: 6px 6px 0 0;
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: rgba(255, 107, 107, 0.15) !important;
+    border-bottom: 2px solid #FF6B6B !important;
+}
+
+/* ===== Buttons ===== */
+.stButton > button {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.stButton > button:hover {
+    border-color: #FF6B6B;
+    color: #FF6B6B;
+}
+
+/* ===== Toggle Styling ===== */
+[data-testid="stToggle"] label span {
+    font-weight: 500 !important;
+}
+
+/* ===== Expander Styling ===== */
+.streamlit-expanderHeader {
+    font-weight: 600 !important;
+}
+
+/* ===== Select boxes ===== */
+[data-testid="stSelectbox"] label {
+    font-weight: 500 !important;
+    opacity: 0.8;
+}
+
+/* ===== Date input ===== */
+[data-testid="stDateInput"] label {
+    font-weight: 500 !important;
+    opacity: 0.8;
+}
+
+/* ===== Spacing utilities ===== */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Reduce spacing between elements */
+.element-container {
+    margin-bottom: 0.5rem;
+}
+
+/* ===== Divider styling ===== */
+.main hr {
+    border-color: rgba(255, 107, 107, 0.2);
+    margin: 1.5rem 0;
+}
+
+/* ===== Caption styling ===== */
+.stCaption {
+    opacity: 0.6;
+}
+</style>
+"""
+
+
+def apply_plotly_style(fig):
+    """Apply consistent styling to Plotly figures."""
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=COLORS["text_primary"], family="sans-serif"),
+        xaxis=dict(
+            gridcolor="rgba(128,128,128,0.2)",
+            linecolor="rgba(128,128,128,0.3)",
+            tickfont=dict(color=COLORS["text_secondary"]),
+        ),
+        yaxis=dict(
+            gridcolor="rgba(128,128,128,0.2)",
+            linecolor="rgba(128,128,128,0.3)",
+            tickfont=dict(color=COLORS["text_secondary"]),
+        ),
+        legend=dict(font=dict(color=COLORS["text_secondary"])),
+    )
+    return fig
+
+
+def format_rating_change(value):
+    """Format rating change with color indicator."""
+    if pd.isna(value):
+        return ""
+    if value > 0:
+        return f"<span style='color: {COLORS['success']}'>+{value:.1f}</span>"
+    elif value < 0:
+        return f"<span style='color: {COLORS['danger']}'>{value:.1f}</span>"
+    else:
+        return f"<span style='color: {COLORS['text_muted']}'>{value:.1f}</span>"
+
+
+def format_trend(trend):
+    """Format trend indicator with color."""
+    if trend == "↑":
+        return f"<span style='color: {COLORS['success']}; font-size: 1.25rem;'>↑</span>"
+    elif trend == "↓":
+        return f"<span style='color: {COLORS['danger']}; font-size: 1.25rem;'>↓</span>"
+    else:
+        return f"<span style='color: {COLORS['text_muted']}; font-size: 1.25rem;'>→</span>"
+
+
 # --- Constants ---
 OUTPUT_FOLDER = Path(__file__).parent / "output"
 DATASET_OPTIONS = {
@@ -80,8 +319,12 @@ def get_available_datasets():
 
 # --- Main App ---
 def main():
-    # Title
+    # Inject custom CSS
+    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+    # Title with subtitle
     st.title("🎮 DFTL Ranking Dashboard")
+    st.caption("Track Elo ratings, compare players, and analyze performance trends")
     st.markdown("---")
 
     # Check for available datasets
@@ -118,6 +361,14 @@ def main():
 
         all_players = sorted(df_leaderboard['player_name'].unique())
 
+        # Create rating-sorted player list (active first, then hidden, both by rating desc)
+        if df_ratings_all is not None:
+            df_active_sorted = df_ratings_all[df_ratings_all['active_rank'].notna()].sort_values('rating', ascending=False)
+            df_hidden_sorted = df_ratings_all[df_ratings_all['active_rank'].isna()].sort_values('rating', ascending=False)
+            players_by_rating = df_active_sorted['player_name'].tolist() + df_hidden_sorted['player_name'].tolist()
+        else:
+            players_by_rating = all_players  # Fallback to alphabetical
+
         st.markdown("---")
         st.caption(f"Data range: {min_date} to {max_date}")
         st.caption(f"Players in Dataset: {len(all_players)}")
@@ -136,6 +387,10 @@ def main():
                 mime="text/csv",
                 help="Download the full daily leaderboard data"
             )
+
+        # Attribution
+        st.markdown("---")
+        st.caption("Made with 🫶 by N Prime")
 
     # Use full date range
     df_filtered = df_leaderboard.copy()
@@ -222,7 +477,7 @@ def main():
             # Player filter (above graph)
             selected_players = st.multiselect(
                 "Select players to compare",
-                options=all_players,
+                options=players_by_rating,
                 default=top_players_default,
                 placeholder="Default: top 10 by rating"
             )
@@ -261,11 +516,13 @@ def main():
                         'player_name': 'Player'
                     },
                     title="Rating Over Time",
-                    category_orders={'player_name': players_sorted_by_rating}
+                    category_orders={'player_name': players_sorted_by_rating},
+                    color_discrete_sequence=COLORS["chart_palette"]
                 )
                 fig.update_traces(
                     hovertemplate='%{fullData.name}: %{y:.0f}<extra></extra>'
                 )
+                apply_plotly_style(fig)
                 fig.update_layout(
                     hovermode='x unified',
                     height=600,
@@ -274,14 +531,16 @@ def main():
                         yanchor="bottom",
                         y=1.02,
                         xanchor="right",
-                        x=1
+                        x=1,
+                        font=dict(color=COLORS["text_secondary"])
                     )
                 )
                 fig.add_hline(
                     y=1500,
                     line_dash="dash",
-                    line_color="gray",
-                    annotation_text="Baseline (1500)"
+                    line_color=COLORS["text_muted"],
+                    annotation_text="Baseline (1500)",
+                    annotation_font_color=COLORS["text_muted"]
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -295,21 +554,24 @@ def main():
             # Date picker for historical rankings
             available_dates = sorted(df_history['date'].dt.date.unique(), reverse=True)
 
-            selected_ranking_date = st.date_input(
-                "Select date",
-                value=available_dates[0],  # Default to most recent
-                min_value=available_dates[-1],
-                max_value=available_dates[0],
-                key="ranking_date_picker"
-            )
+            # Date selector in a cleaner layout
+            col_date, col_spacer = st.columns([1, 3])
+            with col_date:
+                selected_ranking_date = st.date_input(
+                    "Select date",
+                    value=available_dates[0],  # Default to most recent
+                    min_value=available_dates[-1],
+                    max_value=available_dates[0],
+                    key="ranking_date_picker"
+                )
 
             # Check if viewing current (latest) date
             is_current_date = selected_ranking_date == available_dates[0]
 
             if is_current_date:
-                st.caption(f"Showing current rankings ({selected_ranking_date})")
+                st.caption(f"Showing current rankings as of {selected_ranking_date}")
             else:
-                st.caption(f"Showing historical rankings ({selected_ranking_date})")
+                st.caption(f"Viewing historical rankings from {selected_ranking_date}")
 
             # Get history data for selected date
             df_date_history = df_history[df_history['date'].dt.date == selected_ranking_date].copy()
@@ -346,11 +608,14 @@ def main():
                     else:
                         st.metric("Median Rating", "N/A")
 
-                # All players table
+                # Visual separator
+                st.markdown("---")
+
+                # Leaderboard section
                 st.subheader("Elo Ranking Leaderboard")
 
                 # Toggle to show inactive players
-                show_inactive = st.toggle("Show Hidden Players", value=False, help="Players inactive >7 days or with <7 ranked games")
+                show_inactive = st.toggle("Show Hidden Players", value=True, help="Players inactive >7 days or with <7 ranked games")
 
                 # Determine which data to display
                 if show_inactive:
@@ -438,8 +703,8 @@ def main():
                 # Determine columns based on available data
                 has_days_inactive = 'days_inactive' in df_rankings_display.columns
 
-                # Select columns to display
-                display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency']
+                # Select columns to display (including trend indicator)
+                display_cols = ['active_rank', 'player_name', 'rating', 'trend', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency']
                 if has_days_inactive:
                     display_cols.append('days_inactive')
 
@@ -453,6 +718,7 @@ def main():
                     "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
                     "player_name": st.column_config.TextColumn("Player"),
                     "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
+                    "trend": st.column_config.TextColumn("Trend", help="Performance trend: ↑ improving, ↓ declining, → stable"),
                     "games_played": st.column_config.NumberColumn("Games", format="%d"),
                     "wins": st.column_config.NumberColumn("Wins", format="%d"),
                     "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
@@ -476,9 +742,11 @@ def main():
                 st.markdown("---")
                 col_select, col_button = st.columns([3, 1])
                 with col_select:
+                    # Always show all players (active + hidden) sorted by rating
+                    all_players_sorted = df_date_history.sort_values('rating', ascending=False)['player_name'].tolist()
                     quick_select_player = st.selectbox(
                         "Quick jump to player history",
-                        options=df_rankings_display['player_name'].tolist(),
+                        options=all_players_sorted,
                         index=None,
                         placeholder="Select a player...",
                         key="tab1_player_select"
@@ -518,8 +786,9 @@ def main():
                     x='rating',
                     nbins=20,
                     labels={'rating': 'Elo Rating', 'count': 'Players'},
-                    color_discrete_sequence=['#636EFA']
+                    color_discrete_sequence=[COLORS["primary"]]
                 )
+                apply_plotly_style(fig_dist)
                 fig_dist.update_layout(
                     showlegend=False,
                     height=300,
@@ -530,13 +799,14 @@ def main():
                 fig_dist.add_vline(
                     x=df_ratings['rating'].median(),
                     line_dash="dash",
-                    line_color="orange",
-                    annotation_text=f"Median: {df_ratings['rating'].median():.0f}"
+                    line_color=COLORS["warning"],
+                    annotation_text=f"Median: {df_ratings['rating'].median():.0f}",
+                    annotation_font_color=COLORS["warning"]
                 )
                 st.plotly_chart(fig_dist, use_container_width=True)
 
             # Toggle to show inactive players
-            show_inactive = st.toggle("Show Hidden Players", value=False, help="Players inactive >7 days or with <7 ranked games")
+            show_inactive = st.toggle("Show Hidden Players", value=True, help="Players inactive >7 days or with <7 ranked games")
 
             # Determine which ratings to display
             if show_inactive and df_ratings_all is not None:
@@ -621,9 +891,11 @@ def main():
             st.markdown("---")
             col_select, col_button = st.columns([3, 1])
             with col_select:
+                # Always show all players (active + hidden) sorted by rating
+                all_players_sorted = df_ratings_all.sort_values('rating', ascending=False)['player_name'].tolist() if df_ratings_all is not None else df_ratings_display['player_name'].tolist()
                 quick_select_player2 = st.selectbox(
                     "Quick jump to player history",
-                    options=df_ratings_display['player_name'].tolist(),
+                    options=all_players_sorted,
                     index=None,
                     placeholder="Select a player...",
                     key="tab1_player_select_fallback"
@@ -645,7 +917,7 @@ def main():
             # Note: Value can be pre-set from Elo Rankings tab via session state key
             selected_player = st.selectbox(
                 "Select a player",
-                options=all_players,
+                options=players_by_rating,
                 index=None,
                 placeholder="Choose a player...",
                 key="tab4_player_select"
@@ -763,8 +1035,10 @@ def main():
                         x='date',
                         y='rating',
                         markers=True,
-                        labels={'date': 'Date', 'rating': 'Elo Rating'}
+                        labels={'date': 'Date', 'rating': 'Elo Rating'},
+                        color_discrete_sequence=[COLORS["primary"]]
                     )
+                    apply_plotly_style(fig_rating)
                     fig_rating.update_layout(
                         height=250,
                         margin=dict(l=20, r=20, t=30, b=20),
@@ -773,8 +1047,9 @@ def main():
                     fig_rating.add_hline(
                         y=1500,
                         line_dash="dash",
-                        line_color="gray",
-                        annotation_text="Baseline"
+                        line_color=COLORS["text_muted"],
+                        annotation_text="Baseline",
+                        annotation_font_color=COLORS["text_muted"]
                     )
                     # Add peak rating marker
                     peak_idx = df_chart['rating'].idxmax()
@@ -783,7 +1058,7 @@ def main():
                         x=[peak_row['date']],
                         y=[peak_row['rating']],
                         mode='markers',
-                        marker=dict(size=12, color='gold', symbol='star'),
+                        marker=dict(size=12, color=COLORS["warning"], symbol='star'),
                         name='Peak',
                         hovertemplate=f"Peak: {peak_row['rating']:.0f}<extra></extra>"
                     )
@@ -822,13 +1097,15 @@ def main():
                     y='player_name',
                     markers=True,
                     labels={'date': 'Date', 'player_name': 'Elo #1'},
-                    category_orders={'player_name': all_rank1_players}
+                    category_orders={'player_name': all_rank1_players},
+                    color_discrete_sequence=[COLORS["primary"]]
                 )
                 fig_rank1.update_traces(
-                    line=dict(shape='hv'),  # Step line
-                    marker=dict(size=8),
+                    line=dict(shape='hv', color=COLORS["primary"]),  # Step line
+                    marker=dict(size=8, color=COLORS["primary"]),
                     hovertemplate='%{y}<br>%{x|%Y-%m-%d}<extra></extra>'
                 )
+                apply_plotly_style(fig_rank1)
                 fig_rank1.update_layout(
                     height=max(200, len(all_rank1_players) * 25),  # Dynamic height based on player count
                     margin=dict(l=20, r=20, t=20, b=20),
@@ -838,7 +1115,8 @@ def main():
                     yaxis=dict(
                         tickmode='array',
                         tickvals=all_rank1_players,
-                        ticktext=all_rank1_players
+                        ticktext=all_rank1_players,
+                        tickfont=dict(color=COLORS["text_secondary"])
                     )
                 )
                 st.plotly_chart(fig_rank1, use_container_width=True)
@@ -883,7 +1161,7 @@ def main():
             with col_p1:
                 player1 = st.selectbox(
                     "Select Player 1",
-                    options=all_players,
+                    options=players_by_rating,
                     index=None,
                     placeholder="Choose Player 1...",
                     key="duel_player1"
@@ -892,7 +1170,7 @@ def main():
             with col_p2:
                 player2 = st.selectbox(
                     "Select Player 2",
-                    options=all_players,
+                    options=players_by_rating,
                     index=None,
                     placeholder="Choose Player 2...",
                     key="duel_player2"
@@ -1073,13 +1351,13 @@ def main():
                             # Filter out zero values
                             pie_data = pie_data[pie_data['Count'] > 0]
 
-                            # WCAG-compliant, colorblind-safe colors with high contrast
+                            # Use design system colors (colorblind-safe)
                             fig_pie = px.pie(
                                 pie_data,
                                 values='Count',
                                 names='Result',
                                 hole=0.4,
-                                color_discrete_sequence=['#3B82F6', '#F59E0B', '#10B981']  # Blue, Amber, Emerald
+                                color_discrete_sequence=[COLORS["info"], COLORS["warning"], COLORS["success"]]
                             )
                             fig_pie.update_traces(
                                 textposition='inside',
@@ -1087,6 +1365,7 @@ def main():
                                 textfont=dict(color='white', size=14),
                                 hovertemplate='%{label}: %{value} wins<extra></extra>'
                             )
+                            apply_plotly_style(fig_pie)
                             fig_pie.update_layout(
                                 height=250,
                                 margin=dict(l=20, r=20, t=20, b=20),
@@ -1097,7 +1376,7 @@ def main():
                                     y=-0.1,
                                     xanchor="center",
                                     x=0.5,
-                                    font=dict(size=12)
+                                    font=dict(size=12, color=COLORS["text_secondary"])
                                 )
                             )
                             st.plotly_chart(fig_pie, use_container_width=True)
