@@ -361,11 +361,11 @@ def main():
 
         all_players = sorted(df_leaderboard['player_name'].unique())
 
-        # Create rating-sorted player list (active first, then hidden, both by rating desc)
+        # Create rating-sorted player list (ranked first, then unranked, both by rating desc)
         if df_ratings_all is not None:
-            df_active_sorted = df_ratings_all[df_ratings_all['active_rank'].notna()].sort_values('rating', ascending=False)
-            df_hidden_sorted = df_ratings_all[df_ratings_all['active_rank'].isna()].sort_values('rating', ascending=False)
-            players_by_rating = df_active_sorted['player_name'].tolist() + df_hidden_sorted['player_name'].tolist()
+            df_ranked_sorted = df_ratings_all[df_ratings_all['active_rank'].notna()].sort_values('rating', ascending=False)
+            df_unranked_sorted = df_ratings_all[df_ratings_all['active_rank'].isna()].sort_values('rating', ascending=False)
+            players_by_rating = df_ranked_sorted['player_name'].tolist() + df_unranked_sorted['player_name'].tolist()
         else:
             players_by_rating = all_players  # Fallback to alphabetical
 
@@ -377,15 +377,16 @@ def main():
         st.markdown("---")
         st.header("📥 Export Data")
 
-        # Export leaderboard data
-        if df_leaderboard is not None:
-            csv_leaderboard = df_leaderboard.to_csv(index=False)
+        # Export leaderboard data (always use full dataset for complete data)
+        df_full_leaderboard = load_leaderboard_data("full")
+        if df_full_leaderboard is not None:
+            csv_leaderboard = df_full_leaderboard.to_csv(index=False)
             st.download_button(
                 label="Download Leaderboard CSV",
                 data=csv_leaderboard,
-                file_name=f"{dataset_prefix}_leaderboard.csv",
+                file_name="full_leaderboard.csv",
                 mime="text/csv",
-                help="Download the full daily leaderboard data"
+                help="Download the complete daily leaderboard data (all dates)"
             )
 
         # Attribution
@@ -398,19 +399,18 @@ def main():
     # --- Main Content ---
     st.markdown(f"**Active dataset:** {dataset_label}")
 
-    # Create tabs
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    # Create tabs (Elo Rankings first for main use case)
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "🏅 Elo Rankings",
-        "📈 Elo Rating History",
-        "📊 Daily Leaderboard",
+        "⚔️ Daily Duels",
         "👤 Player Tracker",
+        "📊 Steam Leaderboards",
         "🏆 Top 10 History",
-        "⚔️ Player Duel",
         "📖 FAQ / Glossary"
     ])
 
-    # --- Tab 3: Daily Leaderboard ---
-    with tab3:
+    # --- Tab 4: Steam Leaderboards ---
+    with tab4:
 
         # Date selector for specific day
         available_dates = sorted(df_filtered['date'].dt.date.unique(), reverse=True)
@@ -467,252 +467,81 @@ def main():
         else:
             st.warning("No data available for the selected date range.")
 
-    # --- Tab 2: Elo Rating History ---
-    with tab2:
-
-        if df_history is not None and df_ratings is not None:
-            # Get top 10 players by rating as default
-            top_players_default = df_ratings.head(10)['player_name'].tolist()
-
-            # Player filter (above graph)
-            selected_players = st.multiselect(
-                "Select players to compare",
-                options=players_by_rating,
-                default=top_players_default,
-                placeholder="Default: top 10 by rating"
-            )
-
-            if selected_players:
-                # Filter history for selected players
-                df_hist_filtered = df_history[
-                    df_history['player_name'].isin(selected_players)
-                ].copy()
-
-                # Filter to only active periods (days with Active Rank)
-                if 'active_rank' in df_hist_filtered.columns:
-                    df_hist_filtered = df_hist_filtered[df_hist_filtered['active_rank'].notna()]
-
-                # Filter to only days when players actually played
-                if 'score' in df_hist_filtered.columns:
-                    df_hist_filtered = df_hist_filtered[df_hist_filtered['score'].notna()]
-            else:
-                df_hist_filtered = pd.DataFrame()
-
-            if not df_hist_filtered.empty:
-                # Get latest rating for each player to sort legend
-                latest_ratings = df_hist_filtered.groupby('player_name')['rating'].last().sort_values(ascending=False)
-                players_sorted_by_rating = latest_ratings.index.tolist()
-
-                # Line chart with sorted legend
-                fig = px.line(
-                    df_hist_filtered,
-                    x='date',
-                    y='rating',
-                    color='player_name',
-                    markers=True,
-                    labels={
-                        'date': 'Date',
-                        'rating': 'Elo Rating',
-                        'player_name': 'Player'
-                    },
-                    title="Rating Over Time",
-                    category_orders={'player_name': players_sorted_by_rating},
-                    color_discrete_sequence=COLORS["chart_palette"]
-                )
-                fig.update_traces(
-                    hovertemplate='%{fullData.name}: %{y:.0f}<extra></extra>'
-                )
-                apply_plotly_style(fig)
-                fig.update_layout(
-                    hovermode='x unified',
-                    height=600,
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1,
-                        font=dict(color=COLORS["text_secondary"])
-                    )
-                )
-                fig.add_hline(
-                    y=1500,
-                    line_dash="dash",
-                    line_color=COLORS["text_muted"],
-                    annotation_text="Baseline (1500)",
-                    annotation_font_color=COLORS["text_muted"]
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No history data available for the selected players.")
-        else:
-            st.warning("Rating history data not available.")
-
-    # --- Tab 1: Current Rankings ---
+    # --- Tab 1: Elo Rankings ---
     with tab1:
         if df_history is not None and 'active_rank' in df_history.columns:
             # Date picker for historical rankings
             available_dates = sorted(df_history['date'].dt.date.unique(), reverse=True)
 
-            # Date selector in a cleaner layout
-            col_date, col_spacer = st.columns([1, 3])
+            # Compact header: date picker + metrics on same row
+            col_date, col1, col2, col3, col4, col5 = st.columns([1.2, 1, 1, 1, 1, 1])
             with col_date:
                 selected_ranking_date = st.date_input(
-                    "Select date",
-                    value=available_dates[0],  # Default to most recent
+                    "Date",
+                    value=available_dates[0],
                     min_value=available_dates[-1],
                     max_value=available_dates[0],
-                    key="ranking_date_picker"
+                    key="elo_ranking_date"
                 )
 
-            # Check if viewing current (latest) date
-            is_current_date = selected_ranking_date == available_dates[0]
-
-            if is_current_date:
-                st.caption(f"Showing current rankings as of {selected_ranking_date}")
-            else:
-                st.caption(f"Viewing historical rankings from {selected_ranking_date}")
-
-            # Get history data for selected date
+            # Load data for selected date and compute metrics
             df_date_history = df_history[df_history['date'].dt.date == selected_ranking_date].copy()
+
+            if not df_date_history.empty:
+                df_ranked = df_date_history[df_date_history['active_rank'].notna()].copy()
+                df_unranked = df_date_history[df_date_history['active_rank'].isna()].copy()
+                ranked_count = len(df_ranked)
+                unranked_count = len(df_unranked)
+                if 'games_played' in df_unranked.columns:
+                    too_few_games = len(df_unranked[df_unranked['games_played'] < 7])
+                    inactive_players = unranked_count - too_few_games
+                else:
+                    too_few_games = 0
+                    inactive_players = unranked_count
+                highest_rating = f"{df_ranked['rating'].max():.1f}" if not df_ranked.empty else "N/A"
+                avg_rating = f"{df_ranked['rating'].mean():.1f}" if not df_ranked.empty else "N/A"
+                median_rating = f"{df_ranked['rating'].median():.1f}" if not df_ranked.empty else "N/A"
+            else:
+                ranked_count = 0
+                unranked_count = 0
+                too_few_games = 0
+                inactive_players = 0
+                highest_rating = "N/A"
+                avg_rating = "N/A"
+                median_rating = "N/A"
+
+            # Display metrics (computed after date selection)
+            with col1:
+                st.metric("Ranked", ranked_count)
+            with col2:
+                st.metric("Unranked", unranked_count, help=f"<7 games: {too_few_games} | Inactive: {inactive_players}")
+            with col3:
+                st.metric("Top Rating", highest_rating)
+            with col4:
+                st.metric("Average", avg_rating)
+            with col5:
+                st.metric("Median", median_rating)
 
             if df_date_history.empty:
                 st.info(f"No ranking data for {selected_ranking_date}. Try another date.")
             else:
-                # Separate active and inactive players based on active_rank
-                df_active = df_date_history[df_date_history['active_rank'].notna()].copy()
-                df_inactive = df_date_history[df_date_history['active_rank'].isna()].copy()
-
-                active_count = len(df_active)
-                inactive_count = len(df_inactive)
-
-                # Summary metrics
-                col1, col2, col3, col4, col5 = st.columns(5)
-                with col1:
-                    st.metric("Active Players", active_count)
-                with col2:
-                    st.metric("Hidden Players", inactive_count)
-                with col3:
-                    if not df_active.empty:
-                        st.metric("Highest Rating", f"{df_active['rating'].max():.1f}")
-                    else:
-                        st.metric("Highest Rating", "N/A")
-                with col4:
-                    if not df_active.empty:
-                        st.metric("Average Rating", f"{df_active['rating'].mean():.1f}")
-                    else:
-                        st.metric("Average Rating", "N/A")
-                with col5:
-                    if not df_active.empty:
-                        st.metric("Median Rating", f"{df_active['rating'].median():.1f}")
-                    else:
-                        st.metric("Median Rating", "N/A")
-
-                # Visual separator
-                st.markdown("---")
-
                 # Leaderboard section
                 st.subheader("Elo Ranking Leaderboard")
 
-                # Toggle to show inactive players
-                show_inactive = st.toggle("Show Hidden Players", value=True, help="Players inactive >7 days or with <7 ranked games")
+                # Toggle to show unranked players
+                show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
 
-                # Determine which data to display
-                if show_inactive:
-                    df_rankings_to_display = df_date_history.copy()
-                else:
-                    df_rankings_to_display = df_active.copy()
-
-                # Calculate cumulative player stats UP TO the selected date
-                df_leaderboard_filtered = df_leaderboard[df_leaderboard['date'].dt.date <= selected_ranking_date]
-                player_stats = df_leaderboard_filtered.groupby('player_name').agg(
-                    wins=('rank', lambda x: (x == 1).sum()),
-                    top_10s=('rank', lambda x: (x <= 10).sum()),
-                    avg_daily_rank=('rank', 'mean'),
-                    total_games=('rank', 'count')
-                ).reset_index()
-                player_stats['avg_daily_rank'] = player_stats['avg_daily_rank'].round(1)
-                player_stats['win_rate'] = (player_stats['wins'] / player_stats['total_games'] * 100).round(1)
-                player_stats['top_10s_rate'] = (player_stats['top_10s'] / player_stats['total_games'] * 100).round(1)
-                player_stats = player_stats.drop(columns=['total_games'])
-
-                # Get history data filtered to selected date for peak rating
-                df_history_filtered = df_history[df_history['date'].dt.date <= selected_ranking_date]
-
-                # Calculate advanced metrics per player
-                advanced_stats = []
-                for player in df_rankings_to_display['player_name'].unique():
-                    player_games = df_leaderboard_filtered[
-                        df_leaderboard_filtered['player_name'] == player
-                    ].sort_values('date', ascending=False)
-
-                    player_history = df_history_filtered[
-                        df_history_filtered['player_name'] == player
-                    ]
-
-                    # Last 7 avg
-                    last7_games = player_games.head(7)
-                    avg_last7 = last7_games['rank'].mean() if len(last7_games) > 0 else None
-
-                    # Previous 7 avg (games 8-14)
-                    prev7_games = player_games.iloc[7:14] if len(player_games) > 7 else pd.DataFrame()
-                    avg_prev7 = prev7_games['rank'].mean() if len(prev7_games) > 0 else None
-
-                    # Trend: compare last 7 vs previous 7 (lower rank = better, so improving = last7 < prev7)
-                    if avg_last7 is not None and avg_prev7 is not None:
-                        diff = avg_prev7 - avg_last7  # positive = improving
-                        if diff > 1.5:
-                            trend = "↑"  # Improving
-                        elif diff < -1.5:
-                            trend = "↓"  # Declining
-                        else:
-                            trend = "→"  # Stable
-                    else:
-                        trend = "→"  # Not enough data
-
-                    # Peak rating
-                    peak_rating = player_history['rating'].max() if not player_history.empty else None
-
-                    # Days since last win
-                    win_games = player_games[player_games['rank'] == 1]
-                    if not win_games.empty:
-                        last_win_date = win_games.iloc[0]['date'].date()
-                        days_since_win = (selected_ranking_date - last_win_date).days
-                    else:
-                        days_since_win = None  # Never won
-
-                    # Consistency (last 14 games only)
-                    last14_games = player_games.head(14)
-                    consistency = last14_games['rank'].std() if len(last14_games) >= 2 else None
-
-                    advanced_stats.append({
-                        'player_name': player,
-                        'last_7': round(avg_last7, 1) if avg_last7 else None,
-                        'trend': trend,
-                        'peak_rating': round(peak_rating, 1) if peak_rating else None,
-                        'days_since_win': days_since_win,
-                        'consistency': round(consistency, 1) if consistency else None
-                    })
-
-                df_advanced = pd.DataFrame(advanced_stats)
-                player_stats = player_stats.merge(df_advanced, on='player_name', how='left')
-
-                # Merge stats with rankings
-                df_rankings_display = df_rankings_to_display.merge(player_stats, on='player_name', how='left')
-
-                # Determine columns based on available data
-                has_days_inactive = 'days_inactive' in df_rankings_display.columns
-
-                # Select columns to display (including trend indicator)
+                # Columns to display (defined once, reused)
                 display_cols = ['active_rank', 'player_name', 'rating', 'trend', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency']
-                if has_days_inactive:
+                if 'days_inactive' in df_date_history.columns:
                     display_cols.append('days_inactive')
 
-                # Sort by rating (highest first)
-                df_rankings_display = df_rankings_display.sort_values(
-                    by='rating',
-                    ascending=False
-                )
+                # Filter and sort in one operation (no unnecessary copies)
+                # All stats are pre-computed in the history CSV - just filter and display
+                if show_unranked:
+                    df_rankings_display = df_date_history.sort_values('rating', ascending=False)[display_cols]
+                else:
+                    df_rankings_display = df_date_history[df_date_history['active_rank'].notna()].sort_values('rating', ascending=False)[display_cols]
 
                 column_config = {
                     "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
@@ -726,13 +555,12 @@ def main():
                     "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
                     "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
                     "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average daily rank over last 7 games"),
-                    "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of daily ranks over last 14 games (lower = more consistent)")
+                    "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of daily ranks over last 14 games (lower = more consistent)"),
+                    "days_inactive": st.column_config.NumberColumn("Inactive", format="%d")
                 }
-                if has_days_inactive:
-                    column_config["days_inactive"] = st.column_config.NumberColumn("Inactive", format="%d")
 
                 st.dataframe(
-                    df_rankings_display[display_cols],
+                    df_rankings_display,
                     use_container_width=True,
                     hide_index=True,
                     column_config=column_config
@@ -742,11 +570,10 @@ def main():
                 st.markdown("---")
                 col_select, col_button = st.columns([3, 1])
                 with col_select:
-                    # Always show all players (active + hidden) sorted by rating
-                    all_players_sorted = df_date_history.sort_values('rating', ascending=False)['player_name'].tolist()
+                    # Use pre-sorted player list (df_date_history is already filtered for this date)
                     quick_select_player = st.selectbox(
                         "Quick jump to player history",
-                        options=all_players_sorted,
+                        options=df_date_history.sort_values('rating', ascending=False)['player_name'].tolist(),
                         index=None,
                         placeholder="Select a player...",
                         key="tab1_player_select"
@@ -762,16 +589,25 @@ def main():
             st.warning("Historical rankings not available. Showing current rankings only.")
 
             # Activity gating info
-            active_count = len(df_ratings)
-            total_count = len(df_ratings_all) if df_ratings_all is not None else active_count
-            inactive_count = total_count - active_count
+            ranked_count = len(df_ratings)
+            total_count = len(df_ratings_all) if df_ratings_all is not None else ranked_count
+            unranked_count = total_count - ranked_count
+
+            # Break down unranked players by reason
+            if df_ratings_all is not None and 'games_played' in df_ratings_all.columns:
+                df_unranked_all = df_ratings_all[df_ratings_all['active_rank'].isna()]
+                too_few_games = len(df_unranked_all[df_unranked_all['games_played'] < 7])
+                inactive_players = unranked_count - too_few_games
+            else:
+                too_few_games = 0
+                inactive_players = unranked_count
 
             # Summary metrics
             col1, col2, col3, col4, col5 = st.columns(5)
             with col1:
-                st.metric("Active Players", active_count)
+                st.metric("Ranked Players", ranked_count)
             with col2:
-                st.metric("Inactive Players", inactive_count)
+                st.metric("Unranked Players", unranked_count, help=f"<7 games: {too_few_games} | Inactive: {inactive_players}")
             with col3:
                 st.metric("Highest Rating", f"{df_ratings['rating'].max():.1f}")
             with col4:
@@ -805,11 +641,11 @@ def main():
                 )
                 st.plotly_chart(fig_dist, use_container_width=True)
 
-            # Toggle to show inactive players
-            show_inactive = st.toggle("Show Hidden Players", value=True, help="Players inactive >7 days or with <7 ranked games")
+            # Toggle to show unranked players
+            show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
 
             # Determine which ratings to display
-            if show_inactive and df_ratings_all is not None:
+            if show_unranked and df_ratings_all is not None:
                 df_ratings_to_display = df_ratings_all.copy()
             else:
                 df_ratings_to_display = df_ratings.copy()
@@ -859,7 +695,7 @@ def main():
             display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'last_seen']
             if has_days_inactive:
                 display_cols.insert(-1, 'days_inactive')
-            if has_uncertainty and show_inactive:
+            if has_uncertainty and show_unranked:
                 display_cols.insert(-1, 'uncertainty')
 
             column_config = {
@@ -891,7 +727,7 @@ def main():
             st.markdown("---")
             col_select, col_button = st.columns([3, 1])
             with col_select:
-                # Always show all players (active + hidden) sorted by rating
+                # Always show all players (ranked + unranked) sorted by rating
                 all_players_sorted = df_ratings_all.sort_values('rating', ascending=False)['player_name'].tolist() if df_ratings_all is not None else df_ratings_display['player_name'].tolist()
                 quick_select_player2 = st.selectbox(
                     "Quick jump to player history",
@@ -909,8 +745,8 @@ def main():
         else:
             st.warning("Ratings data not available.")
 
-    # --- Tab 4: Player History ---
-    with tab4:
+    # --- Tab 3: Player Tracker ---
+    with tab3:
 
         if df_history is not None:
             # Player selector (single selection)
@@ -930,65 +766,9 @@ def main():
                 ].copy()
 
                 if not df_player_history.empty:
-                    # Sort by date
-                    df_player_history = df_player_history.sort_values('date')
-
-                    # Calculate cumulative stats from leaderboard data
-                    df_player_leaderboard = df_leaderboard[
-                        df_leaderboard['player_name'] == selected_player
-                    ].sort_values('date')
-
-                    # Calculate cumulative wins, top 10s, avg rank, and recent avg for each date
-                    cumulative_stats = []
-                    total_wins = 0
-                    total_top_10s = 0
-                    all_ranks = []
-
-                    for _, row in df_player_leaderboard.iterrows():
-                        if row['rank'] == 1:
-                            total_wins += 1
-                        if row['rank'] <= 10:
-                            total_top_10s += 1
-                        all_ranks.append(row['rank'])
-
-                        # Calculate cumulative average daily rank
-                        avg_daily_rank = sum(all_ranks) / len(all_ranks)
-
-                        # Calculate recent avg (last 7 games)
-                        recent_ranks = all_ranks[-7:] if len(all_ranks) >= 7 else all_ranks
-                        recent_avg = sum(recent_ranks) / len(recent_ranks)
-
-                        # Calculate win rate and top 10 rate
-                        total_games = len(all_ranks)
-                        win_rate = (total_wins / total_games * 100) if total_games > 0 else 0
-                        top_10s_rate = (total_top_10s / total_games * 100) if total_games > 0 else 0
-
-                        # Calculate consistency (last 14 games)
-                        last_14_ranks = all_ranks[-14:] if len(all_ranks) >= 2 else all_ranks
-                        consistency = np.std(last_14_ranks) if len(last_14_ranks) >= 2 else None
-
-                        cumulative_stats.append({
-                            'date': row['date'],
-                            'wins': total_wins,
-                            'top_10s': total_top_10s,
-                            'avg_daily_rank': round(avg_daily_rank, 1),
-                            'last_7': round(recent_avg, 1),
-                            'win_rate': round(win_rate, 1),
-                            'top_10s_rate': round(top_10s_rate, 1),
-                            'consistency': round(consistency, 1) if consistency else None
-                        })
-
-                    df_cumulative = pd.DataFrame(cumulative_stats)
-
-                    # Merge cumulative stats with player history
-                    df_player_display = df_player_history.merge(
-                        df_cumulative,
-                        on='date',
-                        how='left'
-                    )
-
-                    # Only show days where the player actually played (score is not null)
-                    df_player_display = df_player_display[df_player_display['score'].notna()]
+                    # All stats are pre-computed in the history CSV - no runtime computation needed!
+                    # Just filter to days where the player actually played (score is not null)
+                    df_player_display = df_player_history[df_player_history['score'].notna()].copy()
 
                     # Determine if active_rank column exists
                     has_active_rank = 'active_rank' in df_player_display.columns
@@ -1070,7 +850,7 @@ def main():
         else:
             st.warning("History data not available.")
 
-    # --- Tab 5: Active Rank History ---
+    # --- Tab 5: Top 10 History ---
     with tab5:
 
         if df_history is not None and 'active_rank' in df_history.columns:
@@ -1152,8 +932,8 @@ def main():
         else:
             st.warning("Active rank history data not available.")
 
-    # --- Tab 6: Player Duel ---
-    with tab6:
+    # --- Tab 2: Daily Duels ---
+    with tab2:
 
         if df_history is not None:
             col_p1, col_p2 = st.columns(2)
@@ -1330,6 +1110,8 @@ def main():
 
                         # Summary statistics
                         st.subheader("Head-to-Head Summary")
+                        ties = len(common_dates) - p1_wins - p2_wins
+
                         col1, col2, col3, col4 = st.columns(4)
 
                         with col1:
@@ -1339,8 +1121,150 @@ def main():
                         with col3:
                             st.metric(f"{player2} Wins", p2_wins)
                         with col4:
-                            ties = len(common_dates) - p1_wins - p2_wins
                             st.metric("Ties", ties)
+
+                        # First and Last Encounter
+                        sorted_dates = sorted(common_dates)
+                        first_date = sorted_dates[0]
+                        last_date = sorted_dates[-1]
+
+                        # Get first encounter winner
+                        first_p1 = df_p1_played[df_p1_played['date'].dt.date == first_date].iloc[0]
+                        first_p2 = df_p2_played[df_p2_played['date'].dt.date == first_date].iloc[0]
+                        if first_p1['rank'] < first_p2['rank']:
+                            first_winner = player1
+                        elif first_p2['rank'] < first_p1['rank']:
+                            first_winner = player2
+                        else:
+                            first_winner = "Tie"
+
+                        # Get last encounter winner
+                        last_p1 = df_p1_played[df_p1_played['date'].dt.date == last_date].iloc[0]
+                        last_p2 = df_p2_played[df_p2_played['date'].dt.date == last_date].iloc[0]
+                        if last_p1['rank'] < last_p2['rank']:
+                            last_winner = player1
+                        elif last_p2['rank'] < last_p1['rank']:
+                            last_winner = player2
+                        else:
+                            last_winner = "Tie"
+
+                        # Display encounter badges
+                        col_first, col_last = st.columns(2)
+                        with col_first:
+                            st.markdown(f"""
+                            <div style="background: linear-gradient(135deg, {COLORS['bg_card']} 0%, rgba(59,130,246,0.2) 100%);
+                                        border: 1px solid {COLORS['info']}; border-radius: 8px; padding: 1rem; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: {COLORS['text_secondary']}; margin-bottom: 0.25rem;">First Encounter</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: {COLORS['text_primary']};">{first_date.strftime('%Y-%m-%d')}</div>
+                                <div style="font-size: 0.875rem; color: {COLORS['info']};">Winner: {first_winner}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        with col_last:
+                            st.markdown(f"""
+                            <div style="background: linear-gradient(135deg, {COLORS['bg_card']} 0%, rgba(255,107,107,0.2) 100%);
+                                        border: 1px solid {COLORS['primary']}; border-radius: 8px; padding: 1rem; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: {COLORS['text_secondary']}; margin-bottom: 0.25rem;">Last Encounter</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: {COLORS['text_primary']};">{last_date.strftime('%Y-%m-%d')}</div>
+                                <div style="font-size: 0.875rem; color: {COLORS['primary']};">Winner: {last_winner}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                        st.markdown("")  # Spacer
+
+                        # Comparative Elo Graph - both players' ratings over time
+                        st.subheader("Elo Rating Comparison")
+
+                        # Get full history for both players (all days they played, not just common)
+                        df_p1_chart = df_p1_played[['date', 'rating']].copy()
+                        df_p1_chart['player'] = player1
+                        df_p2_chart = df_p2_played[['date', 'rating']].copy()
+                        df_p2_chart['player'] = player2
+
+                        df_elo_compare = pd.concat([df_p1_chart, df_p2_chart]).sort_values('date')
+
+                        fig_elo = px.line(
+                            df_elo_compare,
+                            x='date',
+                            y='rating',
+                            color='player',
+                            markers=True,
+                            labels={'date': 'Date', 'rating': 'Elo Rating', 'player': 'Player'},
+                            color_discrete_map={player1: COLORS["info"], player2: COLORS["warning"]}
+                        )
+                        fig_elo.update_traces(
+                            hovertemplate='%{fullData.name}: %{y:.0f}<extra></extra>'
+                        )
+                        apply_plotly_style(fig_elo)
+                        fig_elo.update_layout(
+                            hovermode='x unified',
+                            height=350,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="center",
+                                x=0.5,
+                                font=dict(color=COLORS["text_secondary"])
+                            ),
+                            margin=dict(l=20, r=20, t=40, b=20)
+                        )
+                        fig_elo.add_hline(
+                            y=1500,
+                            line_dash="dash",
+                            line_color=COLORS["text_muted"],
+                            annotation_text="Baseline",
+                            annotation_font_color=COLORS["text_muted"]
+                        )
+                        st.plotly_chart(fig_elo, use_container_width=True)
+
+                        # Score Timeline on Mutual Games
+                        st.subheader("Score Timeline (Mutual Games)")
+
+                        # Build score data for mutual games only
+                        score_data = []
+                        for date in sorted(common_dates):
+                            p1_data = df_p1_played[df_p1_played['date'].dt.date == date].iloc[0]
+                            p2_data = df_p2_played[df_p2_played['date'].dt.date == date].iloc[0]
+                            score_data.append({
+                                'date': date,
+                                'player': player1,
+                                'score': p1_data['score']
+                            })
+                            score_data.append({
+                                'date': date,
+                                'player': player2,
+                                'score': p2_data['score']
+                            })
+
+                        df_score_timeline = pd.DataFrame(score_data)
+
+                        fig_score = px.line(
+                            df_score_timeline,
+                            x='date',
+                            y='score',
+                            color='player',
+                            markers=True,
+                            labels={'date': 'Date', 'score': 'Score', 'player': 'Player'},
+                            color_discrete_map={player1: COLORS["info"], player2: COLORS["warning"]}
+                        )
+                        fig_score.update_traces(
+                            hovertemplate='%{fullData.name}: %{y:,.0f}<extra></extra>'
+                        )
+                        apply_plotly_style(fig_score)
+                        fig_score.update_layout(
+                            hovermode='x unified',
+                            height=300,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="center",
+                                x=0.5,
+                                font=dict(color=COLORS["text_secondary"])
+                            ),
+                            margin=dict(l=20, r=20, t=40, b=20)
+                        )
+                        st.plotly_chart(fig_score, use_container_width=True)
 
                         # Win distribution pie chart
                         if len(common_dates) > 0:
@@ -1409,37 +1333,184 @@ def main():
         else:
             st.warning("History data not available.")
 
-    # --- Tab 7: FAQ / Glossary ---
-    with tab7:
+    # --- Tab 6: FAQ / Glossary ---
+    with tab6:
         st.subheader("Frequently Asked Questions")
 
         with st.expander("What is Elo rating?", expanded=True):
             st.markdown("""
             **Elo** is a rating system originally designed for chess that measures relative skill levels.
-            Here, we use a modified Elo system that compares players based on their daily leaderboard performance.
+            Here, I use a modified pairwise Elo system that compares players based on their daily leaderboard performance.
 
-            - **Starting Rating**: All players begin at **1500** (the baseline)
-            - **Rating Range**: Typically between **900** (low) and **2800** (high)
-            - **How it works**: When you finish higher than another player on the daily leaderboard, you "win" against them. Your rating increases, theirs decreases. The amount depends on the rating difference - beating a higher-rated player gives more points.
+            - **Starting Rating**: All players begin at **1500** (the baseline/median)
+            - **Rating Range**: From **1000** (floor) to **3000** (theoretical ceiling)
+            - **How it works**: When you finish higher than another player on the daily leaderboard, you "win" against them. Your rating increases, theirs decreases. The amount depends on the rating difference and score margin.
+            """)
+
+        with st.expander("What do the ratings mean?"):
+            st.markdown("""
+            Ratings roughly correspond to expected performance levels:
+
+            | Rating | Tier | Typical Rank |
+            |--------|------|--------------|
+            | **2800+** | Elite | Top 1 |
+            | **2500-2800** | Expert | Top 5 |
+            | **2000-2500** | Strong | Top 10 |
+            | **1500** | Average | ~Rank 15-20 |
+            | **1200-1500** | Below Average | Rank 20-25 |
+            | **1000-1200** | Beginner | Rank 25-30 |
+
+            *These are approximate guidelines based on current data. The system reflects actual skill gaps, so exact thresholds may shift as the player pool evolves.*
+
+            **Rating Milestones:**
+            - **2800**: Elite tier - only 0-2 players typically reach this level
+            - **2900**: Legendary - requires exceptional sustained dominance
+            - **3000**: Theoretical maximum (asymptotic, effectively unreachable)
             """)
 
         with st.expander("How are rankings calculated?"):
             st.markdown("""
             Each day, all players on the leaderboard are compared pairwise:
             1. Player A (rank 5) vs Player B (rank 12) → Player A "wins"
-            2. Rating changes are calculated using the Elo formula
-            3. Players with more games have more stable ratings (smaller K-factor)
+            2. Rating changes are calculated using a modified Elo formula
+            3. Score margins matter - dominating by 2x score gives more weight than a narrow win
+            4. Players with more games have more stable ratings (dynamic K-factor)
 
-            **Activity Gating**: Only players active in the last 7 days with at least 7 games appear in the main rankings. Inactive players are hidden but their ratings are preserved.
+            **Rating Compression**: Raw Elo scores are compressed using a hybrid system:
+            - Below 2700: Gentle logarithmic scaling (diminishing returns)
+            - Above 2700: Hyperbolic tangent compression toward the 3000 ceiling
+            - This prevents runaway ratings while preserving meaningful differences
+
+            **Activity Gating**: Only players active in the last 7 days with at least 7 games appear in the main rankings. Inactive players don't appear but their ratings are preserved.
             """)
 
         with st.expander("Why did my rating change so much/little?"):
             st.markdown("""
             Several factors affect rating changes:
             - **Opponent ratings**: Beating higher-rated players = bigger gains
+            - **Score margin**: Dominating performances (2x, 3x score) give more weight
             - **Games played**: New players (<10 games) have larger swings to find their true rating
-            - **Your rating stability**: Established players change more slowly
+            - **Your rating level**: Higher ratings compress more, so gains shrink as you climb
             - **Number of opponents**: Placing #1 means you beat 29 opponents, #30 means you beat none
+
+            **Why gains shrink at high ratings:**
+            The system uses rating compression to create meaningful tiers. A player at 2700 needs to perform significantly better than average to gain points, while a player at 1500 can climb more easily with good performances.
+            """)
+
+        st.markdown("---")
+        st.subheader("System Design Philosophy")
+
+        with st.expander("Why use Elo instead of other rating systems?"):
+            st.markdown("""
+            I considered several rating systems before settling on a modified Elo approach:
+
+            | System | Pros | Why I didn't use it |
+            |--------|------|---------------------|
+            | **Glicko/Glicko-2** | Tracks rating uncertainty | Designed for 1v1 matches, not 30-player daily competitions |
+            | **TrueSkill** | Handles team games well | Overly complex for this use case; designed for Xbox matchmaking |
+            | **Simple averages** | Easy to understand | Doesn't account for opponent strength or improvement over time |
+            | **ELO** | Battle-tested, intuitive | Perfect fit with pairwise adaptation |
+
+            **Why Elo works here:**
+            - Chess proved that Elo accurately ranks players over time through repeated competition
+            - My pairwise adaptation treats each daily leaderboard as 435 simultaneous "matches" (30 players = 30×29/2 pairs)
+            - The system is self-correcting: beat strong players, gain more; lose to weak players, lose more
+            - It's intuitive: everyone understands "higher number = better"
+
+            The key insight from chess is that **relative performance over many games** reveals true skill better than any single result.
+            """)
+
+        with st.expander("How do you know the ratings are accurate?"):
+            st.markdown("""
+            Several indicators suggest the ratings reflect actual skill:
+
+            **1. Predictive Power**
+            Higher-rated players consistently outperform lower-rated players when they compete on the same day. If ratings were random, this wouldn't happen.
+
+            **2. Stability with Volume**
+            New players have volatile ratings that stabilize as they play more. This matches how you'd expect skill measurement to work - more data = more certainty.
+
+            **3. Intuitive Results**
+            The rankings align with community perception. Players known for consistent dominance have high ratings; casual players cluster around the median.
+
+            **4. Natural Distribution**
+            The rating distribution resembles a bell curve centered at 1500, with long tails for exceptional and struggling players - exactly what you'd expect from a skill-based metric.
+
+            **5. Score Margin Correlation**
+            Players who win by larger margins (2x, 3x score) tend to have higher ratings than those who barely edge out opponents. The system captures dominance, not just wins.
+
+            **The chess parallel:** Chess ratings have been validated over 60+ years of competitive play. My adaptation applies the same mathematical principles to daily leaderboard competition.
+            """)
+
+        with st.expander("Why pairwise comparisons instead of just using daily rank?"):
+            st.markdown("""
+            Using raw daily rank (1st, 5th, 20th) would be simpler, but it misses crucial information:
+
+            **Problem with raw ranks:**
+            - Finishing 1st against 29 weak players = same as 1st against 29 strong players
+            - A rank of 5th tells you nothing about who you beat or lost to
+            - No way to compare across different days with different player pools
+
+            **Why pairwise works better:**
+            Each day, I ask: "Did Player A beat Player B?" This creates a web of relative comparisons:
+            - Beat a 2500-rated player? Big gain.
+            - Lose to a 1200-rated player? Big loss.
+            - The gains and losses depend on *who* you competed against.
+
+            **Inspiration from competitive gaming:**
+            This is how chess, League of Legends, and other ranked systems work. You don't just get points for winning - you get points based on the *strength of your opponents*.
+
+            The result: a rating that reflects not just how often you win, but *who* you beat to get there.
+            """)
+
+        with st.expander("How do you handle only seeing the top 30 each day?"):
+            st.markdown("""
+            This is one of the most important constraints that shaped my system design.
+
+            **The limitation:**
+            I only see the top 30 players each day. Players ranked 31st or lower are invisible - I don't know their scores, their identities, or even how many of them there are.
+
+            **Why this is actually fine for Elo:**
+            The pairwise system only compares players *who both appear on the same day*. If you're in the top 30, you get compared to the other 29 players. If you're not, you simply don't participate that day.
+
+            **Key implications:**
+            - **No penalty for missing days**: If you don't appear, your rating stays frozen - you don't lose points
+            - **Appearing matters**: To gain or lose rating, you must show up in the top 30
+            - **Self-selecting competition**: The leaderboard naturally captures the most active/competitive players
+            - **Bottom of top 30 is meaningful**: Rank 30 means you beat no one that day and lost to 29 players
+
+            **What I *can't* measure:**
+            - Players who never crack the top 30
+            - How close rank 31 was to rank 30
+            - The "true" skill of players who rarely appear
+
+            **The philosophical tradeoff:**
+            I chose to measure *competitive performance* rather than *total player skill*. If you want a rating, you need to compete. This mirrors chess tournaments - you can't get a rating by staying home.
+
+            The system rewards showing up and performing, which aligns with what a "leaderboard ranking" should capture.
+            """)
+
+        with st.expander("What's the deal with rating compression?"):
+            st.markdown("""
+            Without compression, ratings would diverge infinitely. A dominant player could theoretically reach 5000, 10000, or higher. This creates problems:
+
+            **Why I compress:**
+            - **Meaningful tiers**: 2800 means "elite" - not just "higher than 2700"
+            - **Visual clarity**: Ratings fit on a readable 1000-3000 scale
+            - **Diminishing returns**: The best player can't just run away from the field forever
+
+            **The chess parallel:**
+            Even Magnus Carlsen, the strongest chess player in history, peaked around 2882. The system naturally resists extreme outliers because:
+            - There are fewer players to beat at the top
+            - Beating weaker players yields smaller gains
+            - Losing to anyone costs more when you're highly rated
+
+            My compression applies similar principles mathematically, creating a world where:
+            - **2800+** is genuinely elite (like 2700+ in chess)
+            - **2900** is legendary (like 2800+ in chess)
+            - **3000** is the asymptotic ceiling (like the theoretical limits of human chess ability)
+
+            This makes ratings *meaningful* rather than just *big numbers*.
             """)
 
         st.markdown("---")
@@ -1451,13 +1522,13 @@ def main():
             st.markdown("""
             | Term | Definition |
             |------|------------|
-            | **Elo Rank** | Your position among active players by Elo rating |
-            | **Rating** | Your Elo score (higher = better) |
+            | **Ranked** | Players in the main leaderboard (active + enough games) |
+            | **Unranked** | Players not in main leaderboard (<7 games or inactive >7 days) |
+            | **Elo Rank** | Your position among ranked players by Elo rating |
+            | **Rating** | Your compressed Elo score (higher = better) |
+            | **Raw Rating** | Your uncompressed Elo score (used internally) |
             | **Games** | Total days you've appeared on the leaderboard |
-            | **Wins** | Days you finished #1 on the daily leaderboard |
-            | **Win %** | Percentage of games where you got #1 |
-            | **Top 10s** | Days you finished in the top 10 |
-            | **Top 10 %** | Percentage of games in top 10 |
+            | **Confidence** | How reliable your rating is (based on games played) |
             """)
 
         with col2:
@@ -1466,20 +1537,23 @@ def main():
             |------|------------|
             | **Avg Rank** | Your average daily leaderboard position |
             | **Recent** | Average daily rank over your last 7 games |
-            | **Consistency** | Std deviation of ranks over last 14 games (lower = more consistent) |
-            | **Inactive** | Days since last appearance |
+            | **Consistency** | Std deviation of ranks (lower = more consistent) |
             | **Daily Rank** | Your position on a specific day's leaderboard |
             | **Rating Change** | How much your Elo changed that day |
+            | **Baseline** | The starting/median rating of 1500 |
+            | **Compression** | System that maps raw ratings to display ratings |
             """)
 
         st.markdown("---")
         st.subheader("Tips for Improving Your Rating")
 
         st.markdown("""
-        1. **Play consistently** - Regular appearances help stabilize your rating
-        2. **Aim for top 10** - Even if you can't win, beating more players helps
-        3. **Compete against strong players** - Beating high-rated players gives bigger gains
-        4. **Check your trends** - Use Player Tracker to see if you're improving
+        1. **Play consistently** - Regular appearances build rating stability and keep you ranked
+        2. **Aim for top placements** - Even if you can't win, beating more players helps
+        3. **Dominate when you can** - Score margins matter; a 2x score gives more weight than a narrow win
+        4. **Compete against strong players** - Beating high-rated players gives bigger gains
+        5. **Check your trends** - Use Player Tracker to see if you're improving over time
+        6. **Stay active** - Players inactive for 7+ days become unranked (but keep their rating)
         """)
 
 
