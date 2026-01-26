@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="DFTL Ranking Dashboard",
     page_icon="🎮",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # --- Constants ---
@@ -80,6 +80,10 @@ def get_available_datasets():
 
 # --- Main App ---
 def main():
+    # Initialize session state for player navigation
+    if 'selected_player_for_history' not in st.session_state:
+        st.session_state.selected_player_for_history = None
+
     # Title
     st.title("🎮 DFTL Ranking Dashboard")
     st.markdown("---")
@@ -122,6 +126,32 @@ def main():
         st.caption(f"Data range: {min_date} to {max_date}")
         st.caption(f"Players in Dataset: {len(all_players)}")
 
+        # Export Data section
+        st.markdown("---")
+        st.header("📥 Export Data")
+
+        # Export leaderboard data
+        if df_leaderboard is not None:
+            csv_leaderboard = df_leaderboard.to_csv(index=False)
+            st.download_button(
+                label="Download Leaderboard CSV",
+                data=csv_leaderboard,
+                file_name=f"{dataset_prefix}_leaderboard.csv",
+                mime="text/csv",
+                help="Download the full daily leaderboard data"
+            )
+
+        # Export ratings data
+        if df_ratings is not None:
+            csv_ratings = df_ratings.to_csv(index=False)
+            st.download_button(
+                label="Download Elo Ratings CSV",
+                data=csv_ratings,
+                file_name=f"{dataset_prefix}_elo_ratings.csv",
+                mime="text/csv",
+                help="Download current Elo ratings for active players"
+            )
+
     # Use full date range
     df_filtered = df_leaderboard.copy()
 
@@ -136,7 +166,7 @@ def main():
         "👤 Player Tracker",
         "🏆 Top 10 History",
         "⚔️ Player Duel",
-        "❓ FAQ"
+        "📖 FAQ / Glossary"
     ])
 
     # --- Tab 3: Daily Leaderboard ---
@@ -456,6 +486,23 @@ def main():
                     hide_index=True,
                     column_config=column_config
                 )
+
+                # Quick navigation to Player Tracker
+                st.markdown("---")
+                col_select, col_button = st.columns([3, 1])
+                with col_select:
+                    quick_select_player = st.selectbox(
+                        "Quick jump to player history",
+                        options=df_rankings_display['player_name'].tolist(),
+                        index=None,
+                        placeholder="Select a player...",
+                        key="tab1_player_select"
+                    )
+                with col_button:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("View History", key="tab1_view_history", disabled=quick_select_player is None):
+                        st.session_state.selected_player_for_history = quick_select_player
+                        st.info(f"Go to the **Player Tracker** tab to see {quick_select_player}'s history.")
         elif df_ratings is not None:
             # Fallback if no history data with active_rank
             st.warning("Historical rankings not available. Showing current rankings only.")
@@ -583,6 +630,23 @@ def main():
                 hide_index=True,
                 column_config=column_config
             )
+
+            # Quick navigation to Player Tracker
+            st.markdown("---")
+            col_select, col_button = st.columns([3, 1])
+            with col_select:
+                quick_select_player2 = st.selectbox(
+                    "Quick jump to player history",
+                    options=df_ratings_display['player_name'].tolist(),
+                    index=None,
+                    placeholder="Select a player...",
+                    key="tab1_player_select_fallback"
+                )
+            with col_button:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("View History", key="tab1_view_history_fallback", disabled=quick_select_player2 is None):
+                    st.session_state.selected_player_for_history = quick_select_player2
+                    st.info(f"Go to the **Player Tracker** tab to see {quick_select_player2}'s history.")
         else:
             st.warning("Ratings data not available.")
 
@@ -590,13 +654,26 @@ def main():
     with tab4:
 
         if df_history is not None:
-            # Player selector (single selection) - no default
+            # Determine default player from session state (if set from rankings tab)
+            default_index = None
+            if st.session_state.selected_player_for_history:
+                try:
+                    default_index = all_players.index(st.session_state.selected_player_for_history)
+                except ValueError:
+                    default_index = None
+
+            # Player selector (single selection)
             selected_player = st.selectbox(
                 "Select a player",
                 options=all_players,
-                index=None,
-                placeholder="Choose a player..."
+                index=default_index,
+                placeholder="Choose a player...",
+                key="tab4_player_select"
             )
+
+            # Clear session state after using it
+            if st.session_state.selected_player_for_history:
+                st.session_state.selected_player_for_history = None
 
             if selected_player:
                 # Filter history for selected player
@@ -1077,9 +1154,79 @@ def main():
         else:
             st.warning("History data not available.")
 
-    # --- Tab 7: FAQ ---
+    # --- Tab 7: FAQ / Glossary ---
     with tab7:
-        st.caption("FAQ content coming soon.")
+        st.subheader("Frequently Asked Questions")
+
+        with st.expander("What is Elo rating?", expanded=True):
+            st.markdown("""
+            **Elo** is a rating system originally designed for chess that measures relative skill levels.
+            In DFTL, we use a modified Elo system that compares players based on their daily leaderboard performance.
+
+            - **Starting Rating**: All players begin at **1500** (the baseline)
+            - **Rating Range**: Typically between **900** (low) and **2800** (high)
+            - **How it works**: When you finish higher than another player on the daily leaderboard, you "win" against them. Your rating increases, theirs decreases. The amount depends on the rating difference - beating a higher-rated player gives more points.
+            """)
+
+        with st.expander("How are rankings calculated?"):
+            st.markdown("""
+            Each day, all players on the leaderboard are compared pairwise:
+            1. Player A (rank 5) vs Player B (rank 12) → Player A "wins"
+            2. Rating changes are calculated using the Elo formula
+            3. Players with more games have more stable ratings (smaller K-factor)
+
+            **Activity Gating**: Only players active in the last 7 days with at least 7 games appear in the main rankings. Inactive players are hidden but their ratings are preserved.
+            """)
+
+        with st.expander("Why did my rating change so much/little?"):
+            st.markdown("""
+            Several factors affect rating changes:
+            - **Opponent ratings**: Beating higher-rated players = bigger gains
+            - **Games played**: New players (<10 games) have larger swings to find their true rating
+            - **Your rating stability**: Established players change more slowly
+            - **Number of opponents**: Placing #1 means you beat 29 opponents, #30 means you beat none
+            """)
+
+        st.markdown("---")
+        st.subheader("Glossary of Terms")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("""
+            | Term | Definition |
+            |------|------------|
+            | **Elo Rank** | Your position among active players by Elo rating |
+            | **Rating** | Your Elo score (higher = better) |
+            | **Games** | Total days you've appeared on the leaderboard |
+            | **Wins** | Days you finished #1 on the daily leaderboard |
+            | **Win %** | Percentage of games where you got #1 |
+            | **Top 10s** | Days you finished in the top 10 |
+            | **Top 10 %** | Percentage of games in top 10 |
+            """)
+
+        with col2:
+            st.markdown("""
+            | Term | Definition |
+            |------|------------|
+            | **Avg Rank** | Your average daily leaderboard position |
+            | **Recent** | Average daily rank over your last 7 games |
+            | **Consistency** | Std deviation of ranks (lower = more consistent) |
+            | **Inactive** | Days since last appearance |
+            | **Daily Rank** | Your position on a specific day's leaderboard |
+            | **Score** | Points earned on that day in DFTL |
+            | **Rating Change** | How much your Elo changed that day |
+            """)
+
+        st.markdown("---")
+        st.subheader("Tips for Improving Your Rating")
+
+        st.markdown("""
+        1. **Play consistently** - Regular appearances help stabilize your rating
+        2. **Aim for top 10** - Even if you can't win, beating more players helps
+        3. **Compete against strong players** - Beating high-rated players gives bigger gains
+        4. **Check your trends** - Use Player Tracker to see if you're improving
+        """)
 
 
 if __name__ == "__main__":
