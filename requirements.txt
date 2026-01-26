@@ -1,7 +1,7 @@
 # DFTL Score System Dependencies
 # Pin exact versions for reproducibility and security
 
-streamlit==1.28.0
-pandas==2.0.3
-numpy==1.24.3
-plotly==5.18.0
+streamlit==1.44.0
+pandas==2.2.3
+numpy==1.26.4
+plotly==5.24.1

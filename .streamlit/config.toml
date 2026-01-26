@@ -1,9 +1,31 @@
+# DFTL Ranking Dashboard Theme Configuration
+# Streamlit 1.44+ dual light/dark theme support
+
 [theme]
+# Base settings (global)
+font = "sans serif"
+
+# Dark theme (default)
+[theme.dark]
 primaryColor = "#FF6B6B"
 backgroundColor = "#0E1117"
 secondaryBackgroundColor = "#262730"
 textColor = "#FAFAFA"
-font = "sans serif"
+
+[theme.dark.sidebar]
+backgroundColor = "#262730"
+textColor = "#FAFAFA"
+
+# Light theme (user can switch via settings)
+[theme.light]
+primaryColor = "#FF6B6B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+
+[theme.light.sidebar]
+backgroundColor = "#F0F2F6"
+textColor = "#262730"
 
 [server]
 headless = true
