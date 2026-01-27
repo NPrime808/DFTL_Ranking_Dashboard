@@ -1,4 +1,5 @@
 import math
+import base64
 
 import streamlit as st
 import pandas as pd
@@ -34,14 +35,137 @@ ACCENT_COLORS = {
     ],
 }
 
-# Theme-specific colors
+# --- Tier System ---
+# Rating tiers with distinct visual identities (like chess/gaming ranks)
+TIER_SYSTEM = {
+    "Grandmaster": {"min": 2700, "color": "#FF6B6B", "gradient": "linear-gradient(135deg, #FF6B6B 0%, #FFD700 50%, #FF6B6B 100%)", "glow": "0 0 20px rgba(255,107,107,0.6)", "icon": "👑"},
+    "Master": {"min": 2500, "color": "#9333EA", "gradient": "linear-gradient(135deg, #9333EA 0%, #C084FC 100%)", "glow": "0 0 15px rgba(147,51,234,0.5)", "icon": "💎"},
+    "Diamond": {"min": 2200, "color": "#06B6D4", "gradient": "linear-gradient(135deg, #06B6D4 0%, #67E8F9 100%)", "glow": "0 0 12px rgba(6,182,212,0.4)", "icon": "💠"},
+    "Platinum": {"min": 1900, "color": "#E2E8F0", "gradient": "linear-gradient(135deg, #94A3B8 0%, #E2E8F0 100%)", "glow": "0 0 10px rgba(226,232,240,0.3)", "icon": "⚪"},
+    "Gold": {"min": 1600, "color": "#F59E0B", "gradient": "linear-gradient(135deg, #D97706 0%, #FCD34D 100%)", "glow": "0 0 10px rgba(245,158,11,0.3)", "icon": "🥇"},
+    "Silver": {"min": 1300, "color": "#9CA3AF", "gradient": "linear-gradient(135deg, #6B7280 0%, #D1D5DB 100%)", "glow": "none", "icon": "🥈"},
+    "Bronze": {"min": 0, "color": "#CD7F32", "gradient": "linear-gradient(135deg, #92400E 0%, #D97706 100%)", "glow": "none", "icon": "🥉"},
+}
+
+def get_tier(rating):
+    """Get tier information for a given rating."""
+    if pd.isna(rating):
+        return None
+    for tier_name, tier_info in TIER_SYSTEM.items():
+        if rating >= tier_info["min"]:
+            return {"name": tier_name, **tier_info}
+    return {"name": "Bronze", **TIER_SYSTEM["Bronze"]}
+
+def get_tier_badge_html(rating, show_icon=True, size="small"):
+    """Generate HTML for a tier badge."""
+    tier = get_tier(rating)
+    if tier is None:
+        return ""
+
+    sizes = {
+        "small": {"font": "0.7rem", "padding": "0.15rem 0.4rem", "icon_size": "0.8rem"},
+        "medium": {"font": "0.8rem", "padding": "0.2rem 0.5rem", "icon_size": "1rem"},
+        "large": {"font": "0.9rem", "padding": "0.25rem 0.6rem", "icon_size": "1.1rem"},
+    }
+    s = sizes.get(size, sizes["small"])
+
+    icon_html = f'<span style="font-size:{s["icon_size"]};margin-right:0.2rem;">{tier["icon"]}</span>' if show_icon else ""
+    badge_style = f'background:{tier["gradient"]};color:#000;font-size:{s["font"]};font-weight:600;padding:{s["padding"]};border-radius:4px;box-shadow:{tier["glow"]};text-shadow:0 1px 0 rgba(255,255,255,0.3);display:inline-flex;align-items:center;'
+
+    return f'<span style="{badge_style}">{icon_html}{tier["name"]}</span>'
+
+# --- Leaderboard Flourishes ---
+# Icons and decorations for top players
+RANK_ICONS = {
+    1: {"icon": "👑", "color": "#FFD700", "label": "Champion"},
+    2: {"icon": "🥈", "color": "#C0C0C0", "label": "Runner-up"},
+    3: {"icon": "🥉", "color": "#CD7F32", "label": "Third Place"},
+}
+
+def get_rank_icon(rank):
+    """Get the icon for a given rank (top 3 only)."""
+    if pd.isna(rank):
+        return ""
+    rank = int(rank)
+    if rank in RANK_ICONS:
+        return RANK_ICONS[rank]["icon"]
+    return ""
+
+def get_rank_badge_html(rank):
+    """Generate HTML for a rank badge with icon and styling."""
+    if pd.isna(rank):
+        return ""
+    rank = int(rank)
+    if rank not in RANK_ICONS:
+        return f'<span style="font-weight:600;">#{rank}</span>'
+
+    info = RANK_ICONS[rank]
+    badge_style = f'display:inline-flex;align-items:center;gap:0.3rem;font-weight:700;color:{info["color"]};text-shadow:0 0 10px {info["color"]}40;'
+    return f'<span style="{badge_style}"><span style="font-size:1.2rem;">{info["icon"]}</span>#{rank}</span>'
+
+
+def format_player_with_tier(player_name, rating, rank=None):
+    """Format player name with tier badge and optional rank icon."""
+    rank_icon = get_rank_icon(rank) if rank else ""
+    tier_badge = get_tier_badge_html(rating, show_icon=False, size="small")
+
+    rank_html = f'<span style="margin-right:0.3rem;font-size:1.1rem;">{rank_icon}</span>' if rank_icon else ""
+
+    return f'<div style="display:inline-flex;align-items:center;gap:0.5rem;">{rank_html}<span style="font-weight:600;">{player_name}</span> {tier_badge}</div>'
+
+
+def create_top3_spotlight_html(df_top3):
+    """Create HTML for the Top 3 Spotlight section with flourishes."""
+    if len(df_top3) == 0:
+        return ""
+
+    cards_html = []
+    for _, row in df_top3.iterrows():
+        rank = int(row['active_rank'])
+        player = row['player_name']
+        rating = row['rating']
+        tier = get_tier(rating)
+        rank_info = RANK_ICONS.get(rank, {"icon": "", "color": "#888888"})
+
+        # Different card sizes: #1 is larger
+        if rank == 1:
+            card_style = f"flex:1.4;min-width:200px;background:linear-gradient(135deg,rgba(38,39,48,0.95) 0%,rgba(14,17,23,0.95) 100%);border:1px solid {rank_info['color']}50;border-radius:16px;padding:1.5rem;text-align:center;box-shadow:0 0 30px {rank_info['color']}60,0 0 60px {rank_info['color']}30;"
+            icon_size = "3rem"
+            name_size = "1.3rem"
+            rating_size = "1.8rem"
+        elif rank == 2:
+            card_style = f"flex:1.2;min-width:180px;background:linear-gradient(135deg,rgba(38,39,48,0.95) 0%,rgba(14,17,23,0.95) 100%);border:1px solid {rank_info['color']}50;border-radius:16px;padding:1.5rem;text-align:center;box-shadow:0 0 20px {rank_info['color']}50;"
+            icon_size = "2.5rem"
+            name_size = "1.1rem"
+            rating_size = "1.5rem"
+        else:
+            card_style = f"flex:1;min-width:160px;background:linear-gradient(135deg,rgba(38,39,48,0.95) 0%,rgba(14,17,23,0.95) 100%);border:1px solid {rank_info['color']}50;border-radius:16px;padding:1.5rem;text-align:center;box-shadow:0 0 15px {rank_info['color']}40;"
+            icon_size = "2rem"
+            name_size = "1rem"
+            rating_size = "1.3rem"
+
+        tier_badge = get_tier_badge_html(rating, show_icon=True, size="medium")
+
+        card = f'<div style="{card_style}">'
+        card += f'<div style="font-size:{icon_size};margin-bottom:0.5rem;filter:drop-shadow(0 0 10px {rank_info["color"]});">{rank_info["icon"]}</div>'
+        card += f'<div style="font-family:Cinzel,serif;font-size:{name_size};font-weight:700;color:#FAFAFA;margin-bottom:0.25rem;text-shadow:0 2px 4px rgba(0,0,0,0.3);">{player}</div>'
+        card += f'<div style="margin-bottom:0.5rem;">{tier_badge}</div>'
+        card += f'<div style="font-family:Rajdhani,sans-serif;font-size:{rating_size};font-weight:700;background:linear-gradient(135deg,#FAFAFA 0%,{tier["color"]} 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">{rating:.1f}</div>'
+        card += '</div>'
+        cards_html.append(card)
+
+    container_style = "display:flex;gap:1rem;justify-content:center;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.5rem;padding:1rem;"
+    return f'<div style="{container_style}">{"".join(cards_html)}</div>'
+
+
+# Theme-specific colors (WCAG AA compliant contrast ratios)
 DARK_THEME = {
     "bg_primary": "#0E1117",
     "bg_secondary": "#262730",
     "bg_hover": "#3D3D4D",
     "text_primary": "#FAFAFA",
-    "text_secondary": "#B0B0B0",
-    "text_muted": "#808080",
+    "text_secondary": "#E0E0E0",  # Improved: ~11:1 contrast vs bg_primary
+    "text_muted": "#A0A0A0",       # Improved: ~7:1 contrast vs bg_primary
 }
 
 LIGHT_THEME = {
@@ -49,8 +173,8 @@ LIGHT_THEME = {
     "bg_secondary": "#F0F2F6",
     "bg_hover": "#E0E2E6",
     "text_primary": "#262730",
-    "text_secondary": "#555555",
-    "text_muted": "#888888",
+    "text_secondary": "#404040",  # Improved: ~10:1 contrast vs bg_primary
+    "text_muted": "#666666",       # Improved: ~5.7:1 contrast vs bg_primary
 }
 
 
@@ -59,7 +183,9 @@ def get_theme_colors():
     # Streamlit 1.44+ provides st.context.theme for runtime theme detection
     try:
         # Check if we're in dark mode
-        is_dark = st.get_option("theme.base") == "dark"
+        # theme.base can be "dark", "light", or None (system default which is dark)
+        theme_base = st.get_option("theme.base")
+        is_dark = theme_base != "light"  # Default to dark unless explicitly light
     except Exception:
         # Default to dark if detection fails
         is_dark = True
@@ -68,20 +194,176 @@ def get_theme_colors():
     return {**ACCENT_COLORS, **theme}
 
 
+def get_theme_css():
+    """Generate theme-specific CSS for elements that need dynamic colors."""
+    colors = get_theme_colors()
+    is_dark = colors["bg_primary"] == "#0E1117"
+
+    if is_dark:
+        return """
+        <style>
+        /* Dark theme overrides */
+        [data-testid="stExpander"] {
+            background: rgba(38, 39, 48, 0.8) !important;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, rgba(38, 39, 48, 0.9) 0%, rgba(14, 17, 23, 0.95) 100%) !important;
+        }
+
+        /* Sidebar - Dark mode: high contrast white text */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #1a1c23 0%, #0E1117 100%) !important;
+        }
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] .stMarkdown h1,
+        [data-testid="stSidebar"] .stMarkdown h2 {
+            color: #FFFFFF !important;
+        }
+        /* Text elements - exclude Material icons by not targeting bare spans */
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] .stMarkdown span,
+        [data-testid="stSidebar"] .stSelectbox span {
+            color: #E0E0E0 !important;
+        }
+        [data-testid="stSidebar"] .stCaption p {
+            color: #CCCCCC !important;
+        }
+        [data-testid="stSidebar"] hr {
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        </style>
+        """
+    else:
+        return """
+        <style>
+        /* Light theme overrides */
+        [data-testid="stExpander"] {
+            background: rgba(240, 242, 246, 0.95) !important;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 242, 246, 0.98) 100%) !important;
+            border-color: rgba(0, 0, 0, 0.1) !important;
+        }
+        .dashboard-title {
+            background: linear-gradient(135deg, #262730 0%, #404040 100%) !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        .dashboard-subtitle {
+            color: #555555 !important;
+        }
+
+        /* Sidebar - Light mode: high contrast dark text */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #FFFFFF 0%, #F0F2F6 100%) !important;
+        }
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] .stMarkdown h1,
+        [data-testid="stSidebar"] .stMarkdown h2 {
+            color: #1a1c23 !important;
+        }
+        /* Text elements - exclude Material icons by not targeting bare spans */
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] .stMarkdown span,
+        [data-testid="stSidebar"] .stSelectbox span {
+            color: #333333 !important;
+        }
+        [data-testid="stSidebar"] .stCaption p {
+            color: #555555 !important;
+        }
+        [data-testid="stSidebar"] hr {
+            border-color: rgba(0, 0, 0, 0.1) !important;
+        }
+
+        /* Sidebar expand button (when collapsed) - make visible in light mode */
+        /* Use filter to darken the icon since color overrides don't work */
+        [data-testid="collapsedControl"],
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="stSidebarNavCollapseButton"] {
+            filter: brightness(0.2) !important;
+        }
+        [data-testid="collapsedControl"]:hover,
+        [data-testid="stSidebarCollapsedControl"]:hover,
+        [data-testid="stSidebarNavCollapseButton"]:hover {
+            filter: brightness(0) !important;
+        }
+        /* Also try targeting via position - the expand control is fixed position */
+        .stApp > div:first-child > [data-testid="collapsedControl"],
+        section[data-testid="stSidebar"] ~ [data-testid="collapsedControl"] {
+            filter: brightness(0.2) !important;
+        }
+        </style>
+        """
+
+
 # For backwards compatibility, create a COLORS alias
 # This is evaluated once at module load, so charts use consistent colors
 COLORS = {**ACCENT_COLORS, **DARK_THEME}  # Default to dark theme for static references
 
+def create_download_link(data: str, filename: str, label: str, is_dark: bool = True) -> str:
+    """
+    Create a styled HTML download link with full CSS control.
+
+    Args:
+        data: The CSV string data to download
+        filename: The filename for the download
+        label: The button label text
+        is_dark: Whether we're in dark mode (affects text color)
+
+    Returns:
+        HTML string with styled download link
+    """
+    b64 = base64.b64encode(data.encode()).decode()
+
+    # Theme-aware colors
+    if is_dark:
+        text_color = "#FAFAFA"
+        bg_color = "rgba(38,39,48,0.8)"
+        border_color = "rgba(255,255,255,0.2)"
+        hover_bg = "rgba(58,59,68,0.9)"
+    else:
+        text_color = "#1a1c23"
+        bg_color = "rgba(255,255,255,0.95)"
+        border_color = "rgba(0,0,0,0.2)"
+        hover_bg = "rgba(240,240,240,1)"
+
+    # Compact single-line HTML for reliable Streamlit rendering
+    style = f"display:inline-block;padding:0.5rem 1rem;background:{bg_color};color:{text_color};text-decoration:none;border:1px solid {border_color};border-radius:0.5rem;font-family:Rajdhani,sans-serif;font-weight:600;font-size:0.9rem;cursor:pointer;width:100%;text-align:center;box-sizing:border-box;"
+
+    return f'<a href="data:text/csv;base64,{b64}" download="{filename}" style="{style}">{label}</a>'
+
+
 # Custom CSS for visual hierarchy and spacing
-# Colors are now handled by Streamlit's native dual-theme system (config.toml)
-# This CSS adds only non-color styling: typography, spacing, borders
+# Includes: Gothic fonts, glassmorphism, animations, gradient effects
 CUSTOM_CSS = """
 <style>
+/* ===== Google Fonts - Gothic/Fantasy Theme ===== */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+/* ===== CSS Variables ===== */
+:root {
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Rajdhani', sans-serif;
+    --primary-glow: 0 0 20px rgba(255, 107, 107, 0.4);
+    --glass-bg: rgba(38, 39, 48, 0.7);
+    --glass-border: rgba(255, 107, 107, 0.2);
+}
+
 /* ===== Typography Hierarchy ===== */
+.main h1, .main h2, .main h3 {
+    font-family: var(--font-display) !important;
+}
+
 .main h1 {
     font-size: 2.25rem !important;
     font-weight: 700 !important;
-    letter-spacing: -0.025em !important;
+    letter-spacing: 0.05em !important;
     margin-bottom: 0.5rem !important;
 }
 
@@ -90,6 +372,7 @@ CUSTOM_CSS = """
     font-weight: 600 !important;
     margin-top: 1.5rem !important;
     margin-bottom: 1rem !important;
+    letter-spacing: 0.03em !important;
 }
 
 .main h3 {
@@ -97,93 +380,188 @@ CUSTOM_CSS = """
     font-weight: 600 !important;
 }
 
+/* Body text uses Rajdhani for readability */
+.main p, .main span, .main label, .main div {
+    font-family: var(--font-body), sans-serif;
+}
+
 /* ===== Section Containers ===== */
 .stTabs [data-baseweb="tab-panel"] {
     padding-top: 1.5rem;
 }
 
-/* ===== Metric Cards ===== */
+/* ===== Glassmorphism Metric Cards (optimized - no blur for performance) ===== */
 [data-testid="stMetric"] {
-    border: 1px solid rgba(255, 107, 107, 0.25);
-    border-radius: 8px;
-    padding: 1rem;
+    background: rgba(38, 39, 48, 0.85) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 12px !important;
+    padding: 1.25rem !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+[data-testid="stMetric"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), var(--primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 107, 107, 0.4) !important;
 }
 
 [data-testid="stMetric"] label {
-    font-size: 0.875rem !important;
-    font-weight: 500 !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
+    letter-spacing: 0.1em !important;
+    opacity: 0.8;
 }
 
 [data-testid="stMetric"] [data-testid="stMetricValue"] {
-    font-size: 1.75rem !important;
+    font-family: var(--font-display) !important;
+    font-size: 2rem !important;
     font-weight: 700 !important;
+    background: linear-gradient(135deg, #FAFAFA 0%, #FF6B6B 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
-/* ===== Data Tables ===== */
+/* ===== Number Counter Effect (static for performance) ===== */
+/* Animation removed - was causing re-renders on every state change */
+
+/* ===== Data Tables with Glass Effect ===== */
 .stDataFrame {
-    border-radius: 8px;
+    border-radius: 12px !important;
     overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .stDataFrame thead th {
-    font-weight: 600 !important;
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
     text-transform: uppercase !important;
-    font-size: 0.75rem !important;
-    letter-spacing: 0.05em !important;
+    font-size: 0.7rem !important;
+    letter-spacing: 0.08em !important;
+    background: rgba(255, 107, 107, 0.1) !important;
 }
 
-/* ===== Sidebar ===== */
+/* ===== Sidebar Styling ===== */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, rgba(14, 17, 23, 0.95) 0%, rgba(38, 39, 48, 0.95) 100%) !important;
+}
+
 [data-testid="stSidebar"] .stMarkdown hr {
-    border-color: rgba(255, 107, 107, 0.2);
+    border-color: rgba(255, 107, 107, 0.3);
     margin: 1.5rem 0;
+    box-shadow: 0 1px 0 rgba(255, 107, 107, 0.1);
 }
 
-/* ===== Tab Styling ===== */
+/* Sidebar collapse button (inside sidebar) - always light (sidebar is always dark) */
+/* Use CSS filter as fallback - inverts dark icon to light */
+/* IMPORTANT: Only target elements INSIDE [data-testid="stSidebar"] */
+[data-testid="stSidebar"] button[data-testid="stBaseButton-headerNoPadding"],
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] button,
+[data-testid="stSidebar"] button[kind="headerNoPadding"],
+[data-testid="stSidebar"] > div > button,
+[data-testid="stSidebar"] header button {
+    color: #FFFFFF !important;
+    filter: brightness(0) invert(1) !important;
+}
+[data-testid="stSidebar"] button[data-testid="stBaseButton-headerNoPadding"] svg,
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] svg,
+[data-testid="stSidebar"] > div > button svg,
+[data-testid="stSidebar"] header button svg {
+    fill: #FFFFFF !important;
+    stroke: #FFFFFF !important;
+}
+
+/* ===== Tab Styling - Subtle ===== */
 .stTabs [data-baseweb="tab-list"] {
-    gap: 0.5rem;
+    gap: 0.25rem;
+    background: transparent;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0;
+    /* Enable horizontal scrolling on narrow screens */
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+/* Hide the animated highlight bar */
+.stTabs [data-baseweb="tab-highlight"] {
+    display: none !important;
 }
 
 .stTabs [data-baseweb="tab"] {
-    border-radius: 6px 6px 0 0;
-    padding: 0.75rem 1rem;
-    font-weight: 500;
+    font-family: var(--font-body) !important;
+    border-radius: 0 !important;
+    padding: 0.6rem 1rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.02em;
+    border-bottom: 2px solid transparent !important;
+    background: transparent !important;
+    opacity: 0.7;
+    transition: opacity 0.15s ease !important;
+    /* Prevent tabs from shrinking on narrow screens */
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    opacity: 0.9;
+    background: transparent !important;
+    color: inherit !important;
 }
 
 .stTabs [aria-selected="true"] {
-    border-bottom: 2px solid #FF6B6B !important;
+    opacity: 1 !important;
+    border-bottom: 2px solid var(--text-color, currentColor) !important;
+    background: transparent !important;
+    color: inherit !important;
 }
 
-/* ===== Buttons ===== */
+/* ===== Buttons with Glow Effect ===== */
 .stButton > button {
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    font-family: var(--font-body) !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.03em;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+    border: 1px solid rgba(255, 107, 107, 0.3) !important;
 }
 
 .stButton > button:hover {
     border-color: #FF6B6B !important;
+    box-shadow: var(--primary-glow) !important;
+    transform: translateY(-1px);
 }
 
-/* ===== Toggle ===== */
+/* ===== Toggle with Animation ===== */
 [data-testid="stToggle"] label span {
-    font-weight: 500 !important;
-}
-
-/* ===== Expander ===== */
-.streamlit-expanderHeader {
+    font-family: var(--font-body) !important;
     font-weight: 600 !important;
 }
 
+/* ===== Expander with Glass Effect ===== */
+.streamlit-expanderHeader {
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em;
+}
+
 [data-testid="stExpander"] {
-    border-color: rgba(255, 107, 107, 0.2) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 12px !important;
+    /* Background set dynamically via get_theme_css() */
 }
 
 /* ===== Form Labels ===== */
 [data-testid="stSelectbox"] label,
 [data-testid="stDateInput"] label {
-    font-weight: 500 !important;
+    font-family: var(--font-body) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em;
 }
 
 /* ===== Spacing ===== */
@@ -196,33 +574,168 @@ CUSTOM_CSS = """
     margin-bottom: 0.5rem;
 }
 
-/* ===== Dividers ===== */
+/* ===== Dividers with Gradient ===== */
 .main hr {
-    border-color: rgba(255, 107, 107, 0.2);
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 107, 107, 0.5) 50%, transparent 100%);
     margin: 1.5rem 0;
+}
+
+/* ===== Leaderboard Row Highlights ===== */
+.rank-1-row {
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.15) 0%, transparent 100%) !important;
+    box-shadow: inset 3px 0 0 #FFD700;
+}
+
+.rank-2-row {
+    background: linear-gradient(90deg, rgba(192, 192, 192, 0.1) 0%, transparent 100%) !important;
+    box-shadow: inset 3px 0 0 #C0C0C0;
+}
+
+.rank-3-row {
+    background: linear-gradient(90deg, rgba(205, 127, 50, 0.1) 0%, transparent 100%) !important;
+    box-shadow: inset 3px 0 0 #CD7F32;
+}
+
+/* ===== Animation Keyframes (removed for performance) ===== */
+/* Infinite animations removed - they cause continuous repaints */
+
+/* ===== Custom Scrollbar ===== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(38, 39, 48, 0.5);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #FF6B6B 0%, #E55555 100%);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #FF8E8E 0%, #FF6B6B 100%);
+}
+
+/* ===== Tooltip Styling ===== */
+[data-testid="stTooltipIcon"] {
+    color: rgba(255, 107, 107, 0.7) !important;
+}
+
+/* ===== Selection Highlight ===== */
+::selection {
+    background: rgba(255, 107, 107, 0.3);
+    color: #FAFAFA;
+}
+
+/* ===== Top 3 Spotlight ===== */
+/* Static styling - animations removed for performance */
+
+/* ===== Sidebar Styling ===== */
+/* Sidebar text styling handled dynamically via get_theme_css() */
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    font-family: var(--font-body) !important;  /* Rajdhani - more conventional than gothic */
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+/* Text elements - exclude Material icons by not targeting bare spans */
+[data-testid="stSidebar"] .stCaption,
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stMarkdown span,
+[data-testid="stSidebar"] .stSelectbox span {
+    font-family: var(--font-body) !important;
+    font-weight: 500 !important;
+}
+
+/* Sidebar dividers - color handled dynamically via get_theme_css() */
+[data-testid="stSidebar"] hr {
+    margin: 1rem 0 !important;
 }
 </style>
 """
 
 
-def apply_plotly_style(fig):
-    """Apply consistent styling to Plotly figures (theme-aware)."""
+def apply_plotly_style(fig, add_gradient_fill=False):
+    """Apply consistent styling to Plotly figures (theme-aware) with optional gradient fill."""
     colors = get_theme_colors()
+
+    # Theme-aware background colors for overlays
+    is_dark = colors["bg_primary"] == "#0E1117"
+    if is_dark:
+        legend_bg = "rgba(38, 39, 48, 0.9)"
+        hover_bg = "rgba(38, 39, 48, 0.95)"
+        grid_color = "rgba(255, 255, 255, 0.08)"
+        line_color = "rgba(255, 255, 255, 0.15)"
+    else:
+        legend_bg = "rgba(255, 255, 255, 0.95)"
+        hover_bg = "rgba(255, 255, 255, 0.98)"
+        grid_color = "rgba(0, 0, 0, 0.08)"
+        line_color = "rgba(0, 0, 0, 0.15)"
+
+    # Bold font weight for better readability
+    bold_weight = 600
+
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=colors["text_primary"], family="sans-serif"),
+        font=dict(color=colors["text_primary"], family="Rajdhani, sans-serif", weight=bold_weight),
         xaxis=dict(
-            gridcolor="rgba(128,128,128,0.2)",
-            linecolor="rgba(128,128,128,0.3)",
-            tickfont=dict(color=colors["text_secondary"]),
+            gridcolor=grid_color,
+            linecolor=line_color,
+            tickfont=dict(color=colors["text_secondary"], family="Rajdhani", size=12, weight=bold_weight),
+            title_font=dict(weight=bold_weight),
+            showgrid=True,
+            zeroline=False,
         ),
         yaxis=dict(
-            gridcolor="rgba(128,128,128,0.2)",
-            linecolor="rgba(128,128,128,0.3)",
-            tickfont=dict(color=colors["text_secondary"]),
+            gridcolor=grid_color,
+            linecolor=line_color,
+            tickfont=dict(color=colors["text_secondary"], family="Rajdhani", size=12, weight=bold_weight),
+            title_font=dict(weight=bold_weight),
+            showgrid=True,
+            zeroline=False,
         ),
-        legend=dict(font=dict(color=colors["text_secondary"])),
+        legend=dict(
+            font=dict(color=colors["text_primary"], family="Rajdhani", weight=bold_weight),
+            bgcolor=legend_bg,
+            bordercolor=line_color,
+            borderwidth=1,
+        ),
+        hoverlabel=dict(
+            bgcolor=hover_bg,
+            bordercolor=colors["primary"],
+            font=dict(color=colors["text_primary"], family="Rajdhani", weight=bold_weight),
+        ),
+    )
+
+    # Add gradient fill under line charts if requested
+    if add_gradient_fill:
+        fig.update_traces(
+            fill='tozeroy',
+            fillcolor='rgba(255, 107, 107, 0.15)',
+            line=dict(width=3),
+        )
+
+    return fig
+
+def apply_plotly_style_enhanced(fig):
+    """Apply enhanced styling with gradient fills and glowing markers."""
+    apply_plotly_style(fig)
+    fig.update_traces(
+        marker=dict(
+            size=8,
+            line=dict(width=2, color='rgba(255, 107, 107, 0.8)'),
+        ),
+        line=dict(width=3),
     )
     return fig
 
@@ -236,7 +749,7 @@ def format_rating_change(value):
     elif value < 0:
         return f"<span style='color: {ACCENT_COLORS['danger']}'>{value:.1f}</span>"
     else:
-        return f"<span style='color: #888888'>{value:.1f}</span>"  # Neutral gray works in both themes
+        return f"<span style='color: #767676'>{value:.1f}</span>"  # WCAG AA compliant in both themes
 
 
 def format_trend(trend):
@@ -246,7 +759,7 @@ def format_trend(trend):
     elif trend == "↓":
         return f"<span style='color: {ACCENT_COLORS['danger']}; font-size: 1.25rem;'>↓</span>"
     else:
-        return f"<span style='color: #888888; font-size: 1.25rem;'>→</span>"  # Neutral gray works in both themes
+        return f"<span style='color: #767676; font-size: 1.25rem;'>→</span>"  # WCAG AA compliant in both themes
 
 
 # --- Constants ---
@@ -314,21 +827,64 @@ def get_available_datasets():
 
 # --- Main App ---
 def main():
-    # Inject custom CSS
+    # Inject custom CSS (static)
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-    # Title with logo (using HTML for proper vertical alignment)
+    # Inject theme-specific CSS (dynamic based on current theme)
+    st.markdown(get_theme_css(), unsafe_allow_html=True)
+
+    # Title with logo, gradient text, and glow effects
     import base64
     logo_path = Path(__file__).parent / "images" / "dftl_logo.png"
     if logo_path.exists():
         with open(logo_path, "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
         st.markdown(f"""
-        <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 0.5rem;">
-            <img src="data:image/png;base64,{logo_b64}" style="width: 120px; height: auto;">
+        <style>
+            .dashboard-header {{
+                display: flex;
+                align-items: center;
+                gap: 2rem;
+                margin-bottom: 1rem;
+                padding: 1.5rem;
+                background: linear-gradient(135deg, rgba(38, 39, 48, 0.9) 0%, rgba(14, 17, 23, 0.95) 100%);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 107, 107, 0.2);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            }}
+            .dashboard-logo {{
+                width: 140px;
+                height: auto;
+                filter: drop-shadow(0 0 15px rgba(255, 107, 107, 0.4));
+            }}
+            .dashboard-title {{
+                font-family: 'Cinzel', serif;
+                font-size: 2.8rem;
+                font-weight: 700;
+                margin: 0;
+                padding: 0;
+                background: linear-gradient(135deg, #FAFAFA 0%, #FF6B6B 50%, #FFD700 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                text-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+                letter-spacing: 0.05em;
+            }}
+            .dashboard-subtitle {{
+                font-family: 'Rajdhani', sans-serif;
+                margin: 0.5rem 0 0 0;
+                font-size: 1.1rem;
+                color: #B0B0B0;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                font-weight: 500;
+            }}
+        </style>
+        <div class="dashboard-header">
+            <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
             <div>
-                <h1 style="margin: 0; padding: 0; font-size: 2.5rem; font-weight: 700;">DFTL Ranking Dashboard</h1>
-                <p style="margin: 0.25rem 0 0 0; opacity: 0.7; font-size: 1rem;">Track Elo ratings, compare players, and analyze performance trends</p>
+                <h1 class="dashboard-title">DFTL Ranking Dashboard</h1>
+                <p class="dashboard-subtitle">Track Elo ratings, compare players, and analyze performance trends</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -347,11 +903,12 @@ def main():
     with st.sidebar:
         st.header("📊 Dataset")
 
-        # Dataset selector
+        # Dataset selector (label hidden - redundant with header)
         dataset_label = st.selectbox(
             "Dataset",
             options=list(available_datasets.keys()),
-            index=0
+            index=0,
+            label_visibility="collapsed"
         )
         dataset_prefix = available_datasets[dataset_label]
 
@@ -391,13 +948,16 @@ def main():
         df_full_leaderboard = load_leaderboard_data("full")
         if df_full_leaderboard is not None:
             csv_leaderboard = df_full_leaderboard.to_csv(index=False)
-            st.download_button(
-                label="Download Leaderboard CSV",
+            # Custom HTML download link - full CSS control for light/dark mode
+            colors = get_theme_colors()
+            is_dark = colors["bg_primary"] == "#0E1117"
+            download_html = create_download_link(
                 data=csv_leaderboard,
-                file_name="full_leaderboard.csv",
-                mime="text/csv",
-                help="Download the complete daily leaderboard data (all dates)"
+                filename="full_leaderboard.csv",
+                label="Download Leaderboard CSV",
+                is_dark=is_dark
             )
+            st.markdown(download_html, unsafe_allow_html=True)
 
         # Attribution
         st.markdown("---")
@@ -483,66 +1043,29 @@ def main():
             # Date picker for historical rankings
             available_dates = sorted(df_history['date'].dt.date.unique(), reverse=True)
 
-            # Compact header: date picker + metrics on same row
-            col_date, col1, col2, col3, col4, col5 = st.columns([1.2, 1, 1, 1, 1, 1])
-            with col_date:
-                selected_ranking_date = st.date_input(
-                    "Date",
-                    value=available_dates[0],
-                    min_value=available_dates[-1],
-                    max_value=available_dates[0],
-                    key="elo_ranking_date"
-                )
+            selected_ranking_date = st.date_input(
+                "Date",
+                value=available_dates[0],
+                min_value=available_dates[-1],
+                max_value=available_dates[0],
+                key="elo_ranking_date"
+            )
 
-            # Load data for selected date and compute metrics
+            # Load data for selected date
             df_date_history = df_history[df_history['date'].dt.date == selected_ranking_date].copy()
-
-            if not df_date_history.empty:
-                df_ranked = df_date_history[df_date_history['active_rank'].notna()].copy()
-                df_unranked = df_date_history[df_date_history['active_rank'].isna()].copy()
-                ranked_count = len(df_ranked)
-                unranked_count = len(df_unranked)
-                if 'games_played' in df_unranked.columns:
-                    too_few_games = len(df_unranked[df_unranked['games_played'] < 7])
-                    inactive_players = unranked_count - too_few_games
-                else:
-                    too_few_games = 0
-                    inactive_players = unranked_count
-                highest_rating = f"{df_ranked['rating'].max():.1f}" if not df_ranked.empty else "N/A"
-                avg_rating = f"{df_ranked['rating'].mean():.1f}" if not df_ranked.empty else "N/A"
-                median_rating = f"{df_ranked['rating'].median():.1f}" if not df_ranked.empty else "N/A"
-            else:
-                ranked_count = 0
-                unranked_count = 0
-                too_few_games = 0
-                inactive_players = 0
-                highest_rating = "N/A"
-                avg_rating = "N/A"
-                median_rating = "N/A"
-
-            # Display metrics (computed after date selection)
-            with col1:
-                st.metric("Ranked", ranked_count)
-            with col2:
-                st.metric("Unranked", unranked_count, help=f"<7 games: {too_few_games} | Inactive: {inactive_players}")
-            with col3:
-                st.metric("Top Rating", highest_rating)
-            with col4:
-                st.metric("Average", avg_rating)
-            with col5:
-                st.metric("Median", median_rating)
 
             if df_date_history.empty:
                 st.info(f"No ranking data for {selected_ranking_date}. Try another date.")
             else:
                 # Leaderboard section
-                st.subheader("Elo Ranking Leaderboard")
+                date_str = selected_ranking_date.strftime("%b %d, %Y")
+                st.subheader(f"Elo Ranking Leaderboard - {date_str} Ratings")
 
                 # Toggle to show unranked players
                 show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
 
                 # Columns to display (defined once, reused)
-                display_cols = ['active_rank', 'player_name', 'rating', 'trend', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency']
+                display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency']
                 if 'days_inactive' in df_date_history.columns:
                     display_cols.append('days_inactive')
 
@@ -557,7 +1080,6 @@ def main():
                     "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
                     "player_name": st.column_config.TextColumn("Player"),
                     "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                    "trend": st.column_config.TextColumn("Trend", help="Performance trend: ↑ improving, ↓ declining, → stable"),
                     "games_played": st.column_config.NumberColumn("Games", format="%d"),
                     "wins": st.column_config.NumberColumn("Wins", format="%d"),
                     "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
@@ -575,55 +1097,9 @@ def main():
                     hide_index=True,
                     column_config=column_config
                 )
-
-                # Quick navigation to Player Tracker
-                st.markdown("---")
-                col_select, col_button = st.columns([3, 1])
-                with col_select:
-                    # Use pre-sorted player list (df_date_history is already filtered for this date)
-                    quick_select_player = st.selectbox(
-                        "Quick jump to player history",
-                        options=df_date_history.sort_values('rating', ascending=False)['player_name'].tolist(),
-                        index=None,
-                        placeholder="Select a player...",
-                        key="tab1_player_select"
-                    )
-                with col_button:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("View History", key="tab1_view_history", disabled=quick_select_player is None):
-                        # Directly set the Player Tracker selectbox value
-                        st.session_state.tab4_player_select = quick_select_player
-                        st.info(f"Click the **Player Tracker** tab above to see {quick_select_player}'s history.")
         elif df_ratings is not None:
             # Fallback if no history data with active_rank
             st.warning("Historical rankings not available. Showing current rankings only.")
-
-            # Activity gating info
-            ranked_count = len(df_ratings)
-            total_count = len(df_ratings_all) if df_ratings_all is not None else ranked_count
-            unranked_count = total_count - ranked_count
-
-            # Break down unranked players by reason
-            if df_ratings_all is not None and 'games_played' in df_ratings_all.columns:
-                df_unranked_all = df_ratings_all[df_ratings_all['active_rank'].isna()]
-                too_few_games = len(df_unranked_all[df_unranked_all['games_played'] < 7])
-                inactive_players = unranked_count - too_few_games
-            else:
-                too_few_games = 0
-                inactive_players = unranked_count
-
-            # Summary metrics
-            col1, col2, col3, col4, col5 = st.columns(5)
-            with col1:
-                st.metric("Ranked Players", ranked_count)
-            with col2:
-                st.metric("Unranked Players", unranked_count, help=f"<7 games: {too_few_games} | Inactive: {inactive_players}")
-            with col3:
-                st.metric("Highest Rating", f"{df_ratings['rating'].max():.1f}")
-            with col4:
-                st.metric("Average Rating", f"{df_ratings['rating'].mean():.1f}")
-            with col5:
-                st.metric("Median Rating", f"{df_ratings['rating'].median():.1f}")
 
             # Rating Distribution Chart
             with st.expander("📊 Rating Distribution", expanded=False):
@@ -635,6 +1111,13 @@ def main():
                     color_discrete_sequence=[ACCENT_COLORS["primary"]]
                 )
                 apply_plotly_style(fig_dist)
+                # Enhanced bar styling with glow effect
+                fig_dist.update_traces(
+                    marker=dict(
+                        line=dict(width=1, color='rgba(255, 107, 107, 0.8)'),
+                        opacity=0.85,
+                    ),
+                )
                 fig_dist.update_layout(
                     showlegend=False,
                     height=300,
@@ -647,7 +1130,7 @@ def main():
                     line_dash="dash",
                     line_color=ACCENT_COLORS["warning"],
                     annotation_text=f"Median: {df_ratings['rating'].median():.0f}",
-                    annotation_font_color=ACCENT_COLORS["warning"]
+                    annotation_font=dict(color=ACCENT_COLORS["warning"], weight=600)
                 )
                 st.plotly_chart(fig_dist, use_container_width=True)
 
@@ -732,26 +1215,6 @@ def main():
                 hide_index=True,
                 column_config=column_config
             )
-
-            # Quick navigation to Player Tracker
-            st.markdown("---")
-            col_select, col_button = st.columns([3, 1])
-            with col_select:
-                # Always show all players (ranked + unranked) sorted by rating
-                all_players_sorted = df_ratings_all.sort_values('rating', ascending=False)['player_name'].tolist() if df_ratings_all is not None else df_ratings_display['player_name'].tolist()
-                quick_select_player2 = st.selectbox(
-                    "Quick jump to player history",
-                    options=all_players_sorted,
-                    index=None,
-                    placeholder="Select a player...",
-                    key="tab1_player_select_fallback"
-                )
-            with col_button:
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("View History", key="tab1_view_history_fallback", disabled=quick_select_player2 is None):
-                    # Directly set the Player Tracker selectbox value
-                    st.session_state.tab4_player_select = quick_select_player2
-                    st.info(f"Click the **Player Tracker** tab above to see {quick_select_player2}'s history.")
         else:
             st.warning("Ratings data not available.")
 
@@ -760,7 +1223,6 @@ def main():
 
         if df_history is not None:
             # Player selector (single selection)
-            # Note: Value can be pre-set from Elo Rankings tab via session state key
             selected_player = st.selectbox(
                 "Select a player",
                 options=players_by_rating,
@@ -776,87 +1238,243 @@ def main():
                 ].copy()
 
                 if not df_player_history.empty:
-                    # All stats are pre-computed in the history CSV - no runtime computation needed!
-                    # Just filter to days where the player actually played (score is not null)
-                    df_player_display = df_player_history[df_player_history['score'].notna()].copy()
+                    # Filter to days where the player actually played (score is not null)
+                    df_player_played = df_player_history[df_player_history['score'].notna()].copy()
 
-                    # Determine if active_rank column exists
-                    has_active_rank = 'active_rank' in df_player_display.columns
+                    if not df_player_played.empty:
+                        # Get latest stats from the most recent game
+                        latest = df_player_played.sort_values('date', ascending=False).iloc[0]
+                        has_active_rank = 'active_rank' in df_player_played.columns
 
-                    # Select columns for display (aligned with Tab 1)
-                    display_cols = ['date', 'rank', 'score', 'rating', 'rating_change']
-                    if has_active_rank:
-                        display_cols.append('active_rank')
-                    display_cols.extend(['games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency'])
+                        # --- Key Metrics Section ---
+                        st.subheader("Player Summary")
 
-                    # Sort by date descending (most recent first)
-                    df_player_display = df_player_display.sort_values('date', ascending=False)
+                        col1, col2, col3, col4 = st.columns(4)
 
-                    column_config = {
-                        "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
-                        "rank": st.column_config.NumberColumn("Daily Rank", format="%d"),
-                        "score": st.column_config.NumberColumn("Score", format="%d"),
-                        "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                        "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f"),
-                        "games_played": st.column_config.NumberColumn("Games", format="%d"),
-                        "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                        "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
-                        "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
-                        "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
-                        "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
-                        "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average daily rank over last 7 games"),
-                        "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of daily ranks over last 14 games (lower = more consistent)")
-                    }
-                    if has_active_rank:
-                        column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
+                        with col1:
+                            current_rating = latest['rating']
+                            tier = get_tier(current_rating)
+                            tier_name = tier['name'] if tier else "Unranked"
+                            st.metric("Current Rating", f"{current_rating:.0f}", help=f"Tier: {tier_name}")
+                        with col2:
+                            games = int(latest['games_played'])
+                            st.metric("Games Played", games)
+                        with col3:
+                            wins = int(latest['wins'])
+                            win_rate = latest['win_rate']
+                            st.metric("Wins", wins, help=f"Win Rate: {win_rate:.1f}%")
+                        with col4:
+                            top_10s = int(latest['top_10s'])
+                            top_10_rate = latest['top_10s_rate']
+                            st.metric("Top 10", top_10s, help=f"Top 10 Rate: {top_10_rate:.1f}%")
 
-                    # Table first
-                    st.dataframe(
-                        df_player_display[display_cols],
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config=column_config
-                    )
+                        # Second row of metrics
+                        col5, col6, col7, col8 = st.columns(4)
 
-                    # Rating trajectory chart below table
-                    df_chart = df_player_display.sort_values('date')  # Ascending for chart
-                    fig_rating = px.line(
-                        df_chart,
-                        x='date',
-                        y='rating',
-                        markers=True,
-                        labels={'date': 'Date', 'rating': 'Elo Rating'},
-                        color_discrete_sequence=[ACCENT_COLORS["primary"]]
-                    )
-                    apply_plotly_style(fig_rating)
-                    fig_rating.update_layout(
-                        height=250,
-                        margin=dict(l=20, r=20, t=30, b=20),
-                        showlegend=False
-                    )
-                    fig_rating.add_hline(
-                        y=1500,
-                        line_dash="dash",
-                        line_color="#888888",
-                        annotation_text="Baseline",
-                        annotation_font_color="#888888"
-                    )
-                    # Add peak rating marker
-                    peak_idx = df_chart['rating'].idxmax()
-                    peak_row = df_chart.loc[peak_idx]
-                    fig_rating.add_scatter(
-                        x=[peak_row['date']],
-                        y=[peak_row['rating']],
-                        mode='markers',
-                        marker=dict(size=12, color=ACCENT_COLORS["warning"], symbol='star'),
-                        name='Peak',
-                        hovertemplate=f"Peak: {peak_row['rating']:.0f}<extra></extra>"
-                    )
-                    st.plotly_chart(fig_rating, use_container_width=True)
+                        with col5:
+                            avg_rank = latest['avg_daily_rank']
+                            st.metric("Avg Rank", f"{avg_rank:.1f}" if pd.notna(avg_rank) else "N/A")
+                        with col6:
+                            last_7 = latest['last_7']
+                            st.metric("Recent (L7)", f"{last_7:.1f}" if pd.notna(last_7) else "N/A", help="Average rank over last 7 games")
+                        with col7:
+                            consistency = latest['consistency']
+                            st.metric("Consistency", f"{consistency:.1f}" if pd.notna(consistency) else "N/A", help="Lower is more consistent")
+                        with col8:
+                            if has_active_rank and pd.notna(latest['active_rank']):
+                                st.metric("Elo Rank", f"#{int(latest['active_rank'])}")
+                            else:
+                                st.metric("Elo Rank", "Unranked", help="Inactive or <7 games")
+
+                        st.markdown("")  # Spacer
+
+                        # --- First and Last Game Badges ---
+                        sorted_games = df_player_played.sort_values('date')
+                        first_game = sorted_games.iloc[0]
+                        last_game = sorted_games.iloc[-1]
+
+                        col_first, col_last = st.columns(2)
+                        with col_first:
+                            first_date = first_game['date']
+                            if hasattr(first_date, 'strftime'):
+                                first_date_str = first_date.strftime('%Y-%m-%d')
+                            else:
+                                first_date_str = str(first_date)[:10]
+                            first_rank = int(first_game['rank'])
+                            first_rating = first_game['rating']
+                            st.markdown(f"""
+                            <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.2) 100%);
+                                        border: 1px solid {ACCENT_COLORS['info']}; border-radius: 8px; padding: 1rem; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">First Game</div>
+                                <div style="font-size: 1.25rem; font-weight: 700;">{first_date_str}</div>
+                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['info']};">Rank #{first_rank} | Rating: {first_rating:.0f}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        with col_last:
+                            last_date = last_game['date']
+                            if hasattr(last_date, 'strftime'):
+                                last_date_str = last_date.strftime('%Y-%m-%d')
+                            else:
+                                last_date_str = str(last_date)[:10]
+                            last_rank = int(last_game['rank'])
+                            last_rating = last_game['rating']
+                            st.markdown(f"""
+                            <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.2) 100%);
+                                        border: 1px solid {ACCENT_COLORS['primary']}; border-radius: 8px; padding: 1rem; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">Last Game</div>
+                                <div style="font-size: 1.25rem; font-weight: 700;">{last_date_str}</div>
+                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['primary']};">Rank #{last_rank} | Rating: {last_rating:.0f}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                        st.markdown("")  # Spacer
+
+                        # --- Rating Trajectory Chart ---
+                        st.subheader("Elo Rating History")
+                        df_chart = df_player_played.sort_values('date')
+
+                        fig_rating = px.line(
+                            df_chart,
+                            x='date',
+                            y='rating',
+                            markers=True,
+                            labels={'date': 'Date', 'rating': 'Elo Rating'},
+                            color_discrete_sequence=[ACCENT_COLORS["primary"]]
+                        )
+                        apply_plotly_style(fig_rating)
+                        fig_rating.update_traces(
+                            marker=dict(size=8, line=dict(width=2, color='rgba(255,255,255,0.3)')),
+                            line=dict(width=3),
+                            fill='tozeroy',
+                            fillcolor='rgba(255, 107, 107, 0.15)',
+                        )
+                        # Set Y-axis range to fit data with padding (don't show 0)
+                        rating_min = df_chart['rating'].min()
+                        rating_max = df_chart['rating'].max()
+                        rating_padding = (rating_max - rating_min) * 0.1
+                        y_min = max(rating_min - rating_padding, 1000)  # Don't go below 1000
+                        y_max = rating_max + rating_padding
+                        fig_rating.update_layout(
+                            height=300,
+                            margin=dict(l=20, r=20, t=30, b=20),
+                            showlegend=False,
+                            yaxis=dict(range=[y_min, y_max])
+                        )
+                        fig_rating.add_hline(
+                            y=1500,
+                            line_dash="dash",
+                            line_color="rgba(255, 107, 107, 0.4)",
+                            annotation_text="Baseline (1500)",
+                            annotation_font=dict(color="rgba(255, 107, 107, 0.7)", weight=600)
+                        )
+                        # Add peak rating marker
+                        peak_idx = df_chart['rating'].idxmax()
+                        peak_row = df_chart.loc[peak_idx]
+                        fig_rating.add_scatter(
+                            x=[peak_row['date']],
+                            y=[peak_row['rating']],
+                            mode='markers',
+                            marker=dict(
+                                size=16,
+                                color=ACCENT_COLORS["warning"],
+                                symbol='star',
+                                line=dict(width=2, color='#FFD700')
+                            ),
+                            name='Peak',
+                            hovertemplate=f"<b>Peak Rating</b><br>{peak_row['rating']:.0f}<extra></extra>"
+                        )
+                        st.plotly_chart(fig_rating, use_container_width=True)
+
+                        # --- Daily Rank History Chart ---
+                        st.subheader("Daily Rank History")
+
+                        fig_rank = px.line(
+                            df_chart,
+                            x='date',
+                            y='rank',
+                            markers=True,
+                            labels={'date': 'Date', 'rank': 'Daily Rank'},
+                            color_discrete_sequence=[ACCENT_COLORS["info"]]
+                        )
+                        apply_plotly_style(fig_rank, add_gradient_fill=True)
+                        fig_rank.update_traces(
+                            marker=dict(size=8, line=dict(width=2, color='rgba(255,255,255,0.3)')),
+                            line=dict(width=3),
+                            fillcolor='rgba(59, 130, 246, 0.15)',
+                        )
+                        fig_rank.update_layout(
+                            height=280,
+                            margin=dict(l=20, r=20, t=30, b=20),
+                            showlegend=False,
+                            yaxis=dict(autorange="reversed")  # Lower rank is better
+                        )
+                        # Add average rank line
+                        avg_rank_val = df_chart['rank'].mean()
+                        fig_rank.add_hline(
+                            y=avg_rank_val,
+                            line_dash="dash",
+                            line_color="rgba(59, 130, 246, 0.6)",
+                            annotation_text=f"Avg: {avg_rank_val:.1f}",
+                            annotation_font=dict(color="rgba(59, 130, 246, 0.8)", weight=600)
+                        )
+                        # Add best rank markers for ALL occurrences of best rank
+                        best_rank = df_chart['rank'].min()
+                        df_best_ranks = df_chart[df_chart['rank'] == best_rank]
+                        fig_rank.add_scatter(
+                            x=df_best_ranks['date'],
+                            y=df_best_ranks['rank'],
+                            mode='markers',
+                            marker=dict(
+                                size=16,
+                                color=ACCENT_COLORS["success"],
+                                symbol='star',
+                                line=dict(width=2, color='#10B981')
+                            ),
+                            name='Best',
+                            hovertemplate=f"<b>Best Rank</b><br>#{int(best_rank)}<extra></extra>"
+                        )
+                        st.plotly_chart(fig_rank, use_container_width=True)
+
+                        # --- Game History Table ---
+                        st.subheader("Game History")
+
+                        display_cols = ['date', 'rank', 'score', 'rating', 'rating_change']
+                        if has_active_rank:
+                            display_cols.append('active_rank')
+                        display_cols.extend(['games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency'])
+
+                        df_table = df_player_played.sort_values('date', ascending=False)
+
+                        column_config = {
+                            "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
+                            "rank": st.column_config.NumberColumn("Daily Rank", format="%d"),
+                            "score": st.column_config.NumberColumn("Score", format="%d"),
+                            "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
+                            "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f"),
+                            "games_played": st.column_config.NumberColumn("Games", format="%d"),
+                            "wins": st.column_config.NumberColumn("Wins", format="%d"),
+                            "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
+                            "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
+                            "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
+                            "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
+                            "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average rank over last 7 games"),
+                            "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of ranks over last 14 games")
+                        }
+                        if has_active_rank:
+                            column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
+
+                        st.dataframe(
+                            df_table[display_cols],
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config=column_config
+                        )
+                    else:
+                        st.info(f"No game history found for {selected_player}.")
                 else:
                     st.info(f"No history data available for {selected_player}.")
             else:
-                st.info("Select a player to view their history.")
+                st.info("Select a player to view their profile and history.")
         else:
             st.warning("History data not available.")
 
@@ -896,6 +1514,15 @@ def main():
                     hovertemplate='%{y}<br>%{x|%Y-%m-%d}<extra></extra>'
                 )
                 apply_plotly_style(fig_rank1)
+                # Enhanced marker styling with glow effect
+                fig_rank1.update_traces(
+                    marker=dict(
+                        size=10,
+                        line=dict(width=2, color='rgba(255, 255, 255, 0.4)'),
+                        symbol='diamond',
+                    ),
+                )
+                colors = get_theme_colors()
                 fig_rank1.update_layout(
                     height=max(200, len(all_rank1_players) * 25),  # Dynamic height based on player count
                     margin=dict(l=20, r=20, t=20, b=20),
@@ -906,7 +1533,7 @@ def main():
                         tickmode='array',
                         tickvals=all_rank1_players,
                         ticktext=all_rank1_players,
-                        tickfont=dict(color="#888888")
+                        tickfont=dict(color=colors["text_secondary"], weight=600)
                     )
                 )
                 st.plotly_chart(fig_rank1, use_container_width=True)
@@ -1202,9 +1829,15 @@ def main():
                             color_discrete_map={player1: ACCENT_COLORS["info"], player2: ACCENT_COLORS["warning"]}
                         )
                         fig_elo.update_traces(
-                            hovertemplate='%{fullData.name}: %{y:.0f}<extra></extra>'
+                            hovertemplate='%{fullData.name}: %{y:.0f}<extra></extra>',
+                            marker=dict(
+                                size=10,
+                                line=dict(width=2, color='rgba(255, 255, 255, 0.3)'),
+                            ),
+                            line=dict(width=3),
                         )
                         apply_plotly_style(fig_elo)
+                        colors = get_theme_colors()
                         fig_elo.update_layout(
                             hovermode='x unified',
                             height=350,
@@ -1214,16 +1847,16 @@ def main():
                                 y=1.02,
                                 xanchor="center",
                                 x=0.5,
-                                font=dict(color="#888888")
+                                font=dict(color=colors["text_primary"], weight=600),
                             ),
                             margin=dict(l=20, r=20, t=40, b=20)
                         )
                         fig_elo.add_hline(
                             y=1500,
                             line_dash="dash",
-                            line_color="#888888",
+                            line_color=colors["text_muted"],
                             annotation_text="Baseline",
-                            annotation_font_color="#888888"
+                            annotation_font=dict(color=colors["text_muted"], weight=600)
                         )
                         st.plotly_chart(fig_elo, use_container_width=True)
 
@@ -1258,9 +1891,15 @@ def main():
                             color_discrete_map={player1: ACCENT_COLORS["info"], player2: ACCENT_COLORS["warning"]}
                         )
                         fig_score.update_traces(
-                            hovertemplate='%{fullData.name}: %{y:,.0f}<extra></extra>'
+                            hovertemplate='%{fullData.name}: %{y:,.0f}<extra></extra>',
+                            marker=dict(
+                                size=10,
+                                line=dict(width=2, color='rgba(255, 255, 255, 0.3)'),
+                            ),
+                            line=dict(width=3),
                         )
                         apply_plotly_style(fig_score)
+                        colors = get_theme_colors()
                         fig_score.update_layout(
                             hovermode='x unified',
                             height=300,
@@ -1270,7 +1909,7 @@ def main():
                                 y=1.02,
                                 xanchor="center",
                                 x=0.5,
-                                font=dict(color="#888888")
+                                font=dict(color=colors["text_primary"], weight=600),
                             ),
                             margin=dict(l=20, r=20, t=40, b=20)
                         )
@@ -1300,6 +1939,7 @@ def main():
                                 hovertemplate='%{label}: %{value} wins<extra></extra>'
                             )
                             apply_plotly_style(fig_pie)
+                            colors = get_theme_colors()
                             fig_pie.update_layout(
                                 height=250,
                                 margin=dict(l=20, r=20, t=20, b=20),
@@ -1310,7 +1950,7 @@ def main():
                                     y=-0.1,
                                     xanchor="center",
                                     x=0.5,
-                                    font=dict(size=12, color="#888888")
+                                    font=dict(size=12, color=colors["text_primary"], weight=600)
                                 )
                             )
                             st.plotly_chart(fig_pie, use_container_width=True)
