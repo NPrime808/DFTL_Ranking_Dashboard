@@ -809,6 +809,8 @@ def run_elo_ranking(df):
     # Cumulative average daily rank
     history_df['cumsum_rank'] = history_df.groupby('player_name')['rank'].cumsum()
     history_df['avg_daily_rank'] = (history_df['cumsum_rank'] / history_df['games_played']).round(1)
+    # Forward-fill avg_daily_rank for days when player didn't play (so they show last known average)
+    history_df['avg_daily_rank'] = history_df.groupby('player_name')['avg_daily_rank'].ffill()
 
     # Win rate and top 10 rate (percentage)
     history_df['win_rate'] = ((history_df['wins'] / history_df['games_played']) * 100).round(1)
@@ -818,6 +820,8 @@ def run_elo_ranking(df):
     history_df['last_7'] = history_df.groupby('player_name')['rank'].transform(
         lambda x: x.rolling(window=7, min_periods=1).mean()
     ).round(1)
+    # Forward-fill for days when player didn't play
+    history_df['last_7'] = history_df.groupby('player_name')['last_7'].ffill()
 
     # Previous 7-game average (games 8-14 back) for trend calculation
     history_df['prev_7'] = history_df.groupby('player_name')['rank'].transform(
@@ -841,6 +845,8 @@ def run_elo_ranking(df):
     history_df['consistency'] = history_df.groupby('player_name')['rank'].transform(
         lambda x: x.rolling(window=14, min_periods=2).std()
     ).round(1)
+    # Forward-fill for days when player didn't play
+    history_df['consistency'] = history_df.groupby('player_name')['consistency'].ffill()
 
     # Peak rating (max rating achieved up to this point)
     history_df['peak_rating'] = history_df.groupby('player_name')['rating'].cummax().round(1)
