@@ -7,7 +7,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -44,15 +44,6 @@ RANK_ICONS = {
     3: {"icon": "🥉", "color": "#CD7F32", "label": "Third Place"},
 }
 
-def get_rank_icon(rank):
-    """Get the icon for a given rank (top 3 only)."""
-    if pd.isna(rank):
-        return ""
-    rank = int(rank)
-    if rank in RANK_ICONS:
-        return RANK_ICONS[rank]["icon"]
-    return ""
-
 def get_rank_badge_html(rank):
     """Generate HTML for a rank badge with icon and styling."""
     if pd.isna(rank):
@@ -64,53 +55,6 @@ def get_rank_badge_html(rank):
     info = RANK_ICONS[rank]
     badge_style = f'display:inline-flex;align-items:center;gap:0.3rem;font-weight:700;color:{info["color"]};text-shadow:0 0 10px {info["color"]}40;'
     return f'<span style="{badge_style}"><span style="font-size:1.2rem;">{info["icon"]}</span>#{rank}</span>'
-
-
-def format_player_with_rank(player_name, rank=None):
-    """Format player name with optional rank icon."""
-    rank_icon = get_rank_icon(rank) if rank else ""
-    rank_html = f'<span style="margin-right:0.3rem;font-size:1.1rem;">{rank_icon}</span>' if rank_icon else ""
-    return f'<div style="display:inline-flex;align-items:center;gap:0.5rem;">{rank_html}<span style="font-weight:600;">{player_name}</span></div>'
-
-
-def create_top3_spotlight_html(df_top3):
-    """Create HTML for the Top 3 Spotlight section with flourishes."""
-    if len(df_top3) == 0:
-        return ""
-
-    cards_html = []
-    for _, row in df_top3.iterrows():
-        rank = int(row['active_rank'])
-        player = row['player_name']
-        rating = row['rating']
-        rank_info = RANK_ICONS.get(rank, {"icon": "", "color": "#888888"})
-
-        # Different card sizes: #1 is larger
-        if rank == 1:
-            card_style = f"flex:1.4;min-width:200px;background:linear-gradient(135deg,rgba(38,39,48,0.95) 0%,rgba(14,17,23,0.95) 100%);border:1px solid {rank_info['color']}50;border-radius:16px;padding:1.5rem;text-align:center;box-shadow:0 0 30px {rank_info['color']}60,0 0 60px {rank_info['color']}30;"
-            icon_size = "3rem"
-            name_size = "1.3rem"
-            rating_size = "1.8rem"
-        elif rank == 2:
-            card_style = f"flex:1.2;min-width:180px;background:linear-gradient(135deg,rgba(38,39,48,0.95) 0%,rgba(14,17,23,0.95) 100%);border:1px solid {rank_info['color']}50;border-radius:16px;padding:1.5rem;text-align:center;box-shadow:0 0 20px {rank_info['color']}50;"
-            icon_size = "2.5rem"
-            name_size = "1.1rem"
-            rating_size = "1.5rem"
-        else:
-            card_style = f"flex:1;min-width:160px;background:linear-gradient(135deg,rgba(38,39,48,0.95) 0%,rgba(14,17,23,0.95) 100%);border:1px solid {rank_info['color']}50;border-radius:16px;padding:1.5rem;text-align:center;box-shadow:0 0 15px {rank_info['color']}40;"
-            icon_size = "2rem"
-            name_size = "1rem"
-            rating_size = "1.3rem"
-
-        card = f'<div style="{card_style}">'
-        card += f'<div style="font-size:{icon_size};margin-bottom:0.5rem;filter:drop-shadow(0 0 10px {rank_info["color"]});">{rank_info["icon"]}</div>'
-        card += f'<div style="font-family:Cinzel,serif;font-size:{name_size};font-weight:700;color:#FAFAFA;margin-bottom:0.25rem;text-shadow:0 2px 4px rgba(0,0,0,0.3);">{player}</div>'
-        card += f'<div style="font-family:Rajdhani,sans-serif;font-size:{rating_size};font-weight:700;background:linear-gradient(135deg,#FAFAFA 0%,{rank_info["color"]} 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">{rating:.1f}</div>'
-        card += '</div>'
-        cards_html.append(card)
-
-    container_style = "display:flex;gap:1rem;justify-content:center;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.5rem;padding:1rem;"
-    return f'<div style="{container_style}">{"".join(cards_html)}</div>'
 
 
 # Theme-specific colors (WCAG AA compliant contrast ratios)
@@ -755,40 +699,6 @@ def apply_plotly_style(fig, add_gradient_fill=False):
 
     return fig
 
-def apply_plotly_style_enhanced(fig):
-    """Apply enhanced styling with gradient fills and glowing markers."""
-    apply_plotly_style(fig)
-    fig.update_traces(
-        marker=dict(
-            size=8,
-            line=dict(width=2, color='rgba(255, 107, 107, 0.8)'),
-        ),
-        line=dict(width=3),
-    )
-    return fig
-
-
-def format_rating_change(value):
-    """Format rating change with color indicator (uses accent colors - theme-independent)."""
-    if pd.isna(value):
-        return ""
-    if value > 0:
-        return f"<span style='color: {ACCENT_COLORS['success']}'>+{value:.1f}</span>"
-    elif value < 0:
-        return f"<span style='color: {ACCENT_COLORS['danger']}'>{value:.1f}</span>"
-    else:
-        return f"<span style='color: #767676'>{value:.1f}</span>"  # WCAG AA compliant in both themes
-
-
-def format_trend(trend):
-    """Format trend indicator with color (uses accent colors - theme-independent)."""
-    if trend == "↑":
-        return f"<span style='color: {ACCENT_COLORS['success']}; font-size: 1.25rem;'>↑</span>"
-    elif trend == "↓":
-        return f"<span style='color: {ACCENT_COLORS['danger']}; font-size: 1.25rem;'>↓</span>"
-    else:
-        return f"<span style='color: #767676; font-size: 1.25rem;'>→</span>"  # WCAG AA compliant in both themes
-
 
 # --- Constants ---
 OUTPUT_FOLDER = Path(__file__).parent / "output"
@@ -862,7 +772,6 @@ def main():
     st.markdown(get_theme_css(), unsafe_allow_html=True)
 
     # Title with logo, gradient text, and glow effects
-    import base64
     logo_path = Path(__file__).parent / "images" / "dftl_logo.png"
     if logo_path.exists():
         with open(logo_path, "rb") as f:
