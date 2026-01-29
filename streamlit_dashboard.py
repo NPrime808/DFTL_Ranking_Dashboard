@@ -279,10 +279,6 @@ def get_theme_css():
         """
 
 
-# For backwards compatibility, create a COLORS alias
-# This is evaluated once at module load, so charts use consistent colors
-COLORS = {**ACCENT_COLORS, **DARK_THEME}  # Default to dark theme for static references
-
 def create_download_link(data: str, filename: str, label: str, is_dark: bool = True) -> str:
     """
     Create a styled HTML download link with full CSS control.
@@ -420,9 +416,7 @@ CUSTOM_CSS = """
 }
 
 /* ===== Sidebar Styling ===== */
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, rgba(14, 17, 23, 0.95) 0%, rgba(38, 39, 48, 0.95) 100%) !important;
-}
+/* Background set dynamically via get_theme_css() for theme support */
 
 [data-testid="stSidebar"] .stMarkdown hr {
     border-color: rgba(255, 107, 107, 0.3);
@@ -555,22 +549,6 @@ CUSTOM_CSS = """
     height: 1px;
     background: linear-gradient(90deg, transparent 0%, rgba(255, 107, 107, 0.5) 50%, transparent 100%);
     margin: 1.5rem 0;
-}
-
-/* ===== Leaderboard Row Highlights ===== */
-.rank-1-row {
-    background: linear-gradient(90deg, rgba(255, 215, 0, 0.15) 0%, transparent 100%) !important;
-    box-shadow: inset 3px 0 0 #FFD700;
-}
-
-.rank-2-row {
-    background: linear-gradient(90deg, rgba(192, 192, 192, 0.1) 0%, transparent 100%) !important;
-    box-shadow: inset 3px 0 0 #C0C0C0;
-}
-
-.rank-3-row {
-    background: linear-gradient(90deg, rgba(205, 127, 50, 0.1) 0%, transparent 100%) !important;
-    box-shadow: inset 3px 0 0 #CD7F32;
 }
 
 /* ===== Animation Keyframes (removed for performance) ===== */
