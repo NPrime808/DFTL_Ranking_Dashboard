@@ -817,16 +817,36 @@ def run_elo_ranking(df):
     history_df['top_10s_rate'] = ((history_df['top_10s'] / history_df['games_played']) * 100).round(1)
 
     # Rolling 7-game average rank (last_7)
-    history_df['last_7'] = history_df.groupby('player_name')['rank'].transform(
-        lambda x: x.rolling(window=7, min_periods=1).mean()
-    ).round(1)
-    # Forward-fill for days when player didn't play
-    history_df['last_7'] = history_df.groupby('player_name')['last_7'].ffill()
+    # IMPORTANT: Only compute on rows where player actually played (rank is not NaN)
+    # This ensures the rolling window covers actual games, not calendar days
+    played_mask = history_df['rank'].notna()
+
+    # Create a temporary df with only played games for proper rolling calculation
+    def calc_rolling_last7(group):
+        played = group[group['rank'].notna()].copy()
+        if len(played) == 0:
+            return pd.Series(index=group.index, dtype=float)
+        played['last_7'] = played['rank'].rolling(window=7, min_periods=1).mean().round(1)
+        # Merge back and forward-fill
+        result = group[['rank']].merge(played[['last_7']], left_index=True, right_index=True, how='left')
+        result['last_7'] = result['last_7'].ffill()
+        return result['last_7']
+
+    history_df['last_7'] = history_df.groupby('player_name', group_keys=False).apply(calc_rolling_last7, include_groups=False)
 
     # Previous 7-game average (games 8-14 back) for trend calculation
-    history_df['prev_7'] = history_df.groupby('player_name')['rank'].transform(
-        lambda x: x.shift(7).rolling(window=7, min_periods=1).mean()
-    )
+    # Same fix: only count actual games, not calendar days
+    def calc_rolling_prev7(group):
+        played = group[group['rank'].notna()].copy()
+        if len(played) < 8:  # Need at least 8 games for prev_7
+            return pd.Series(index=group.index, dtype=float)
+        played['prev_7'] = played['rank'].shift(7).rolling(window=7, min_periods=1).mean()
+        # Merge back and forward-fill
+        result = group[['rank']].merge(played[['prev_7']], left_index=True, right_index=True, how='left')
+        result['prev_7'] = result['prev_7'].ffill()
+        return result['prev_7']
+
+    history_df['prev_7'] = history_df.groupby('player_name', group_keys=False).apply(calc_rolling_prev7, include_groups=False)
 
     # Trend: compare last_7 vs prev_7 (lower rank = better, so improving = prev_7 > last_7)
     def calc_trend(row):
@@ -842,11 +862,18 @@ def run_elo_ranking(df):
     history_df['trend'] = history_df.apply(calc_trend, axis=1)
 
     # Rolling 14-game consistency (std dev of ranks)
-    history_df['consistency'] = history_df.groupby('player_name')['rank'].transform(
-        lambda x: x.rolling(window=14, min_periods=2).std()
-    ).round(1)
-    # Forward-fill for days when player didn't play
-    history_df['consistency'] = history_df.groupby('player_name')['consistency'].ffill()
+    # Same fix: only count actual games, not calendar days
+    def calc_rolling_consistency(group):
+        played = group[group['rank'].notna()].copy()
+        if len(played) < 2:  # Need at least 2 games for std
+            return pd.Series(index=group.index, dtype=float)
+        played['consistency'] = played['rank'].rolling(window=14, min_periods=2).std().round(1)
+        # Merge back and forward-fill
+        result = group[['rank']].merge(played[['consistency']], left_index=True, right_index=True, how='left')
+        result['consistency'] = result['consistency'].ffill()
+        return result['consistency']
+
+    history_df['consistency'] = history_df.groupby('player_name', group_keys=False).apply(calc_rolling_consistency, include_groups=False)
 
     # Peak rating (max rating achieved up to this point)
     history_df['peak_rating'] = history_df.groupby('player_name')['rating'].cummax().round(1)

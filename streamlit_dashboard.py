@@ -1307,10 +1307,13 @@ def main():
                             consistency = latest['consistency']
                             st.metric("Consistency", f"{consistency:.1f}" if pd.notna(consistency) else "N/A", help="Daily Rank variations over the last 14 games")
                         with col8:
-                            if has_active_rank and pd.notna(latest['active_rank']):
-                                st.metric("Elo Rank", f"#{int(latest['active_rank'])}")
+                            # Get CURRENT Elo rank from current ratings (not from last game history)
+                            current_player_rating = df_ratings[df_ratings['player_name'] == selected_player]
+                            if not current_player_rating.empty and pd.notna(current_player_rating.iloc[0]['active_rank']):
+                                current_rank = int(current_player_rating.iloc[0]['active_rank'])
+                                st.metric("Elo Rank", f"#{current_rank}")
                             else:
-                                st.metric("Elo Rank", "Unranked", help="Inactive or <7 games")
+                                st.metric("Elo Rank", "Inactive", help="Not ranked (inactive >7 days or <7 games)")
 
                         st.markdown("")  # Spacer
 
@@ -1333,7 +1336,7 @@ def main():
                                         border: 1px solid {ACCENT_COLORS['info']}; border-radius: 8px; padding: 1rem; text-align: center;">
                                 <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">First Game</div>
                                 <div style="font-size: 1.25rem; font-weight: 700;">{first_date_str}</div>
-                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['info']};">Rank #{first_rank} | Rating: {first_rating:.0f}</div>
+                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['info']};">Daily Rank #{first_rank} | Rating: {first_rating:.0f}</div>
                             </div>
                             """, unsafe_allow_html=True)
                         with col_last:
@@ -1349,7 +1352,7 @@ def main():
                                         border: 1px solid {ACCENT_COLORS['primary']}; border-radius: 8px; padding: 1rem; text-align: center;">
                                 <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">Last Game</div>
                                 <div style="font-size: 1.25rem; font-weight: 700;">{last_date_str}</div>
-                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['primary']};">Rank #{last_rank} | Rating: {last_rating:.0f}</div>
+                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['primary']};">Daily Rank #{last_rank} | Rating: {last_rating:.0f}</div>
                             </div>
                             """, unsafe_allow_html=True)
 
