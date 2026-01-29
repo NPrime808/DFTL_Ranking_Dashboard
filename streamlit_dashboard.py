@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -34,45 +35,6 @@ ACCENT_COLORS = {
         "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1"
     ],
 }
-
-# --- Tier System ---
-# Rating tiers with distinct visual identities (like chess/gaming ranks)
-TIER_SYSTEM = {
-    "Grandmaster": {"min": 2700, "color": "#FF6B6B", "gradient": "linear-gradient(135deg, #FF6B6B 0%, #FFD700 50%, #FF6B6B 100%)", "glow": "0 0 20px rgba(255,107,107,0.6)", "icon": "👑"},
-    "Master": {"min": 2500, "color": "#9333EA", "gradient": "linear-gradient(135deg, #9333EA 0%, #C084FC 100%)", "glow": "0 0 15px rgba(147,51,234,0.5)", "icon": "💎"},
-    "Diamond": {"min": 2200, "color": "#06B6D4", "gradient": "linear-gradient(135deg, #06B6D4 0%, #67E8F9 100%)", "glow": "0 0 12px rgba(6,182,212,0.4)", "icon": "💠"},
-    "Platinum": {"min": 1900, "color": "#E2E8F0", "gradient": "linear-gradient(135deg, #94A3B8 0%, #E2E8F0 100%)", "glow": "0 0 10px rgba(226,232,240,0.3)", "icon": "⚪"},
-    "Gold": {"min": 1600, "color": "#F59E0B", "gradient": "linear-gradient(135deg, #D97706 0%, #FCD34D 100%)", "glow": "0 0 10px rgba(245,158,11,0.3)", "icon": "🥇"},
-    "Silver": {"min": 1300, "color": "#9CA3AF", "gradient": "linear-gradient(135deg, #6B7280 0%, #D1D5DB 100%)", "glow": "none", "icon": "🥈"},
-    "Bronze": {"min": 0, "color": "#CD7F32", "gradient": "linear-gradient(135deg, #92400E 0%, #D97706 100%)", "glow": "none", "icon": "🥉"},
-}
-
-def get_tier(rating):
-    """Get tier information for a given rating."""
-    if pd.isna(rating):
-        return None
-    for tier_name, tier_info in TIER_SYSTEM.items():
-        if rating >= tier_info["min"]:
-            return {"name": tier_name, **tier_info}
-    return {"name": "Bronze", **TIER_SYSTEM["Bronze"]}
-
-def get_tier_badge_html(rating, show_icon=True, size="small"):
-    """Generate HTML for a tier badge."""
-    tier = get_tier(rating)
-    if tier is None:
-        return ""
-
-    sizes = {
-        "small": {"font": "0.7rem", "padding": "0.15rem 0.4rem", "icon_size": "0.8rem"},
-        "medium": {"font": "0.8rem", "padding": "0.2rem 0.5rem", "icon_size": "1rem"},
-        "large": {"font": "0.9rem", "padding": "0.25rem 0.6rem", "icon_size": "1.1rem"},
-    }
-    s = sizes.get(size, sizes["small"])
-
-    icon_html = f'<span style="font-size:{s["icon_size"]};margin-right:0.2rem;">{tier["icon"]}</span>' if show_icon else ""
-    badge_style = f'background:{tier["gradient"]};color:#000;font-size:{s["font"]};font-weight:600;padding:{s["padding"]};border-radius:4px;box-shadow:{tier["glow"]};text-shadow:0 1px 0 rgba(255,255,255,0.3);display:inline-flex;align-items:center;'
-
-    return f'<span style="{badge_style}">{icon_html}{tier["name"]}</span>'
 
 # --- Leaderboard Flourishes ---
 # Icons and decorations for top players
@@ -104,14 +66,11 @@ def get_rank_badge_html(rank):
     return f'<span style="{badge_style}"><span style="font-size:1.2rem;">{info["icon"]}</span>#{rank}</span>'
 
 
-def format_player_with_tier(player_name, rating, rank=None):
-    """Format player name with tier badge and optional rank icon."""
+def format_player_with_rank(player_name, rank=None):
+    """Format player name with optional rank icon."""
     rank_icon = get_rank_icon(rank) if rank else ""
-    tier_badge = get_tier_badge_html(rating, show_icon=False, size="small")
-
     rank_html = f'<span style="margin-right:0.3rem;font-size:1.1rem;">{rank_icon}</span>' if rank_icon else ""
-
-    return f'<div style="display:inline-flex;align-items:center;gap:0.5rem;">{rank_html}<span style="font-weight:600;">{player_name}</span> {tier_badge}</div>'
+    return f'<div style="display:inline-flex;align-items:center;gap:0.5rem;">{rank_html}<span style="font-weight:600;">{player_name}</span></div>'
 
 
 def create_top3_spotlight_html(df_top3):
@@ -124,7 +83,6 @@ def create_top3_spotlight_html(df_top3):
         rank = int(row['active_rank'])
         player = row['player_name']
         rating = row['rating']
-        tier = get_tier(rating)
         rank_info = RANK_ICONS.get(rank, {"icon": "", "color": "#888888"})
 
         # Different card sizes: #1 is larger
@@ -144,13 +102,10 @@ def create_top3_spotlight_html(df_top3):
             name_size = "1rem"
             rating_size = "1.3rem"
 
-        tier_badge = get_tier_badge_html(rating, show_icon=True, size="medium")
-
         card = f'<div style="{card_style}">'
         card += f'<div style="font-size:{icon_size};margin-bottom:0.5rem;filter:drop-shadow(0 0 10px {rank_info["color"]});">{rank_info["icon"]}</div>'
         card += f'<div style="font-family:Cinzel,serif;font-size:{name_size};font-weight:700;color:#FAFAFA;margin-bottom:0.25rem;text-shadow:0 2px 4px rgba(0,0,0,0.3);">{player}</div>'
-        card += f'<div style="margin-bottom:0.5rem;">{tier_badge}</div>'
-        card += f'<div style="font-family:Rajdhani,sans-serif;font-size:{rating_size};font-weight:700;background:linear-gradient(135deg,#FAFAFA 0%,{tier["color"]} 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">{rating:.1f}</div>'
+        card += f'<div style="font-family:Rajdhani,sans-serif;font-size:{rating_size};font-weight:700;background:linear-gradient(135deg,#FAFAFA 0%,{rank_info["color"]} 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">{rating:.1f}</div>'
         card += '</div>'
         cards_html.append(card)
 
@@ -206,6 +161,45 @@ def get_theme_css():
         [data-testid="stExpander"] {
             background: rgba(38, 39, 48, 0.8) !important;
         }
+        /* Expander content text - ensure light text in dark mode */
+        [data-testid="stExpander"] p,
+        [data-testid="stExpander"] li,
+        [data-testid="stExpander"] td,
+        [data-testid="stExpander"] th {
+            color: #FAFAFA !important;
+        }
+        [data-testid="stExpander"] strong {
+            color: #FFFFFF !important;
+        }
+        /* Expander header - force light text in dark mode with multiple methods */
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary *,
+        [data-testid="stExpander"] details > summary,
+        [data-testid="stExpander"] details > summary *,
+        [data-testid="stExpander"] details[open] > summary,
+        [data-testid="stExpander"] details[open] > summary *,
+        .streamlit-expanderHeader,
+        .streamlit-expanderHeader *,
+        details[open] > summary,
+        details[open] > summary * {
+            color: #FAFAFA !important;
+            -webkit-text-fill-color: #FAFAFA !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            background-clip: unset !important;
+            -webkit-background-clip: unset !important;
+        }
+        /* Ensure expanded header has visible background */
+        [data-testid="stExpander"] details[open] > summary {
+            background-color: rgba(38, 39, 48, 0.95) !important;
+        }
+        [data-testid="stExpander"] summary svg,
+        [data-testid="stExpander"] details > summary svg,
+        [data-testid="stExpander"] details[open] > summary svg {
+            fill: #FAFAFA !important;
+            stroke: #FAFAFA !important;
+            opacity: 1 !important;
+        }
         .dashboard-header {
             background: linear-gradient(135deg, rgba(38, 39, 48, 0.9) 0%, rgba(14, 17, 23, 0.95) 100%) !important;
         }
@@ -242,6 +236,45 @@ def get_theme_css():
         /* Light theme overrides */
         [data-testid="stExpander"] {
             background: rgba(240, 242, 246, 0.95) !important;
+        }
+        /* Expander content text - ensure dark text in light mode */
+        [data-testid="stExpander"] p,
+        [data-testid="stExpander"] li,
+        [data-testid="stExpander"] td,
+        [data-testid="stExpander"] th {
+            color: #262730 !important;
+        }
+        [data-testid="stExpander"] strong {
+            color: #1a1c23 !important;
+        }
+        /* Expander header - force dark text in light mode with multiple methods */
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary *,
+        [data-testid="stExpander"] details > summary,
+        [data-testid="stExpander"] details > summary *,
+        [data-testid="stExpander"] details[open] > summary,
+        [data-testid="stExpander"] details[open] > summary *,
+        .streamlit-expanderHeader,
+        .streamlit-expanderHeader *,
+        details[open] > summary,
+        details[open] > summary * {
+            color: #262730 !important;
+            -webkit-text-fill-color: #262730 !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            background-clip: unset !important;
+            -webkit-background-clip: unset !important;
+        }
+        /* Ensure expanded header has visible background */
+        [data-testid="stExpander"] details[open] > summary {
+            background-color: rgba(240, 242, 246, 0.95) !important;
+        }
+        [data-testid="stExpander"] summary svg,
+        [data-testid="stExpander"] details > summary svg,
+        [data-testid="stExpander"] details[open] > summary svg {
+            fill: #262730 !important;
+            stroke: #262730 !important;
+            opacity: 1 !important;
         }
         .dashboard-header {
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 242, 246, 0.98) 100%) !important;
@@ -390,19 +423,19 @@ CUSTOM_CSS = """
     padding-top: 1.5rem;
 }
 
-/* ===== Glassmorphism Metric Cards (optimized - no blur for performance) ===== */
+/* ===== Metric Cards (theme-adaptive using Streamlit CSS variables) ===== */
 [data-testid="stMetric"] {
-    background: rgba(38, 39, 48, 0.85) !important;
-    border: 1px solid var(--glass-border) !important;
+    background: var(--secondary-background-color) !important;
+    border: 1px solid rgba(128, 128, 128, 0.2) !important;
     border-radius: 12px !important;
     padding: 1.25rem !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
     transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
 
 [data-testid="stMetric"]:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), var(--primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
     border-color: rgba(255, 107, 107, 0.4) !important;
 }
 
@@ -412,17 +445,15 @@ CUSTOM_CSS = """
     font-weight: 600 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.1em !important;
-    opacity: 0.8;
+    color: var(--text-color) !important;
+    opacity: 0.7 !important;
 }
 
 [data-testid="stMetric"] [data-testid="stMetricValue"] {
     font-family: var(--font-display) !important;
     font-size: 2rem !important;
     font-weight: 700 !important;
-    background: linear-gradient(135deg, #FAFAFA 0%, #FF6B6B 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--text-color) !important;
 }
 
 /* ===== Number Counter Effect (static for performance) ===== */
@@ -665,21 +696,18 @@ CUSTOM_CSS = """
 
 
 def apply_plotly_style(fig, add_gradient_fill=False):
-    """Apply consistent styling to Plotly figures (theme-aware) with optional gradient fill."""
-    colors = get_theme_colors()
+    """Apply consistent styling to Plotly figures with theme-adaptive text colors.
 
-    # Theme-aware background colors for overlays
-    is_dark = colors["bg_primary"] == "#0E1117"
-    if is_dark:
-        legend_bg = "rgba(38, 39, 48, 0.9)"
-        hover_bg = "rgba(38, 39, 48, 0.95)"
-        grid_color = "rgba(255, 255, 255, 0.08)"
-        line_color = "rgba(255, 255, 255, 0.15)"
-    else:
-        legend_bg = "rgba(255, 255, 255, 0.95)"
-        hover_bg = "rgba(255, 255, 255, 0.98)"
-        grid_color = "rgba(0, 0, 0, 0.08)"
-        line_color = "rgba(0, 0, 0, 0.15)"
+    Text colors are NOT explicitly set, allowing Streamlit to inject theme-aware
+    colors automatically. Only structural elements (grids, backgrounds) use
+    explicit neutral colors.
+    """
+    # Structural colors that work on both light and dark backgrounds
+    grid_color = "rgba(128, 128, 128, 0.4)"  # Neutral gray grid
+    line_color = "rgba(128, 128, 128, 0.3)"  # Neutral gray lines
+    legend_bg = "rgba(128, 128, 128, 0.15)"  # Semi-transparent neutral
+    hover_bg = "rgba(50, 50, 50, 0.9)"  # Dark hover for readability
+    hover_text = "#FFFFFF"  # White text on dark hover background
 
     # Bold font weight for better readability
     bold_weight = 600
@@ -687,11 +715,11 @@ def apply_plotly_style(fig, add_gradient_fill=False):
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=colors["text_primary"], family="Rajdhani, sans-serif", weight=bold_weight),
+        font=dict(family="Rajdhani, sans-serif", weight=bold_weight),
         xaxis=dict(
             gridcolor=grid_color,
             linecolor=line_color,
-            tickfont=dict(color=colors["text_secondary"], family="Rajdhani", size=12, weight=bold_weight),
+            tickfont=dict(family="Rajdhani", size=12, weight=bold_weight),
             title_font=dict(weight=bold_weight),
             showgrid=True,
             zeroline=False,
@@ -699,21 +727,21 @@ def apply_plotly_style(fig, add_gradient_fill=False):
         yaxis=dict(
             gridcolor=grid_color,
             linecolor=line_color,
-            tickfont=dict(color=colors["text_secondary"], family="Rajdhani", size=12, weight=bold_weight),
+            tickfont=dict(family="Rajdhani", size=12, weight=bold_weight),
             title_font=dict(weight=bold_weight),
             showgrid=True,
             zeroline=False,
         ),
         legend=dict(
-            font=dict(color=colors["text_primary"], family="Rajdhani", weight=bold_weight),
+            font=dict(family="Rajdhani", weight=bold_weight),
             bgcolor=legend_bg,
             bordercolor=line_color,
             borderwidth=1,
         ),
         hoverlabel=dict(
             bgcolor=hover_bg,
-            bordercolor=colors["primary"],
-            font=dict(color=colors["text_primary"], family="Rajdhani", weight=bold_weight),
+            bordercolor=ACCENT_COLORS["primary"],
+            font=dict(color=hover_text, family="Rajdhani", weight=bold_weight),
         ),
     )
 
@@ -1080,14 +1108,14 @@ def main():
                     "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
                     "player_name": st.column_config.TextColumn("Player"),
                     "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                    "games_played": st.column_config.NumberColumn("Games", format="%d"),
+                    "games_played": st.column_config.NumberColumn("Games", format="%d", help="Top 30 Daily Runs"),
                     "wins": st.column_config.NumberColumn("Wins", format="%d"),
                     "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
                     "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
                     "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
-                    "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
-                    "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average daily rank over last 7 games"),
-                    "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of daily ranks over last 14 games (lower = more consistent)"),
+                    "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
+                    "last_7": st.column_config.NumberColumn("Recent Perf", format="%.1f", help="Average Daily Rank over last 7 games"),
+                    "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Daily Rank variations over the last 14 games"),
                     "days_inactive": st.column_config.NumberColumn("Inactive", format="%d")
                 }
 
@@ -1195,13 +1223,13 @@ def main():
                 "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
                 "player_name": st.column_config.TextColumn("Player"),
                 "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                "games_played": st.column_config.NumberColumn("Games", format="%d"),
+                "games_played": st.column_config.NumberColumn("Games", format="%d", help="Top 30 Daily Runs"),
                 "wins": st.column_config.NumberColumn("Wins", format="%d"),
                 "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
                 "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
                 "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
-                "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
-                "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average daily rank over last 7 games"),
+                "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
+                "last_7": st.column_config.NumberColumn("Recent Perf", format="%.1f", help="Average Daily Rank over last 7 games"),
                 "last_seen": st.column_config.DateColumn("Last Seen", format="YYYY-MM-DD")
             }
             if has_days_inactive:
@@ -1253,12 +1281,10 @@ def main():
 
                         with col1:
                             current_rating = latest['rating']
-                            tier = get_tier(current_rating)
-                            tier_name = tier['name'] if tier else "Unranked"
-                            st.metric("Current Rating", f"{current_rating:.0f}", help=f"Tier: {tier_name}")
+                            st.metric("Current Rating", f"{current_rating:.0f}")
                         with col2:
                             games = int(latest['games_played'])
-                            st.metric("Games Played", games)
+                            st.metric("Games Played", games, help="Top 30 Daily Runs")
                         with col3:
                             wins = int(latest['wins'])
                             win_rate = latest['win_rate']
@@ -1273,13 +1299,13 @@ def main():
 
                         with col5:
                             avg_rank = latest['avg_daily_rank']
-                            st.metric("Avg Rank", f"{avg_rank:.1f}" if pd.notna(avg_rank) else "N/A")
+                            st.metric("Avg Rank", f"{avg_rank:.1f}" if pd.notna(avg_rank) else "N/A", help="Average Daily Rank over all games")
                         with col6:
                             last_7 = latest['last_7']
-                            st.metric("Recent (L7)", f"{last_7:.1f}" if pd.notna(last_7) else "N/A", help="Average rank over last 7 games")
+                            st.metric("Recent Performance", f"{last_7:.1f}" if pd.notna(last_7) else "N/A", help="Average Daily Rank over last 7 games")
                         with col7:
                             consistency = latest['consistency']
-                            st.metric("Consistency", f"{consistency:.1f}" if pd.notna(consistency) else "N/A", help="Lower is more consistent")
+                            st.metric("Consistency", f"{consistency:.1f}" if pd.notna(consistency) else "N/A", help="Daily Rank variations over the last 14 games")
                         with col8:
                             if has_active_rank and pd.notna(latest['active_rank']):
                                 st.metric("Elo Rank", f"#{int(latest['active_rank'])}")
@@ -1385,53 +1411,60 @@ def main():
                         )
                         st.plotly_chart(fig_rating, use_container_width=True)
 
-                        # --- Daily Rank History Chart ---
+                        # --- Daily Rank History Chart (Bar Chart) ---
                         st.subheader("Daily Rank History")
 
-                        fig_rank = px.line(
-                            df_chart,
-                            x='date',
-                            y='rank',
-                            markers=True,
-                            labels={'date': 'Date', 'rank': 'Daily Rank'},
-                            color_discrete_sequence=[ACCENT_COLORS["info"]]
-                        )
-                        apply_plotly_style(fig_rank, add_gradient_fill=True)
-                        fig_rank.update_traces(
-                            marker=dict(size=8, line=dict(width=2, color='rgba(255,255,255,0.3)')),
-                            line=dict(width=3),
-                            fillcolor='rgba(59, 130, 246, 0.15)',
-                        )
+                        # Bars grow from bottom (rank 31) UPWARD toward rank 1
+                        # Better ranks (closer to 1) = taller bars
+                        base_rank = 31  # Base of all bars (bottom of chart)
+                        fig_rank = go.Figure()
+
+                        # Calculate bar heights: negative values so bars grow upward on reversed y-axis
+                        # height = rank - base_rank (e.g., rank 1 -> height -30, rank 30 -> height -1)
+                        ranks = df_chart['rank'].tolist()
+                        bar_heights = [r - base_rank for r in ranks]  # All negative
+
+                        # Determine colors: green for best rank (rank 1), blue for others
+                        best_rank = df_chart['rank'].min()
+                        bar_colors = [ACCENT_COLORS["success"] if r == best_rank else ACCENT_COLORS["info"] for r in ranks]
+
+                        fig_rank.add_trace(go.Bar(
+                            x=df_chart['date'],
+                            y=bar_heights,  # Negative heights = bars grow upward
+                            base=[base_rank] * len(df_chart),  # All bars start from rank 31
+                            marker=dict(
+                                color=bar_colors,
+                                line=dict(width=1, color='rgba(255,255,255,0.3)')
+                            ),
+                            customdata=ranks,  # Store actual ranks for hover
+                            hovertemplate='%{x|%b %d, %Y}<br>Rank #%{customdata}<extra></extra>',
+                        ))
+
+                        apply_plotly_style(fig_rank)
                         fig_rank.update_layout(
                             height=280,
-                            margin=dict(l=20, r=20, t=30, b=20),
+                            margin=dict(l=20, r=70, t=30, b=20),  # Extra right margin for annotation
                             showlegend=False,
-                            yaxis=dict(autorange="reversed")  # Lower rank is better
+                            yaxis=dict(
+                                autorange="reversed",  # Rank 1 at top, rank 31 at bottom
+                                range=[1, base_rank],  # With reversed: 1 at top, 31 at bottom
+                                title="Daily Rank",
+                                tickmode='array',
+                                tickvals=[1, 5, 10, 15, 20, 25, 30],
+                            ),
+                            xaxis=dict(title="Date"),
+                            bargap=0.15,
                         )
-                        # Add average rank line
+                        # Add average rank line with annotation at right edge
                         avg_rank_val = df_chart['rank'].mean()
                         fig_rank.add_hline(
                             y=avg_rank_val,
                             line_dash="dash",
-                            line_color="rgba(59, 130, 246, 0.6)",
+                            line_color="rgba(59, 130, 246, 0.8)",
                             annotation_text=f"Avg: {avg_rank_val:.1f}",
-                            annotation_font=dict(color="rgba(59, 130, 246, 0.8)", weight=600)
-                        )
-                        # Add best rank markers for ALL occurrences of best rank
-                        best_rank = df_chart['rank'].min()
-                        df_best_ranks = df_chart[df_chart['rank'] == best_rank]
-                        fig_rank.add_scatter(
-                            x=df_best_ranks['date'],
-                            y=df_best_ranks['rank'],
-                            mode='markers',
-                            marker=dict(
-                                size=16,
-                                color=ACCENT_COLORS["success"],
-                                symbol='star',
-                                line=dict(width=2, color='#10B981')
-                            ),
-                            name='Best',
-                            hovertemplate=f"<b>Best Rank</b><br>#{int(best_rank)}<extra></extra>"
+                            annotation_position="right",
+                            annotation_font=dict(color="rgba(59, 130, 246, 1)", weight=600),
+                            annotation_xshift=5,  # Small shift to ensure text is in margin area
                         )
                         st.plotly_chart(fig_rank, use_container_width=True)
 
@@ -1451,14 +1484,14 @@ def main():
                             "score": st.column_config.NumberColumn("Score", format="%d"),
                             "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
                             "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f"),
-                            "games_played": st.column_config.NumberColumn("Games", format="%d"),
+                            "games_played": st.column_config.NumberColumn("Games", format="%d", help="Top 30 Daily Runs"),
                             "wins": st.column_config.NumberColumn("Wins", format="%d"),
                             "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
                             "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
                             "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
-                            "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f"),
-                            "last_7": st.column_config.NumberColumn("Recent", format="%.1f", help="Average rank over last 7 games"),
-                            "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Standard deviation of ranks over last 14 games")
+                            "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
+                            "last_7": st.column_config.NumberColumn("Recent Perf", format="%.1f", help="Average Daily Rank over last 7 games"),
+                            "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Daily Rank variations over the last 14 games")
                         }
                         if has_active_rank:
                             column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
@@ -1533,7 +1566,7 @@ def main():
                         tickmode='array',
                         tickvals=all_rank1_players,
                         ticktext=all_rank1_players,
-                        tickfont=dict(color=colors["text_secondary"], weight=600)
+                        tickfont=dict(weight=600)
                     )
                 )
                 st.plotly_chart(fig_rank1, use_container_width=True)
@@ -1806,6 +1839,43 @@ def main():
                             </div>
                             """, unsafe_allow_html=True)
 
+                        # Win distribution pie chart (below encounter badges)
+                        if len(common_dates) > 0:
+                            pie_data = pd.DataFrame({
+                                'Result': [player1, player2, 'Tie'],
+                                'Count': [p1_wins, p2_wins, ties]
+                            })
+                            pie_data = pie_data[pie_data['Count'] > 0]
+
+                            fig_pie = px.pie(
+                                pie_data,
+                                values='Count',
+                                names='Result',
+                                hole=0.4,
+                                color_discrete_sequence=[ACCENT_COLORS["info"], ACCENT_COLORS["warning"], ACCENT_COLORS["success"]]
+                            )
+                            fig_pie.update_traces(
+                                textposition='inside',
+                                textinfo='percent+value',
+                                textfont=dict(color='white', size=14),
+                                hovertemplate='%{label}: %{value} wins<extra></extra>'
+                            )
+                            apply_plotly_style(fig_pie)
+                            fig_pie.update_layout(
+                                height=250,
+                                margin=dict(l=20, r=20, t=20, b=40),
+                                showlegend=True,
+                                legend=dict(
+                                    orientation="h",
+                                    yanchor="top",
+                                    y=-0.05,
+                                    xanchor="center",
+                                    x=0.5,
+                                    font=dict(size=12, weight=600)
+                                )
+                            )
+                            st.plotly_chart(fig_pie, use_container_width=True)
+
                         st.markdown("")  # Spacer
 
                         # Comparative Elo Graph - both players' ratings over time
@@ -1837,7 +1907,6 @@ def main():
                             line=dict(width=3),
                         )
                         apply_plotly_style(fig_elo)
-                        colors = get_theme_colors()
                         fig_elo.update_layout(
                             hovermode='x unified',
                             height=350,
@@ -1847,113 +1916,149 @@ def main():
                                 y=1.02,
                                 xanchor="center",
                                 x=0.5,
-                                font=dict(color=colors["text_primary"], weight=600),
+                                font=dict(weight=600),
                             ),
                             margin=dict(l=20, r=20, t=40, b=20)
                         )
                         fig_elo.add_hline(
                             y=1500,
                             line_dash="dash",
-                            line_color=colors["text_muted"],
+                            line_color="rgba(128, 128, 128, 0.5)",
                             annotation_text="Baseline",
-                            annotation_font=dict(color=colors["text_muted"], weight=600)
+                            annotation_font=dict(weight=600)
                         )
                         st.plotly_chart(fig_elo, use_container_width=True)
 
-                        # Score Timeline on Mutual Games
-                        st.subheader("Score Timeline (Mutual Games)")
+                        # Score Comparison (Diverging Bar Chart with Winner Highlighting)
+                        st.subheader("Score Comparison")
 
-                        # Build score data for mutual games only
-                        score_data = []
-                        for date in sorted(common_dates):
+                        # Build diverging score data: P1 positive, P2 negative
+                        dates_sorted = sorted(common_dates)
+                        p1_scores_raw = []
+                        p2_scores_raw = []
+
+                        for date in dates_sorted:
                             p1_data = df_p1_played[df_p1_played['date'].dt.date == date].iloc[0]
                             p2_data = df_p2_played[df_p2_played['date'].dt.date == date].iloc[0]
-                            score_data.append({
-                                'date': date,
-                                'player': player1,
-                                'score': p1_data['score']
-                            })
-                            score_data.append({
-                                'date': date,
-                                'player': player2,
-                                'score': p2_data['score']
-                            })
+                            p1_scores_raw.append(p1_data['score'])
+                            p2_scores_raw.append(p2_data['score'])
 
-                        df_score_timeline = pd.DataFrame(score_data)
+                        # Calculate adaptive cap based on 90th percentile
+                        all_scores = p1_scores_raw + p2_scores_raw
+                        if len(all_scores) > 0:
+                            score_cap = np.percentile(all_scores, 90) * 1.5  # 1.5x the 90th percentile
+                            score_cap = max(score_cap, 1000)  # Minimum cap to avoid tiny charts
+                        else:
+                            score_cap = 50000
 
-                        fig_score = px.line(
-                            df_score_timeline,
-                            x='date',
-                            y='score',
-                            color='player',
-                            markers=True,
-                            labels={'date': 'Date', 'score': 'Score', 'player': 'Player'},
-                            color_discrete_map={player1: ACCENT_COLORS["info"], player2: ACCENT_COLORS["warning"]}
-                        )
-                        fig_score.update_traces(
-                            hovertemplate='%{fullData.name}: %{y:,.0f}<extra></extra>',
+                        # Build display data with capping
+                        p1_scores_display = []
+                        p2_scores_display = []
+                        p1_colors = []
+                        p2_colors = []
+                        p1_patterns = []
+                        p2_patterns = []
+
+                        for i, date in enumerate(dates_sorted):
+                            p1_score = p1_scores_raw[i]
+                            p2_score = p2_scores_raw[i]
+
+                            # Cap scores for display (keep actual for hover)
+                            p1_capped = min(p1_score, score_cap)
+                            p2_capped = min(p2_score, score_cap)
+                            p1_scores_display.append(p1_capped)
+                            p2_scores_display.append(-p2_capped)  # Negative for diverging
+
+                            # Determine winner and color accordingly
+                            if p1_score > p2_score:
+                                p1_colors.append(ACCENT_COLORS["info"])  # Winner: highlighted
+                                p2_colors.append("rgba(128, 128, 128, 0.4)")  # Loser: muted
+                            elif p2_score > p1_score:
+                                p1_colors.append("rgba(128, 128, 128, 0.4)")  # Loser: muted
+                                p2_colors.append(ACCENT_COLORS["warning"])  # Winner: highlighted
+                            else:  # Tie
+                                p1_colors.append("rgba(128, 128, 128, 0.6)")
+                                p2_colors.append("rgba(128, 128, 128, 0.6)")
+
+                            # Add stripe pattern for capped bars
+                            p1_patterns.append("/" if p1_score > score_cap else "")
+                            p2_patterns.append("/" if p2_score > score_cap else "")
+
+                        fig_score = go.Figure()
+
+                        # P1 bars (positive, above zero line)
+                        fig_score.add_trace(go.Bar(
+                            name=player1,
+                            x=dates_sorted,
+                            y=p1_scores_display,
                             marker=dict(
-                                size=10,
-                                line=dict(width=2, color='rgba(255, 255, 255, 0.3)'),
+                                color=p1_colors,
+                                line=dict(width=1, color='rgba(255,255,255,0.3)'),
+                                pattern=dict(shape=p1_patterns, solidity=0.5),
                             ),
-                            line=dict(width=3),
-                        )
+                            customdata=p1_scores_raw,
+                            hovertemplate=f'{player1}: %{{customdata:,.0f}}<extra></extra>',
+                            showlegend=False,
+                        ))
+
+                        # P2 bars (negative, below zero line)
+                        fig_score.add_trace(go.Bar(
+                            name=player2,
+                            x=dates_sorted,
+                            y=p2_scores_display,
+                            marker=dict(
+                                color=p2_colors,
+                                line=dict(width=1, color='rgba(255,255,255,0.3)'),
+                                pattern=dict(shape=p2_patterns, solidity=0.5),
+                            ),
+                            customdata=p2_scores_raw,
+                            hovertemplate=f'{player2}: %{{customdata:,.0f}}<extra></extra>',
+                            showlegend=False,
+                        ))
+
+                        # Add invisible traces for legend with consistent player colors
+                        fig_score.add_trace(go.Scatter(
+                            x=[None], y=[None],
+                            mode='markers',
+                            marker=dict(size=10, color=ACCENT_COLORS["info"]),
+                            name=player1,
+                            showlegend=True,
+                        ))
+                        fig_score.add_trace(go.Scatter(
+                            x=[None], y=[None],
+                            mode='markers',
+                            marker=dict(size=10, color=ACCENT_COLORS["warning"]),
+                            name=player2,
+                            showlegend=True,
+                        ))
+
                         apply_plotly_style(fig_score)
-                        colors = get_theme_colors()
                         fig_score.update_layout(
+                            barmode='relative',
                             hovermode='x unified',
                             height=300,
+                            bargap=0.15,
                             legend=dict(
                                 orientation="h",
                                 yanchor="bottom",
                                 y=1.02,
                                 xanchor="center",
                                 x=0.5,
-                                font=dict(color=colors["text_primary"], weight=600),
+                                font=dict(weight=600),
                             ),
-                            margin=dict(l=20, r=20, t=40, b=20)
+                            margin=dict(l=20, r=20, t=40, b=20),
+                            yaxis=dict(
+                                title="Score",
+                                tickformat=",d",
+                                range=[-score_cap * 1.1, score_cap * 1.1],  # Symmetric range
+                            ),
+                            xaxis=dict(title="Date"),
                         )
+
+                        # Add zero line for visual clarity
+                        fig_score.add_hline(y=0, line_width=1, line_color="rgba(128, 128, 128, 0.5)")
+
                         st.plotly_chart(fig_score, use_container_width=True)
-
-                        # Win distribution pie chart
-                        if len(common_dates) > 0:
-                            pie_data = pd.DataFrame({
-                                'Result': [player1, player2, 'Tie'],
-                                'Count': [p1_wins, p2_wins, ties]
-                            })
-                            # Filter out zero values
-                            pie_data = pie_data[pie_data['Count'] > 0]
-
-                            # Use design system colors (colorblind-safe)
-                            fig_pie = px.pie(
-                                pie_data,
-                                values='Count',
-                                names='Result',
-                                hole=0.4,
-                                color_discrete_sequence=[ACCENT_COLORS["info"], ACCENT_COLORS["warning"], ACCENT_COLORS["success"]]
-                            )
-                            fig_pie.update_traces(
-                                textposition='inside',
-                                textinfo='percent+value',
-                                textfont=dict(color='white', size=14),
-                                hovertemplate='%{label}: %{value} wins<extra></extra>'
-                            )
-                            apply_plotly_style(fig_pie)
-                            colors = get_theme_colors()
-                            fig_pie.update_layout(
-                                height=250,
-                                margin=dict(l=20, r=20, t=20, b=20),
-                                showlegend=True,
-                                legend=dict(
-                                    orientation="h",
-                                    yanchor="bottom",
-                                    y=-0.1,
-                                    xanchor="center",
-                                    x=0.5,
-                                    font=dict(size=12, color=colors["text_primary"], weight=600)
-                                )
-                            )
-                            st.plotly_chart(fig_pie, use_container_width=True)
 
                         # Display the duel table
                         st.subheader("Game-by-Game Comparison")
@@ -1999,52 +2104,43 @@ def main():
 
         with st.expander("What do the ratings mean?"):
             st.markdown("""
-            Ratings roughly correspond to expected performance levels:
+            Ratings reflects actual skill gaps between players (the better the player the higher the rating), and roughly matches with expected performance:
 
-            | Rating | Tier | Typical Rank |
-            |--------|------|--------------|
-            | **2800+** | Elite | Top 1 |
-            | **2500-2800** | Expert | Top 5 |
-            | **2000-2500** | Strong | Top 10 |
-            | **1500** | Average | ~Rank 15-20 |
-            | **1200-1500** | Below Average | Rank 20-25 |
-            | **1000-1200** | Beginner | Rank 25-30 |
-
-            *These are approximate guidelines based on current data. The system reflects actual skill gaps, so exact thresholds may shift as the player pool evolves.*
-
-            **Rating Milestones:**
-            - **2800**: Elite tier - only 0-2 players typically reach this level
-            - **2900**: Legendary - requires exceptional sustained dominance
-            - **3000**: Theoretical maximum (asymptotic, effectively unreachable)
+            | Rating | Typical Rank |
+            |--------|--------------|
+            | **2800+** | Top 1 |
+            | **2500-2800** | Top 5 |
+            | **2000-2500** | Top 10 |
+            | **1500** | ~Rank 15-20 |
+            | **1200-1500** | Rank 20-25 |
+            | **1000-1200** | Rank 25-30 |
             """)
 
-        with st.expander("How are rankings calculated?"):
+        with st.expander("How are Elo Rankings calculated?"):
             st.markdown("""
             Each day, all players on the leaderboard are compared pairwise:
-            1. Player A (rank 5) vs Player B (rank 12) → Player A "wins"
+            1. Player A finishes 5th. They beat the 25 players below them, and lost to the 4 above
             2. Rating changes are calculated using a modified Elo formula
-            3. Score margins matter - dominating by 2x score gives more weight than a narrow win
+            3. Score is taken into account. Domination means more points, narrow wins mean less
             4. Players with more games have more stable ratings (dynamic K-factor)
+            5. Uncertainty increases with inactivity, so you'll face big rating swings on return
 
-            **Rating Compression**: Raw Elo scores are compressed using a hybrid system:
-            - Below 2700: Gentle logarithmic scaling (diminishing returns)
-            - Above 2700: Hyperbolic tangent compression toward the 3000 ceiling
-            - This prevents runaway ratings while preserving meaningful differences
+            After 7 daily leaderboard appearances, you become Ranked.
+            Your Elo rank is determined by your rating compared to the other Ranked players.
 
-            **Activity Gating**: Only players active in the last 7 days with at least 7 games appear in the main rankings. Inactive players don't appear but their ratings are preserved.
+            After 7 days without a leaderboard appearance, you are considered inactive, and you become Unranked.
+            Don't worry, your rating is preserved.
+            At this point, a single top 30 result is enough to get you back in the rankings.
             """)
 
         with st.expander("Why did my rating change so much/little?"):
             st.markdown("""
-            Several factors affect rating changes:
+            Several factors:
             - **Opponent ratings**: Beating higher-rated players = bigger gains
-            - **Score margin**: Dominating performances (2x, 3x score) give more weight
+            - **Score margin**: Dominating performances give more weight
             - **Games played**: New players (<10 games) have larger swings to find their true rating
-            - **Your rating level**: Higher ratings compress more, so gains shrink as you climb
+            - **Your rating level**: Gains shrink as you climb
             - **Number of opponents**: Placing #1 means you beat 29 opponents, #30 means you beat none
-
-            **Why gains shrink at high ratings:**
-            The system uses rating compression to create meaningful tiers. A player at 2700 needs to perform significantly better than average to gain points, while a player at 1500 can climb more easily with good performances.
             """)
 
         st.markdown("---")
@@ -2052,115 +2148,71 @@ def main():
 
         with st.expander("Why use Elo instead of other rating systems?"):
             st.markdown("""
-            I considered several rating systems before settling on a modified Elo approach:
+            The true answer is that I'm a former chess player and I'll always be biased in favor of the Elo system.
+            I did consider and/or try several other rating systems though:
 
             | System | Pros | Why I didn't use it |
             |--------|------|---------------------|
-            | **Glicko/Glicko-2** | Tracks rating uncertainty | Designed for 1v1 matches, not 30-player daily competitions |
-            | **TrueSkill** | Handles team games well | Overly complex for this use case; designed for Xbox matchmaking |
-            | **Simple averages** | Easy to understand | Doesn't account for opponent strength or improvement over time |
-            | **ELO** | Battle-tested, intuitive | Perfect fit with pairwise adaptation |
+            | **Glicko/Glicko-2** | Popular, tracks rating uncertainty | Designed for 1v1 matches, not 30-player daily competitions |
+            | **TrueSkill** | Robust skill-based matchmaking algorithm  | Overkill for our use case. Also it's patented by Microsoft and I don't have "Microsoft lawyer" money |
+            | **Simple averages** | Easy to understand, easy to implement | "Underkill" for our use case. Doesn't account for opponent strength or improvement over time |
+            | **ELO** | Battle-tested, intuitive | Not quite perfect without some tweaks |
 
-            **Why Elo works here:**
+            **Why Pairwise Elo works here:**
             - Chess proved that Elo accurately ranks players over time through repeated competition
             - My pairwise adaptation treats each daily leaderboard as 435 simultaneous "matches" (30 players = 30×29/2 pairs)
             - The system is self-correcting: beat strong players, gain more; lose to weak players, lose more
-            - It's intuitive: everyone understands "higher number = better"
-
-            The key insight from chess is that **relative performance over many games** reveals true skill better than any single result.
-            """)
-
-        with st.expander("How do you know the ratings are accurate?"):
-            st.markdown("""
-            Several indicators suggest the ratings reflect actual skill:
-
-            **1. Predictive Power**
-            Higher-rated players consistently outperform lower-rated players when they compete on the same day. If ratings were random, this wouldn't happen.
-
-            **2. Stability with Volume**
-            New players have volatile ratings that stabilize as they play more. This matches how you'd expect skill measurement to work - more data = more certainty.
-
-            **3. Intuitive Results**
-            The rankings align with community perception. Players known for consistent dominance have high ratings; casual players cluster around the median.
-
-            **4. Natural Distribution**
-            The rating distribution resembles a bell curve centered at 1500, with long tails for exceptional and struggling players - exactly what you'd expect from a skill-based metric.
-
-            **5. Score Margin Correlation**
-            Players who win by larger margins (2x, 3x score) tend to have higher ratings than those who barely edge out opponents. The system captures dominance, not just wins.
-
-            **The chess parallel:** Chess ratings have been validated over 60+ years of competitive play. My adaptation applies the same mathematical principles to daily leaderboard competition.
+            - It's popular and intuitive: everyone understands "higher number = better"
             """)
 
         with st.expander("Why pairwise comparisons instead of just using daily rank?"):
             st.markdown("""
-            Using raw daily rank (1st, 5th, 20th) would be simpler, but it misses crucial information:
+            Skill comparisons felt important to highlight
+            Daily rank is simply less effective to make those evaluations:
 
-            **Problem with raw ranks:**
             - Finishing 1st against 29 weak players = same as 1st against 29 strong players
             - A rank of 5th tells you nothing about who you beat or lost to
             - No way to compare across different days with different player pools
 
             **Why pairwise works better:**
-            Each day, I ask: "Did Player A beat Player B?" This creates a web of relative comparisons:
             - Beat a 2500-rated player? Big gain.
             - Lose to a 1200-rated player? Big loss.
             - The gains and losses depend on *who* you competed against.
-
-            **Inspiration from competitive gaming:**
-            This is how chess, League of Legends, and other ranked systems work. You don't just get points for winning - you get points based on the *strength of your opponents*.
-
-            The result: a rating that reflects not just how often you win, but *who* you beat to get there.
             """)
 
         with st.expander("How do you handle only seeing the top 30 each day?"):
             st.markdown("""
-            This is one of the most important constraints that shaped my system design.
+            That shaped the system design a lot actually.
 
             **The limitation:**
-            I only see the top 30 players each day. Players ranked 31st or lower are invisible - I don't know their scores, their identities, or even how many of them there are.
+            Players ranked 31st or lower are invisible: I don't know their scores, their identities, or even how many of them there are.
 
             **Why this is actually fine for Elo:**
             The pairwise system only compares players *who both appear on the same day*. If you're in the top 30, you get compared to the other 29 players. If you're not, you simply don't participate that day.
 
             **Key implications:**
-            - **No penalty for missing days**: If you don't appear, your rating stays frozen - you don't lose points
+            - **No penalty for missing days**: If you don't appear, your rating stays untouched
             - **Appearing matters**: To gain or lose rating, you must show up in the top 30
-            - **Self-selecting competition**: The leaderboard naturally captures the most active/competitive players
-            - **Bottom of top 30 is meaningful**: Rank 30 means you beat no one that day and lost to 29 players
+            - **Bottom of top 30 is meaningful**: Rank 30 means you made it, but barely. There is still some road ahead
 
             **What I *can't* measure:**
             - Players who never crack the top 30
-            - How close rank 31 was to rank 30
+            - How much above the rest of the field the top 30 is
             - The "true" skill of players who rarely appear
-
-            **The philosophical tradeoff:**
-            I chose to measure *competitive performance* rather than *total player skill*. If you want a rating, you need to compete. This mirrors chess tournaments - you can't get a rating by staying home.
-
-            The system rewards showing up and performing, which aligns with what a "leaderboard ranking" should capture.
             """)
 
         with st.expander("What's the deal with rating compression?"):
             st.markdown("""
-            Without compression, ratings would diverge infinitely. A dominant player could theoretically reach 5000, 10000, or higher. This creates problems:
-
-            **Why I compress:**
-            - **Meaningful tiers**: 2800 means "elite" - not just "higher than 2700"
-            - **Visual clarity**: Ratings fit on a readable 1000-3000 scale
-            - **Diminishing returns**: The best player can't just run away from the field forever
-
-            **The chess parallel:**
-            Even Magnus Carlsen, the strongest chess player in history, peaked around 2882. The system naturally resists extreme outliers because:
-            - There are fewer players to beat at the top
-            - Beating weaker players yields smaller gains
-            - Losing to anyone costs more when you're highly rated
-
-            My compression applies similar principles mathematically, creating a world where:
-            - **2800+** is genuinely elite (like 2700+ in chess)
-            - **2900** is legendary (like 2800+ in chess)
-            - **3000** is the asymptotic ceiling (like the theoretical limits of human chess ability)
-
-            This makes ratings *meaningful* rather than just *big numbers*.
+            Raw Elo scores are processed and then compressed using a hybrid system:
+            - Below 2700: Gentle logarithmic scaling (diminishing returns)
+            - Above 2700: Hyperbolic tangent compression toward the 3000 ceiling
+                        
+            This allows the high end of the distribution curve to mimic chess Elo, in the sense that:
+            - **2800+** is genuinely elite
+            - **2900** is legendary
+            - **3000** is the theoretical limits of human ability
+                        
+            While mostly aesthetics (compared to the raw ratings), it prevents runaway ratings while preserving meaningful differences
             """)
 
         st.markdown("---")
@@ -2177,7 +2229,7 @@ def main():
             | **Elo Rank** | Your position among ranked players by Elo rating |
             | **Rating** | Your compressed Elo score (higher = better) |
             | **Raw Rating** | Your uncompressed Elo score (used internally) |
-            | **Games** | Total days you've appeared on the leaderboard |
+            | **Games** | Top 30 Daily Runs |
             | **Confidence** | How reliable your rating is (based on games played) |
             """)
 
@@ -2185,26 +2237,14 @@ def main():
             st.markdown("""
             | Term | Definition |
             |------|------------|
-            | **Avg Rank** | Your average daily leaderboard position |
-            | **Recent** | Average daily rank over your last 7 games |
-            | **Consistency** | Std deviation of ranks (lower = more consistent) |
+            | **Avg Rank** | Average Daily Rank over all games |
+            | **Recent Performance** | Average Daily Rank over last 7 games |
+            | **Consistency** | Daily Rank variations over the last 14 games |
             | **Daily Rank** | Your position on a specific day's leaderboard |
             | **Rating Change** | How much your Elo changed that day |
             | **Baseline** | The starting/median rating of 1500 |
             | **Compression** | System that maps raw ratings to display ratings |
             """)
-
-        st.markdown("---")
-        st.subheader("Tips for Improving Your Rating")
-
-        st.markdown("""
-        1. **Play consistently** - Regular appearances build rating stability and keep you ranked
-        2. **Aim for top placements** - Even if you can't win, beating more players helps
-        3. **Dominate when you can** - Score margins matter; a 2x score gives more weight than a narrow win
-        4. **Compete against strong players** - Beating high-rated players gives bigger gains
-        5. **Check your trends** - Use Player Tracker to see if you're improving over time
-        6. **Stay active** - Players inactive for 7+ days become unranked (but keep their rating)
-        """)
 
 
 if __name__ == "__main__":
