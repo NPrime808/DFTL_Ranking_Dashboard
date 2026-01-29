@@ -22,7 +22,6 @@ _project_root = str(Path(__file__).parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import re
 import pandas as pd
 from datetime import datetime
 from typing import List, Optional
@@ -39,25 +38,14 @@ from api.utils import (
     atomic_write_csv,
     validate_dataset,
     validate_input_size,
+    DATE_RE,
+    RANK1_RE,
+    RANK_RE,
+    strip_markdown,
 )
 
 # --- Module Logger ---
 logger = setup_logging(__name__)
-
-# --- Regex Patterns (flexible - handles both markdown and plain text) ---
-# Date format: date: DD/MM/YYYY (optional backticks around)
-DATE_RE = re.compile(r"`?date:\s*(\d{2}/\d{2}/\d{4})`?", re.IGNORECASE)
-
-# Rank 1: :crown_dftl: **PlayerName** - 12345 OR :crown_dftl: PlayerName - 12345
-# The crown emoji indicates rank 1
-RANK1_RE = re.compile(
-    r":crown_dftl:\s*\*{0,2}(.+?)\*{0,2}\s+-\s+(\d+)\s*$"
-)
-
-# Ranks 2-30: #N **PlayerName** - 12345 OR #N PlayerName - 12345
-RANK_RE = re.compile(
-    r"#(\d+)\s+\*{0,2}(.+?)\*{0,2}\s+-\s+(\d+)\s*$"
-)
 
 
 class IngestionError(Exception):
@@ -73,11 +61,6 @@ class ValidationError(IngestionError):
 class DuplicateDateError(IngestionError):
     """Raised when attempting to ingest a date that already exists"""
     pass
-
-
-def strip_markdown(name: str) -> str:
-    """Remove **bold**, `backticks`, and leading/trailing spaces"""
-    return re.sub(r"[*`]", "", name).strip()
 
 
 def parse_leaderboard_text(text: str) -> pd.DataFrame:

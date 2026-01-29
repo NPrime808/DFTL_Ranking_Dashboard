@@ -19,7 +19,6 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import json
-import re
 import pandas as pd
 from typing import List, Tuple, Optional
 
@@ -29,23 +28,18 @@ from api.config import (
     MIN_DATE_EARLY_ACCESS,
     AUTHOR_NAME,
 )
-from api.utils import setup_logging, cleanup_old_files, atomic_write_csv
+from api.utils import (
+    setup_logging,
+    cleanup_old_files,
+    atomic_write_csv,
+    DATE_RE,
+    RANK1_RE,
+    RANK_RE,
+    strip_markdown,
+)
 
 # --- Module Logger ---
 logger = setup_logging(__name__)
-
-# --- Regex Patterns ---
-# Date format: `date: DD/MM/YYYY` (backticks around the whole thing)
-DATE_RE = re.compile(r"`date:\s*(\d{2}/\d{2}/\d{4})`")
-# Rank 1: :crown_dftl: **PlayerName** - 12345 (names may contain hyphens)
-RANK1_RE = re.compile(r":crown_dftl:\s*\*\*(.+)\*\*\s+-\s+(\d+)\s*$")
-# Ranks 2-30: #2 **PlayerName** - 12345 (names may contain hyphens)
-RANK_RE = re.compile(r"#(\d+)\s+\*\*(.+)\*\*\s+-\s+(\d+)\s*$")
-
-
-def strip_markdown(name: str) -> str:
-    """Remove **bold**, `backticks`, and leading/trailing spaces."""
-    return re.sub(r"[*`]", "", name).strip()
 
 
 def parse_leaderboard_content(content: str) -> List[Tuple[Optional[str], str, int, int]]:

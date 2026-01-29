@@ -16,9 +16,26 @@ if _project_root not in sys.path:
 import logging
 import tempfile
 import shutil
+import re
 from typing import List, Optional
 
 from api.config import OUTPUT_FOLDER, ALLOWED_DATASETS
+
+
+# --- Shared Regex Patterns for Leaderboard Parsing ---
+# Date format: date: DD/MM/YYYY (optional backticks, case-insensitive)
+DATE_RE = re.compile(r"`?date:\s*(\d{2}/\d{2}/\d{4})`?", re.IGNORECASE)
+
+# Rank 1: :crown_dftl: **PlayerName** - 12345 (handles optional markdown)
+RANK1_RE = re.compile(r":crown_dftl:\s*\*{0,2}(.+?)\*{0,2}\s+-\s+(\d+)\s*$")
+
+# Ranks 2-30: #N **PlayerName** - 12345 (handles optional markdown)
+RANK_RE = re.compile(r"#(\d+)\s+\*{0,2}(.+?)\*{0,2}\s+-\s+(\d+)\s*$")
+
+
+def strip_markdown(name: str) -> str:
+    """Remove **bold**, `backticks`, and leading/trailing spaces."""
+    return re.sub(r"[*`]", "", name).strip()
 
 # --- Logging Setup ---
 def setup_logging(name: str = None, level: int = logging.INFO) -> logging.Logger:
@@ -152,9 +169,17 @@ def validate_input_size(text: str, max_size: int) -> None:
 
 
 __all__ = [
+    # Logging
     'setup_logging',
+    # File operations
     'cleanup_old_files',
     'atomic_write_csv',
+    # Validation
     'validate_dataset',
     'validate_input_size',
+    # Leaderboard parsing
+    'DATE_RE',
+    'RANK1_RE',
+    'RANK_RE',
+    'strip_markdown',
 ]
