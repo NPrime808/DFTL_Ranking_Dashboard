@@ -794,10 +794,46 @@ def main():
                 text-transform: uppercase;
                 font-weight: 500;
             }}
+            /* Mobile responsive header */
+            @media (max-width: 768px) {{
+                .dashboard-header {{
+                    flex-direction: column !important;
+                    align-items: center !important;
+                    text-align: center !important;
+                    gap: 1rem !important;
+                    padding: 1rem !important;
+                }}
+                .dashboard-logo {{
+                    width: 100px !important;
+                }}
+                .dashboard-text {{
+                    width: 100% !important;
+                    text-align: center !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }}
+                .dashboard-title {{
+                    font-size: 1.6rem !important;
+                    text-align: center !important;
+                    margin: 0 auto !important;
+                    padding: 0 !important;
+                    display: flex !important;
+                    justify-content: center !important;
+                }}
+                .dashboard-subtitle {{
+                    font-size: 0.85rem !important;
+                    letter-spacing: 0.05em !important;
+                    text-align: center !important;
+                }}
+                /* Hide Streamlit's heading anchor link on mobile */
+                [data-testid="stHeaderActionElements"] {{
+                    display: none !important;
+                }}
+            }}
         </style>
         <div class="dashboard-header">
             <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
-            <div>
+            <div class="dashboard-text">
                 <h1 class="dashboard-title">DFTL Ranking Dashboard</h1>
                 <p class="dashboard-subtitle">Track Elo ratings, compare players, and analyze performance trends</p>
             </div>
