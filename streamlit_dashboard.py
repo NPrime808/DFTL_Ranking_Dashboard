@@ -1,5 +1,6 @@
 import math
 import base64
+import html
 
 import streamlit as st
 import pandas as pd
@@ -57,6 +58,97 @@ def get_rank_badge_html(rank):
     return f'<span style="{badge_style}"><span style="font-size:1.2rem;">{info["icon"]}</span>#{rank}</span>'
 
 
+def generate_ranking_cards(df):
+    """
+    Generate HTML cards for the rankings display.
+    Responsive: 4 columns on mobile, 8 columns on desktop.
+    Uses Streamlit CSS variables for automatic theme support.
+    """
+    if df.empty:
+        return "<p>No data available</p>"
+
+    # Theme-adaptive styles using Streamlit CSS variables
+    # Base card styling (border, radius, shadow) - background varies by active status
+    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.875rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);"
+    # Active player: coral accent gradient
+    active_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
+    # Inactive player (N/R): muted gray gradient to visually distinguish
+    inactive_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(128,128,128,0.12) 100%);"
+
+    # Header now uses CSS classes for responsive layout (see CSS: .card-header, .card-rank, etc.)
+    # Status label style for inactive players (blue to match N/R and rating)
+    inactive_blue = "#6B9AFF"
+    status_label_style = f"font-size:0.65rem;font-weight:400;margin-top:0.15rem;color:{inactive_blue};"
+
+    stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
+    label_style = "font-size:0.65rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);"
+    value_style = "font-size:0.9rem;font-weight:600;color:var(--text-color);"
+
+    def safe_str(val, fmt=None):
+        if pd.isna(val):
+            return "—"
+        if fmt:
+            return fmt.format(val)
+        return str(int(val))
+
+    cards = []
+    for _, row in df.iterrows():
+        rank = row.get('active_rank')
+        is_inactive = pd.isna(rank)
+
+        # Choose card background based on active status
+        card_style = (inactive_bg if is_inactive else active_bg) + card_base
+
+        # Rank display - centered, emojis only for podium (1-3), # for others
+        if is_inactive:
+            # N/R for unranked players - blue to visually distinguish from ranked players
+            rank_html = f'<span style="color:{inactive_blue};">N/R</span>'
+        else:
+            rank_int = int(rank)
+            if rank_int in RANK_ICONS:
+                # Podium ranks (1-3): show only emoji, centered
+                info = RANK_ICONS[rank_int]
+                rank_html = f'<span style="color:{info["color"]};font-size:1.2rem;">{info["icon"]}</span>'
+            else:
+                # Ranks 4+: show #N in coral (same as rating for visual link)
+                rank_html = f'<span style="color:#FF6B6B;">#{rank_int}</span>'
+
+        # Player name with status indicator (stacked vertically for small viewports)
+        name = html.escape(str(row.get('player_name', 'Unknown')))
+        games_played = row.get('games_played', 0)
+        games_count = int(games_played) if pd.notna(games_played) else 0
+
+        if is_inactive:
+            # WCAG compliant opacity (0.7 provides ~4.5:1 contrast)
+            # Status label on separate line to avoid cutoff on small screens
+            if games_count < 7:
+                status_text = "(not enough games)"
+            else:
+                status_text = "(inactive)"
+            name_html = f'<span class="card-name-text">{name}</span><span style="{status_label_style}">{status_text}</span>'
+        else:
+            name_html = f'<span class="card-name-text">{name}</span>'
+
+        # Stats
+        rating = safe_str(row.get('rating'), "{:.1f}")
+        games = safe_str(row.get('games_played'))
+        wins = safe_str(row.get('wins'))
+        win_rate = safe_str(row.get('win_rate'), "{:.1f}") + "%" if pd.notna(row.get('win_rate')) else "—"
+        top10 = safe_str(row.get('top_10s'))
+        top10_rate = safe_str(row.get('top_10s_rate'), "{:.1f}") + "%" if pd.notna(row.get('top_10s_rate')) else "—"
+        avg_r = safe_str(row.get('avg_daily_rank'), "{:.1f}")
+        last7 = safe_str(row.get('last_7'), "{:.1f}")
+        consist = safe_str(row.get('consistency'), "{:.1f}")
+
+        # Build card with CSS-class-based responsive header
+        # Rating class: 'active' (coral) for ranked, 'inactive' (muted) for unranked
+        rating_class = "inactive" if is_inactive else "active"
+        card = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating {rating_class}">{rating}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Games</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Wins</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Win%</span><span style="{value_style}">{win_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10</span><span style="{value_style}">{top10}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10%</span><span style="{value_style}">{top10_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Avg Rank</span><span style="{value_style}">{avg_r}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last7}</span></div><div style="{stat_layout}"><span style="{label_style}">Stability</span><span style="{value_style}">{consist}</span></div></div></div>'
+        cards.append(card)
+
+    return "".join(cards)
+
+
 # Theme-specific colors (WCAG AA compliant contrast ratios)
 DARK_THEME = {
     "bg_primary": "#0E1117",
@@ -79,15 +171,33 @@ LIGHT_THEME = {
 
 def get_theme_colors():
     """Get the current theme colors based on user's theme preference."""
-    # Streamlit 1.44+ provides st.context.theme for runtime theme detection
+    is_dark = True  # Default to dark
+
     try:
-        # Check if we're in dark mode
-        # theme.base can be "dark", "light", or None (system default which is dark)
-        theme_base = st.get_option("theme.base")
-        is_dark = theme_base != "light"  # Default to dark unless explicitly light
+        # Method 1: st.context (Streamlit 1.37+) - most reliable for runtime detection
+        if hasattr(st, 'context') and hasattr(st.context, 'theme'):
+            theme_info = st.context.theme
+            if theme_info:
+                # Check backgroundColor - light themes have high RGB values
+                bg_color = getattr(theme_info, 'backgroundColor', None)
+                if bg_color:
+                    # Parse hex color to check luminance
+                    bg_hex = bg_color.lstrip('#')
+                    if len(bg_hex) == 6:
+                        r, g, b = int(bg_hex[0:2], 16), int(bg_hex[2:4], 16), int(bg_hex[4:6], 16)
+                        luminance = (0.299 * r + 0.587 * g + 0.114 * b)
+                        is_dark = luminance < 128
     except Exception:
-        # Default to dark if detection fails
-        is_dark = True
+        pass
+
+    # Method 2: Fallback to theme.base option
+    if is_dark:
+        try:
+            theme_base = st.get_option("theme.base")
+            if theme_base == "light":
+                is_dark = False
+        except Exception:
+            pass
 
     theme = DARK_THEME if is_dark else LIGHT_THEME
     return {**ACCENT_COLORS, **theme}
@@ -829,8 +939,142 @@ def main():
                 [data-testid="stHeaderActionElements"] {{
                     display: none !important;
                 }}
+                /* Mobile: 4-column stats grid */
+                .stats-grid {{
+                    grid-template-columns: repeat(4, 1fr) !important;
+                }}
+                /* Mobile: responsive header to match 4-column stats grid */
+                .card-header {{
+                    grid-template-columns: repeat(4, 1fr) !important;
+                }}
+                .card-rank {{
+                    grid-column: 1 !important;
+                    justify-self: center !important;
+                    text-align: center !important;
+                }}
+                .card-name {{
+                    grid-column: 2 / 4 !important;
+                    justify-self: center !important;
+                    text-align: center !important;
+                }}
+                .card-name-text {{
+                    font-size: 0.875rem !important;
+                }}
+                .card-rating {{
+                    grid-column: 4 !important;
+                    justify-self: center !important;
+                    text-align: center !important;
+                    font-size: 1rem !important;
+                }}
+            }}
+
+            /* Ranking cards - visible on all viewports */
+            .ranking-cards {{
+                display: block;
+            }}
+
+            /* Responsive stats grid: 8 columns on desktop, 4 on mobile */
+            .stats-grid {{
+                display: grid;
+                grid-template-columns: repeat(8, 1fr);
+                gap: 0.5rem;
+                margin-top: 0.5rem;
+            }}
+
+            /* Responsive card header: matches stats grid columns */
+            .card-header {{
+                display: grid;
+                grid-template-columns: repeat(8, 1fr);
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.625rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 1px solid rgba(128,128,128,0.35);
+            }}
+            .card-rank {{
+                grid-column: 1;
+                font-weight: 700;
+                font-size: 1rem;
+                text-align: center;
+            }}
+            .card-name {{
+                grid-column: 2 / 8;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                overflow: hidden;
+            }}
+            .card-name-text {{
+                font-weight: 600;
+                font-size: 1rem;
+                color: var(--text-color);
+                word-break: break-word;
+                overflow-wrap: break-word;
+                line-height: 1.2;
+            }}
+            .card-rating {{
+                grid-column: 8;
+                font-weight: 700;
+                font-size: 1.1rem;
+                text-align: center;
+            }}
+            .card-rating.active {{
+                color: #FF6B6B;
+            }}
+            .card-rating.inactive {{
+                color: #6B9AFF;
+            }}
+
+            /* Sort controls - visible on all viewports */
+            .sort-controls {{
+                display: block;
+                margin-bottom: 1rem;
+            }}
+
+            /* Hide the dataframe table on all viewports */
+            [data-testid="stElementContainer"]:has(.desktop-rankings-table),
+            [data-testid="stElementContainer"]:has(.desktop-rankings-table) + [data-testid="stElementContainer"] {{
+                display: none !important;
+            }}
+
+            /* Back to top anchor - scroll above its position */
+            #top {{
+                scroll-margin-top: 100vh;
+            }}
+
+            /* Back to top button */
+            .back-to-top {{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: fixed;
+                bottom: 2rem;
+                right: 1.5rem;
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #FF6B6B 0%, #ee5a5a 100%);
+                border: none;
+                color: white !important;
+                font-size: 1.5rem;
+                font-weight: bold;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(255,107,107,0.4);
+                z-index: 1000;
+                transition: transform 0.2s, box-shadow 0.2s;
+                text-decoration: none !important;
+            }}
+            .back-to-top:hover {{
+                transform: scale(1.1);
+                box-shadow: 0 6px 16px rgba(255,107,107,0.5);
+            }}
+            .back-to-top:active {{
+                transform: scale(0.95);
             }}
         </style>
+        <a id="top"></a>
         <div class="dashboard-header">
             <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
             <div class="dashboard-text">
@@ -838,6 +1082,7 @@ def main():
                 <p class="dashboard-subtitle">Track Elo ratings, compare players, and analyze performance trends</p>
             </div>
         </div>
+        <a href="#top" class="back-to-top" title="Back to top">↑</a>
         """, unsafe_allow_html=True)
     else:
         st.title("DFTL Ranking Dashboard")
@@ -1012,20 +1257,60 @@ def main():
                 date_str = selected_ranking_date.strftime("%b %d, %Y")
                 st.subheader(f"Elo Ranking Leaderboard - {date_str} Ratings")
 
-                # Toggle to show unranked players
+                # Toggle to show unranked players (sticky via CSS targeting aria-label)
                 show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
+
+                # Sort controls for card view
+                # Sort options: display name -> (column, default_ascending)
+                # ascending=True means lower values first (good for ranks)
+                # ascending=False means higher values first (good for ratings, counts)
+                sort_options = {
+                    "Rating": ("rating", False),
+                    "Games": ("games_played", False),
+                    "Wins": ("wins", False),
+                    "Win %": ("win_rate", False),
+                    "Top 10": ("top_10s", False),
+                    "Top 10 %": ("top_10s_rate", False),
+                    "Avg Rank": ("avg_daily_rank", True),
+                    "7-Game Avg": ("last_7", True),
+                    "Stability": ("consistency", True),
+                }
+
+                st.markdown('<div class="sort-controls">', unsafe_allow_html=True)
+                sort_col1, sort_col2 = st.columns([3, 1])
+                with sort_col1:
+                    selected_sort = st.selectbox(
+                        "Sort by",
+                        options=list(sort_options.keys()),
+                        index=0,  # Default to Rating
+                        key="card_sort"
+                    )
+                with sort_col2:
+                    sort_column, default_asc = sort_options[selected_sort]
+                    sort_direction = st.selectbox(
+                        "Order",
+                        options=["Best", "Worst"],
+                        index=0,
+                        key="card_sort_dir"
+                    )
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # Determine sort direction based on selection
+                sort_ascending = default_asc if sort_direction == "Best" else not default_asc
 
                 # Columns to display (defined once, reused)
                 display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency']
                 if 'days_inactive' in df_date_history.columns:
                     display_cols.append('days_inactive')
 
-                # Filter and sort in one operation (no unnecessary copies)
-                # All stats are pre-computed in the history CSV - just filter and display
+                # Filter data based on unranked toggle
                 if show_unranked:
-                    df_rankings_display = df_date_history.sort_values('rating', ascending=False)[display_cols]
+                    df_filtered = df_date_history[display_cols].copy()
                 else:
-                    df_rankings_display = df_date_history[df_date_history['active_rank'].notna()].sort_values('rating', ascending=False)[display_cols]
+                    df_filtered = df_date_history[df_date_history['active_rank'].notna()][display_cols].copy()
+
+                # Sort cards by selected option
+                df_cards_display = df_filtered.sort_values(sort_column, ascending=sort_ascending, na_position='last')
 
                 column_config = {
                     "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
@@ -1037,17 +1322,24 @@ def main():
                     "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
                     "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
                     "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
-                    "last_7": st.column_config.NumberColumn("Recent Perf", format="%.1f", help="Average Daily Rank over last 7 games"),
-                    "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Daily Rank variations over the last 14 games"),
+                    "last_7": st.column_config.NumberColumn("7-Game Avg", format="%.1f", help="Average Daily Rank over last 7 games"),
+                    "consistency": st.column_config.NumberColumn("Stability", format="%.1f", help="Rank variation over last 14 games (lower = more stable)"),
                     "days_inactive": st.column_config.NumberColumn("Inactive", format="%d")
                 }
 
+                # Desktop view: dataframe table (hidden via CSS, kept for potential future use)
+                st.markdown('<div class="desktop-rankings-table"></div>', unsafe_allow_html=True)
                 st.dataframe(
-                    df_rankings_display,
+                    df_cards_display,
                     use_container_width=True,
                     hide_index=True,
                     column_config=column_config
                 )
+
+                # Card layout (responsive: 8 stats on desktop, 4x2 on mobile)
+                # Uses Streamlit CSS variables for automatic theme adaptation
+                cards_html = generate_ranking_cards(df_cards_display)
+                st.markdown(f'<div class="ranking-cards">{cards_html}</div>', unsafe_allow_html=True)
         elif df_ratings is not None:
             # Fallback if no history data with active_rank
             st.warning("Historical rankings not available. Showing current rankings only.")
@@ -1152,7 +1444,7 @@ def main():
                 "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
                 "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
                 "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
-                "last_7": st.column_config.NumberColumn("Recent Perf", format="%.1f", help="Average Daily Rank over last 7 games"),
+                "last_7": st.column_config.NumberColumn("7-Game Avg", format="%.1f", help="Average Daily Rank over last 7 games"),
                 "last_seen": st.column_config.DateColumn("Last Seen", format="YYYY-MM-DD")
             }
             if has_days_inactive:
@@ -1225,10 +1517,10 @@ def main():
                             st.metric("Avg Rank", f"{avg_rank:.1f}" if pd.notna(avg_rank) else "N/A", help="Average Daily Rank over all games")
                         with col6:
                             last_7 = latest['last_7']
-                            st.metric("Recent Performance", f"{last_7:.1f}" if pd.notna(last_7) else "N/A", help="Average Daily Rank over last 7 games")
+                            st.metric("7-Game Avg", f"{last_7:.1f}" if pd.notna(last_7) else "N/A", help="Average Daily Rank over last 7 games")
                         with col7:
                             consistency = latest['consistency']
-                            st.metric("Consistency", f"{consistency:.1f}" if pd.notna(consistency) else "N/A", help="Daily Rank variations over the last 14 games")
+                            st.metric("Stability", f"{consistency:.1f}" if pd.notna(consistency) else "N/A", help="Rank variation over last 14 games (lower = more stable)")
                         with col8:
                             # Get CURRENT Elo rank from current ratings (not from last game history)
                             current_player_rating = df_ratings[df_ratings['player_name'] == selected_player]
@@ -1416,8 +1708,8 @@ def main():
                             "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
                             "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
                             "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
-                            "last_7": st.column_config.NumberColumn("Recent Perf", format="%.1f", help="Average Daily Rank over last 7 games"),
-                            "consistency": st.column_config.NumberColumn("Consistency", format="%.1f", help="Daily Rank variations over the last 14 games")
+                            "last_7": st.column_config.NumberColumn("7-Game Avg", format="%.1f", help="Average Daily Rank over last 7 games"),
+                            "consistency": st.column_config.NumberColumn("Stability", format="%.1f", help="Rank variation over last 14 games (lower = more stable)")
                         }
                         if has_active_rank:
                             column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
@@ -2164,8 +2456,8 @@ def main():
             | Term | Definition |
             |------|------------|
             | **Avg Rank** | Average Daily Rank over all games |
-            | **Recent Performance** | Average Daily Rank over last 7 games |
-            | **Consistency** | Daily Rank variations over the last 14 games |
+            | **7-Game Avg** | Average Daily Rank over last 7 games |
+            | **Stability** | Rank variation over last 14 games (lower = more stable) |
             | **Daily Rank** | Your position on a specific day's leaderboard |
             | **Rating Change** | How much your Elo changed that day |
             | **Baseline** | The starting/median rating of 1500 |
