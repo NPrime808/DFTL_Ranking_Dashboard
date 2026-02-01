@@ -1,3 +1,14 @@
+---
+title: DFTL Ranking Dashboard
+emoji: 🏆
+colorFrom: purple
+colorTo: blue
+sdk: streamlit
+sdk_version: 1.53.1
+app_file: streamlit_dashboard.py
+pinned: false
+---
+
 # DFTL Ranking Dashboard
 
 A competitive Elo rating system and analytics dashboard for **Die For The Lich** (DFTL) Daily Run leaderboards. This project tracks player performance over time, computes skill-based rankings using an advanced Elo algorithm, and presents the data through an interactive Streamlit dashboard.
