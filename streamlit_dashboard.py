@@ -723,6 +723,141 @@ CUSTOM_CSS = """
 [data-testid="stSidebar"] hr {
     margin: 1rem 0 !important;
 }
+
+/* ===== Ranking Cards ===== */
+.ranking-cards {
+    display: block;
+}
+
+/* Responsive stats grid: 8 columns on desktop, 4 on mobile */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* Responsive card header: matches stats grid columns */
+.card-header {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.625rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(128,128,128,0.35);
+}
+.card-rank {
+    grid-column: 1;
+    font-weight: 700;
+    font-size: 1rem;
+    text-align: center;
+}
+.card-name {
+    grid-column: 2 / 8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: hidden;
+}
+.card-name-text {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-color);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.2;
+}
+.card-rating {
+    grid-column: 8;
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-align: center;
+}
+.card-rating.active {
+    color: #FF6B6B;
+}
+.card-rating.inactive {
+    color: #6B9AFF;
+}
+
+/* Sort controls */
+.sort-controls {
+    display: block;
+    margin-bottom: 1rem;
+}
+
+/* Hide the dataframe table on all viewports */
+[data-testid="stElementContainer"]:has(.desktop-rankings-table),
+[data-testid="stElementContainer"]:has(.desktop-rankings-table) + [data-testid="stElementContainer"] {
+    display: none !important;
+}
+
+/* Back to top anchor */
+#top {
+    scroll-margin-top: 100vh;
+}
+
+/* Back to top button */
+.back-to-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    bottom: 2rem;
+    right: 1.5rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FF6B6B 0%, #ee5a5a 100%);
+    border: none;
+    color: white !important;
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(255,107,107,0.4);
+    z-index: 1000;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none !important;
+}
+.back-to-top:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(255,107,107,0.5);
+}
+.back-to-top:active {
+    transform: scale(0.95);
+}
+
+/* Mobile responsive: 4-column grid */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+    .card-header {
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+    .card-rank {
+        grid-column: 1 !important;
+        justify-self: center !important;
+        text-align: center !important;
+    }
+    .card-name {
+        grid-column: 2 / 4 !important;
+        justify-self: center !important;
+        text-align: center !important;
+    }
+    .card-name-text {
+        font-size: 0.875rem !important;
+    }
+    .card-rating {
+        grid-column: 4 !important;
+        justify-self: center !important;
+        text-align: center !important;
+        font-size: 1rem !important;
+    }
+}
 </style>
 """
 
@@ -939,142 +1074,8 @@ def main():
                 [data-testid="stHeaderActionElements"] {{
                     display: none !important;
                 }}
-                /* Mobile: 4-column stats grid */
-                .stats-grid {{
-                    grid-template-columns: repeat(4, 1fr) !important;
-                }}
-                /* Mobile: responsive header to match 4-column stats grid */
-                .card-header {{
-                    grid-template-columns: repeat(4, 1fr) !important;
-                }}
-                .card-rank {{
-                    grid-column: 1 !important;
-                    justify-self: center !important;
-                    text-align: center !important;
-                }}
-                .card-name {{
-                    grid-column: 2 / 4 !important;
-                    justify-self: center !important;
-                    text-align: center !important;
-                }}
-                .card-name-text {{
-                    font-size: 0.875rem !important;
-                }}
-                .card-rating {{
-                    grid-column: 4 !important;
-                    justify-self: center !important;
-                    text-align: center !important;
-                    font-size: 1rem !important;
-                }}
-            }}
-
-            /* Ranking cards - visible on all viewports */
-            .ranking-cards {{
-                display: block;
-            }}
-
-            /* Responsive stats grid: 8 columns on desktop, 4 on mobile */
-            .stats-grid {{
-                display: grid;
-                grid-template-columns: repeat(8, 1fr);
-                gap: 0.5rem;
-                margin-top: 0.5rem;
-            }}
-
-            /* Responsive card header: matches stats grid columns */
-            .card-header {{
-                display: grid;
-                grid-template-columns: repeat(8, 1fr);
-                align-items: center;
-                gap: 0.5rem;
-                margin-bottom: 0.625rem;
-                padding-bottom: 0.5rem;
-                border-bottom: 1px solid rgba(128,128,128,0.35);
-            }}
-            .card-rank {{
-                grid-column: 1;
-                font-weight: 700;
-                font-size: 1rem;
-                text-align: center;
-            }}
-            .card-name {{
-                grid-column: 2 / 8;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                overflow: hidden;
-            }}
-            .card-name-text {{
-                font-weight: 600;
-                font-size: 1rem;
-                color: var(--text-color);
-                word-break: break-word;
-                overflow-wrap: break-word;
-                line-height: 1.2;
-            }}
-            .card-rating {{
-                grid-column: 8;
-                font-weight: 700;
-                font-size: 1.1rem;
-                text-align: center;
-            }}
-            .card-rating.active {{
-                color: #FF6B6B;
-            }}
-            .card-rating.inactive {{
-                color: #6B9AFF;
-            }}
-
-            /* Sort controls - visible on all viewports */
-            .sort-controls {{
-                display: block;
-                margin-bottom: 1rem;
-            }}
-
-            /* Hide the dataframe table on all viewports */
-            [data-testid="stElementContainer"]:has(.desktop-rankings-table),
-            [data-testid="stElementContainer"]:has(.desktop-rankings-table) + [data-testid="stElementContainer"] {{
-                display: none !important;
-            }}
-
-            /* Back to top anchor - scroll above its position */
-            #top {{
-                scroll-margin-top: 100vh;
-            }}
-
-            /* Back to top button */
-            .back-to-top {{
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                position: fixed;
-                bottom: 2rem;
-                right: 1.5rem;
-                width: 48px;
-                height: 48px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, #FF6B6B 0%, #ee5a5a 100%);
-                border: none;
-                color: white !important;
-                font-size: 1.5rem;
-                font-weight: bold;
-                cursor: pointer;
-                box-shadow: 0 4px 12px rgba(255,107,107,0.4);
-                z-index: 1000;
-                transition: transform 0.2s, box-shadow 0.2s;
-                text-decoration: none !important;
-            }}
-            .back-to-top:hover {{
-                transform: scale(1.1);
-                box-shadow: 0 6px 16px rgba(255,107,107,0.5);
-            }}
-            .back-to-top:active {{
-                transform: scale(0.95);
             }}
         </style>
-        <a id="top"></a>
         <div class="dashboard-header">
             <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
             <div class="dashboard-text">
@@ -1082,11 +1083,13 @@ def main():
                 <p class="dashboard-subtitle">Track Elo ratings, compare players, and analyze performance trends</p>
             </div>
         </div>
-        <a href="#top" class="back-to-top" title="Back to top">↑</a>
         """, unsafe_allow_html=True)
     else:
         st.title("DFTL Ranking Dashboard")
         st.caption("Track Elo ratings, compare players, and analyze performance trends")
+
+    # Back-to-top anchor and button (always rendered)
+    st.markdown('<a id="top"></a><a href="#top" class="back-to-top" title="Back to top">↑</a>', unsafe_allow_html=True)
     st.markdown("---")
 
     # Check for available datasets
