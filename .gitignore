@@ -19,7 +19,7 @@ env/
 *.swo
 
 # Data files
-data/raw/              # Discord exports contain platform IDs - not published
+data/raw/
 
 # OS
 .DS_Store
