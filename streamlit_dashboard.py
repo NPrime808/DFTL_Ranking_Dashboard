@@ -1229,7 +1229,7 @@ def main():
 
                 st.dataframe(
                     df_day[display_cols],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True,
                     column_config=column_config
                 )
@@ -1334,7 +1334,7 @@ def main():
                 st.markdown('<div class="desktop-rankings-table"></div>', unsafe_allow_html=True)
                 st.dataframe(
                     df_cards_display,
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True,
                     column_config=column_config
                 )
@@ -1378,7 +1378,7 @@ def main():
                     annotation_text=f"Median: {df_ratings['rating'].median():.0f}",
                     annotation_font=dict(color=ACCENT_COLORS["warning"], weight=600)
                 )
-                st.plotly_chart(fig_dist, use_container_width=True)
+                st.plotly_chart(fig_dist, width='stretch')
 
             # Toggle to show unranked players
             show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
@@ -1457,7 +1457,7 @@ def main():
 
             st.dataframe(
                 df_ratings_display[display_cols],
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 column_config=column_config
             )
@@ -1630,7 +1630,7 @@ def main():
                             name='Peak',
                             hovertemplate=f"<b>Peak Rating</b><br>{peak_row['rating']:.0f}<extra></extra>"
                         )
-                        st.plotly_chart(fig_rating, use_container_width=True)
+                        st.plotly_chart(fig_rating, width='stretch')
 
                         # --- Daily Rank History Chart (Bar Chart) ---
                         st.subheader("Daily Rank History")
@@ -1687,7 +1687,7 @@ def main():
                             annotation_font=dict(color="rgba(59, 130, 246, 1)", weight=600),
                             annotation_xshift=5,  # Small shift to ensure text is in margin area
                         )
-                        st.plotly_chart(fig_rank, use_container_width=True)
+                        st.plotly_chart(fig_rank, width='stretch')
 
                         # --- Game History Table ---
                         st.subheader("Game History")
@@ -1719,7 +1719,7 @@ def main():
 
                         st.dataframe(
                             df_table[display_cols],
-                            use_container_width=True,
+                            width='stretch',
                             hide_index=True,
                             column_config=column_config
                         )
@@ -1790,7 +1790,7 @@ def main():
                         tickfont=dict(weight=600)
                     )
                 )
-                st.plotly_chart(fig_rank1, use_container_width=True)
+                st.plotly_chart(fig_rank1, width='stretch')
 
             # Pivot to get ranks as columns for table
             df_pivot = df_top10.pivot(
@@ -1816,7 +1816,7 @@ def main():
 
             st.dataframe(
                 df_pivot,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 column_config=column_config
             )
@@ -2095,7 +2095,7 @@ def main():
                                     font=dict(size=12, weight=600)
                                 )
                             )
-                            st.plotly_chart(fig_pie, use_container_width=True)
+                            st.plotly_chart(fig_pie, width='stretch')
 
                         st.markdown("")  # Spacer
 
@@ -2148,7 +2148,7 @@ def main():
                             annotation_text="Baseline",
                             annotation_font=dict(weight=600)
                         )
-                        st.plotly_chart(fig_elo, use_container_width=True)
+                        st.plotly_chart(fig_elo, width='stretch')
 
                         # Score Comparison (Diverging Bar Chart with Winner Highlighting)
                         st.subheader("Score Comparison")
@@ -2279,7 +2279,7 @@ def main():
                         # Add zero line for visual clarity
                         fig_score.add_hline(y=0, line_width=1, line_color="rgba(128, 128, 128, 0.5)")
 
-                        st.plotly_chart(fig_score, use_container_width=True)
+                        st.plotly_chart(fig_score, width='stretch')
 
                         # Display the duel table
                         st.subheader("Game-by-Game Comparison")
@@ -2300,7 +2300,7 @@ def main():
 
                         st.dataframe(
                             df_duel,
-                            use_container_width=True,
+                            width='stretch',
                             hide_index=True,
                             column_config=column_config
                         )
