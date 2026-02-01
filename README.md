@@ -1,4 +1,4 @@
-# DFTL Score System
+# DFTL Ranking Dashboard
 
 A competitive Elo rating system and analytics dashboard for **Die For The Lich** (DFTL) Daily Run leaderboards. This project tracks player performance over time, computes skill-based rankings using an advanced Elo algorithm, and presents the data through an interactive Streamlit dashboard.
 
@@ -55,8 +55,8 @@ The system uses several enhancements over standard Elo:
 
 ```bash
 # Clone the repository
-git clone https://github.com/NPrime808/DFTL_score_system.git
-cd DFTL_score_system
+git clone https://github.com/NPrime808/DFTL_Ranking_Dashboard.git
+cd DFTL_Ranking_Dashboard
 
 # Install dependencies
 pip install -r requirements.txt
@@ -103,7 +103,7 @@ python -m src.elo.engine
 ## Project Structure
 
 ```
-DFTL_score_system/
+DFTL_Ranking_Dashboard/
 ├── streamlit_dashboard.py   # Main dashboard application
 ├── src/
 │   ├── config.py            # Central configuration
