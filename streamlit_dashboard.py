@@ -1088,8 +1088,24 @@ def main():
         st.title("DFTL Ranking Dashboard")
         st.caption("Track Elo ratings, compare players, and analyze performance trends")
 
-    # Back-to-top anchor and button (always rendered)
-    st.markdown('<a id="top"></a><a href="#top" class="back-to-top" title="Back to top">↑</a>', unsafe_allow_html=True)
+    # Back-to-top anchor and button (injected via JS to avoid Streamlit re-render issues)
+    st.markdown('<a id="top"></a>', unsafe_allow_html=True)
+    st.markdown("""
+        <script>
+        (function() {
+            // Only create button if it doesn't exist
+            if (!document.getElementById('back-to-top-btn')) {
+                var btn = document.createElement('a');
+                btn.id = 'back-to-top-btn';
+                btn.href = '#top';
+                btn.className = 'back-to-top';
+                btn.title = 'Back to top';
+                btn.textContent = '↑';
+                document.body.appendChild(btn);
+            }
+        })();
+        </script>
+    """, unsafe_allow_html=True)
     st.markdown("---")
 
     # Check for available datasets
