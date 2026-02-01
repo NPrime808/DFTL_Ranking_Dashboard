@@ -81,7 +81,7 @@ The system supports two ingestion methods:
 Parse exported Discord channel JSON containing DFTL_BOT leaderboard messages:
 
 ```bash
-python -m api.discord_leaderboard_parser
+python -m src.ingestion.discord_parser
 ```
 
 #### 2. Paste Mode (Daily Updates)
@@ -89,7 +89,7 @@ python -m api.discord_leaderboard_parser
 Quickly add a single day's leaderboard by pasting the Discord message:
 
 ```bash
-python -m api.paste_mode_ingestion
+python -m src.ingestion.paste_mode
 ```
 
 #### 3. Recompute Elo Ratings
@@ -97,7 +97,7 @@ python -m api.paste_mode_ingestion
 After adding new data, recompute all ratings:
 
 ```bash
-python -m api.elo_ranking
+python -m src.elo.engine
 ```
 
 ## Project Structure
@@ -105,20 +105,24 @@ python -m api.elo_ranking
 ```
 DFTL_score_system/
 ├── streamlit_dashboard.py   # Main dashboard application
-├── api/
+├── src/
 │   ├── config.py            # Central configuration
-│   ├── discord_leaderboard_parser.py  # JSON export parser
-│   ├── paste_mode_ingestion.py        # Daily paste ingestion
-│   ├── elo_ranking.py       # Elo computation engine
-│   └── utils.py             # Shared utilities
-├── assets/                  # Discord JSON exports
-├── output/                  # Generated CSV files
+│   ├── utils.py             # Shared utilities
+│   ├── elo/
+│   │   ├── compression.py   # Rating compression functions
+│   │   └── engine.py        # Elo computation engine
+│   └── ingestion/
+│       ├── discord_parser.py    # JSON export parser
+│       └── paste_mode.py        # Daily paste ingestion
+├── data/
+│   ├── raw/                 # Discord JSON exports
+│   └── processed/           # Generated CSV files
 └── requirements.txt
 ```
 
 ## Configuration
 
-Key parameters in `api/config.py`:
+Key parameters in `src/config.py`:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -128,6 +132,23 @@ Key parameters in `api/config.py`:
 | `ACTIVITY_WINDOW_DAYS` | 7 | Days of inactivity before becoming unranked |
 | `SOFT_TARGET` | 2700 | Rating where log compression begins |
 | `HARD_CEILING` | 3000 | Theoretical maximum rating |
+
+## Data & Privacy
+
+This project follows data minimization principles:
+
+| Published | Not Published |
+|-----------|---------------|
+| In-game player names | Discord user IDs |
+| Daily ranks and scores | Discord message IDs |
+| Derived Elo ratings | Platform metadata |
+| Activity metrics | Raw message content |
+
+**How it works:**
+- Raw Discord exports are used only as an ingestion source (not published)
+- The parser extracts only game-level data: date, player name, rank, score
+- All Discord platform identifiers are discarded during processing
+- Published datasets contain only leaderboard data and derived analytics
 
 ## Tech Stack
 
@@ -139,7 +160,10 @@ Key parameters in `api/config.py`:
 
 ## License
 
-This project is for personal/educational use. Game data and leaderboard content belong to their respective owners.
+- **Code**: MIT License - see [LICENSE](LICENSE)
+- **Data**: CC-BY 4.0 for derived analytics - see [DATA_LICENSE.md](DATA_LICENSE.md)
+
+Game data and leaderboard content belong to their respective owners.
 
 ---
 

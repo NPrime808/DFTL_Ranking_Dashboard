@@ -789,7 +789,7 @@ def apply_plotly_style(fig, add_gradient_fill=False):
 
 
 # --- Constants ---
-OUTPUT_FOLDER = Path(__file__).parent / "output"
+OUTPUT_FOLDER = Path(__file__).parent / "data" / "processed"
 DATASET_OPTIONS = {
     "Steam Demo+Early Access": "full",
     "Early Access Only": "early_access"
