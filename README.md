@@ -3,9 +3,7 @@ title: DFTL Ranking Dashboard
 emoji: 🏆
 colorFrom: purple
 colorTo: blue
-sdk: streamlit
-sdk_version: 1.53.1
-app_file: streamlit_dashboard.py
+sdk: docker
 pinned: false
 ---
 
