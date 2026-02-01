@@ -15,7 +15,7 @@ st.set_page_config(
     page_title="DFTL Ranking Dashboard",
     page_icon="🎮",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # --- Design System ---
@@ -144,6 +144,226 @@ def generate_ranking_cards(df):
         # Rating class: 'active' (coral) for ranked, 'inactive' (muted) for unranked
         rating_class = "inactive" if is_inactive else "active"
         card = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating {rating_class}">{rating}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Games</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Wins</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Win%</span><span style="{value_style}">{win_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10</span><span style="{value_style}">{top10}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10%</span><span style="{value_style}">{top10_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Avg Rank</span><span style="{value_style}">{avg_r}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last7}</span></div><div style="{stat_layout}"><span style="{label_style}">Stability</span><span style="{value_style}">{consist}</span></div></div></div>'
+        cards.append(card)
+
+    return "".join(cards)
+
+
+def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
+    """
+    Generate HTML cards for the daily leaderboard display (Tab 4).
+    Shows: Daily Rank, Player Name, Score, Rating (if available), Rating Change, Elo Rank.
+    """
+    if df.empty:
+        return "<p>No data available</p>"
+
+    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.875rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
+
+    stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
+    label_style = "font-size:0.65rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);"
+    value_style = "font-size:0.9rem;font-weight:600;color:var(--text-color);"
+
+    def safe_str(val, fmt=None):
+        if pd.isna(val):
+            return "—"
+        if fmt:
+            return fmt.format(val)
+        return str(int(val))
+
+    cards = []
+    for _, row in df.iterrows():
+        rank = row.get('rank')
+        rank_int = int(rank) if pd.notna(rank) else 0
+
+        # Rank display with podium icons
+        if rank_int in RANK_ICONS:
+            info = RANK_ICONS[rank_int]
+            rank_html = f'<span style="color:{info["color"]};font-size:1.2rem;">{info["icon"]}</span>'
+        else:
+            rank_html = f'<span style="color:#FF6B6B;">#{rank_int}</span>'
+
+        name = html.escape(str(row.get('player_name', 'Unknown')))
+        score = safe_str(row.get('score'))
+
+        # Build stats grid based on available columns
+        stats_html = f'<div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{score}</span></div>'
+
+        if has_rating and 'rating' in row.index:
+            rating = safe_str(row.get('rating'), "{:.1f}")
+            stats_html += f'<div style="{stat_layout}"><span style="{label_style}">Rating</span><span style="{value_style}">{rating}</span></div>'
+
+            if 'rating_change' in row.index:
+                change = row.get('rating_change')
+                if pd.notna(change):
+                    change_color = "#10B981" if change >= 0 else "#EF4444"
+                    change_str = f"+{change:.1f}" if change >= 0 else f"{change:.1f}"
+                    stats_html += f'<div style="{stat_layout}"><span style="{label_style}">Change</span><span style="{value_style};color:{change_color};">{change_str}</span></div>'
+
+        if has_active_rank and 'active_rank' in row.index:
+            elo_rank = row.get('active_rank')
+            elo_rank_str = f"#{int(elo_rank)}" if pd.notna(elo_rank) else "N/R"
+            elo_color = "#FF6B6B" if pd.notna(elo_rank) else "#6B9AFF"
+            stats_html += f'<div style="{stat_layout}"><span style="{label_style}">Elo Rank</span><span style="{value_style};color:{elo_color};">{elo_rank_str}</span></div>'
+
+        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name"><span class="card-name-text">{name}</span></div><div class="card-rating active">{score}</div></div><div class="stats-grid" style="grid-template-columns:repeat(4, 1fr);">{stats_html}</div></div>'
+        cards.append(card)
+
+    return "".join(cards)
+
+
+def generate_game_history_cards(df, has_active_rank=True):
+    """
+    Generate HTML cards for player game history display (Tab 3).
+    Shows: Date, Daily Rank, Score, Rating, Rating Change, cumulative stats.
+    """
+    if df.empty:
+        return "<p>No data available</p>"
+
+    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.875rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.12) 100%);"
+
+    stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
+    label_style = "font-size:0.65rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);"
+    value_style = "font-size:0.9rem;font-weight:600;color:var(--text-color);"
+
+    def safe_str(val, fmt=None):
+        if pd.isna(val):
+            return "—"
+        if fmt:
+            return fmt.format(val)
+        return str(int(val))
+
+    cards = []
+    for _, row in df.iterrows():
+        # Date as header
+        date_val = row.get('date')
+        if hasattr(date_val, 'strftime'):
+            date_str = date_val.strftime('%Y-%m-%d')
+        else:
+            date_str = str(date_val)[:10]
+
+        rank = row.get('rank')
+        rank_int = int(rank) if pd.notna(rank) else 0
+
+        # Rank display
+        if rank_int in RANK_ICONS:
+            info = RANK_ICONS[rank_int]
+            rank_html = f'<span style="color:{info["color"]};font-size:1.1rem;">{info["icon"]} #{rank_int}</span>'
+        else:
+            rank_html = f'<span style="color:#3B82F6;">#{rank_int}</span>'
+
+        score = safe_str(row.get('score'))
+        rating = safe_str(row.get('rating'), "{:.1f}")
+
+        # Rating change with color
+        change = row.get('rating_change')
+        if pd.notna(change):
+            change_color = "#10B981" if change >= 0 else "#EF4444"
+            change_str = f"+{change:.1f}" if change >= 0 else f"{change:.1f}"
+        else:
+            change_color = "var(--text-color)"
+            change_str = "—"
+
+        # Build stats
+        stats_html = f'''
+        <div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{score}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Rating</span><span style="{value_style}">{rating}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Change</span><span style="{value_style};color:{change_color};">{change_str}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Games</span><span style="{value_style}">{safe_str(row.get('games_played'))}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Wins</span><span style="{value_style}">{safe_str(row.get('wins'))}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Win%</span><span style="{value_style}">{safe_str(row.get('win_rate'), "{:.1f}")}%</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Avg Rank</span><span style="{value_style}">{safe_str(row.get('avg_daily_rank'), "{:.1f}")}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Stability</span><span style="{value_style}">{safe_str(row.get('consistency'), "{:.1f}")}</span></div>
+        '''
+
+        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name"><span class="card-name-text">{date_str}</span></div><div class="card-rating active">{rating}</div></div><div class="stats-grid">{stats_html}</div></div>'
+        cards.append(card)
+
+    return "".join(cards)
+
+
+def generate_duel_cards(df, player1, player2):
+    """
+    Generate HTML cards for head-to-head comparison (Tab 2).
+    Shows: Date, Winner, both players' ranks/scores/elo side-by-side.
+    """
+    if df.empty:
+        return "<p>No data available</p>"
+
+    stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;min-width:60px;"
+    label_style = "font-size:0.6rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);"
+    value_style = "font-size:0.85rem;font-weight:600;color:var(--text-color);"
+
+    def safe_str(val, fmt=None):
+        if pd.isna(val):
+            return "—"
+        if fmt:
+            return fmt.format(val)
+        return str(int(val))
+
+    cards = []
+    for _, row in df.iterrows():
+        date_val = row.get('Date')
+        if hasattr(date_val, 'strftime'):
+            date_str = date_val.strftime('%Y-%m-%d')
+        else:
+            date_str = str(date_val)[:10]
+
+        winner = row.get('Winner', 'Tie')
+
+        # Determine card style based on winner
+        if winner == player1:
+            card_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.2) 100%);"
+            winner_color = "#3B82F6"
+        elif winner == player2:
+            card_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(245,158,11,0.2) 100%);"
+            winner_color = "#F59E0B"
+        else:
+            card_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(128,128,128,0.15) 100%);"
+            winner_color = "#888888"
+
+        card_base = f"border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.875rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);{card_bg}"
+
+        p1_rank = safe_str(row.get(f'{player1} Daily Rank'))
+        p2_rank = safe_str(row.get(f'{player2} Daily Rank'))
+        p1_score = safe_str(row.get(f'{player1} Score'))
+        p2_score = safe_str(row.get(f'{player2} Score'))
+        p1_elo = safe_str(row.get(f'{player1} Elo'), "{:.0f}")
+        p2_elo = safe_str(row.get(f'{player2} Elo'), "{:.0f}")
+
+        # Header: Date and Winner
+        header_html = f'''
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
+            <span style="font-weight:600;font-size:1rem;color:var(--text-color);">{date_str}</span>
+            <span style="font-weight:700;color:{winner_color};">🏆 {winner}</span>
+        </div>
+        '''
+
+        # Two-column layout for players
+        p1_color = "#3B82F6"
+        p2_color = "#F59E0B"
+
+        stats_html = f'''
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+            <div style="text-align:center;">
+                <div style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:0.85rem;">{html.escape(player1)}</div>
+                <div style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div style="{stat_layout}"><span style="{label_style}">Rank</span><span style="{value_style}">#{p1_rank}</span></div>
+                    <div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{p1_score}</span></div>
+                    <div style="{stat_layout}"><span style="{label_style}">Elo</span><span style="{value_style}">{p1_elo}</span></div>
+                </div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:0.85rem;">{html.escape(player2)}</div>
+                <div style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div style="{stat_layout}"><span style="{label_style}">Rank</span><span style="{value_style}">#{p2_rank}</span></div>
+                    <div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{p2_score}</span></div>
+                    <div style="{stat_layout}"><span style="{label_style}">Elo</span><span style="{value_style}">{p2_elo}</span></div>
+                </div>
+            </div>
+        </div>
+        '''
+
+        card = f'<div style="{card_base}">{header_html}{stats_html}</div>'
         cards.append(card)
 
     return "".join(cards)
@@ -789,11 +1009,7 @@ CUSTOM_CSS = """
     margin-bottom: 1rem;
 }
 
-/* Hide the dataframe table on all viewports */
-[data-testid="stElementContainer"]:has(.desktop-rankings-table),
-[data-testid="stElementContainer"]:has(.desktop-rankings-table) + [data-testid="stElementContainer"] {
-    display: none !important;
-}
+/* Removed: Hidden table CSS - tables now fully removed from code */
 
 /* Back to top anchor */
 #top {
@@ -855,6 +1071,22 @@ CUSTOM_CSS = """
         grid-column: 4 !important;
         justify-self: center !important;
         text-align: center !important;
+        font-size: 1rem !important;
+    }
+}
+
+/* Large viewport: bigger card content */
+@media (min-width: 1200px) {
+    .card-name-text {
+        font-size: 1.15rem !important;
+    }
+    .card-rating {
+        font-size: 1.25rem !important;
+    }
+    .card-rank {
+        font-size: 1.1rem !important;
+    }
+    .stats-grid > div span:last-child {
         font-size: 1rem !important;
     }
 }
@@ -1001,6 +1233,11 @@ def main():
             logo_b64 = base64.b64encode(f.read()).decode()
         st.markdown(f"""
         <style>
+            /* Container query context */
+            .header-container {{
+                container-type: inline-size;
+                container-name: header;
+            }}
             .dashboard-header {{
                 display: flex;
                 align-items: center;
@@ -1016,10 +1253,11 @@ def main():
                 width: 140px;
                 height: auto;
                 filter: drop-shadow(0 0 15px rgba(255, 107, 107, 0.4));
+                flex-shrink: 0;
             }}
             .dashboard-title {{
                 font-family: 'Cinzel', serif;
-                font-size: 2.8rem;
+                font-size: clamp(1.4rem, 5cqw, 2.8rem) !important;
                 font-weight: 700;
                 margin: 0;
                 padding: 0;
@@ -1033,54 +1271,60 @@ def main():
             .dashboard-subtitle {{
                 font-family: 'Rajdhani', sans-serif;
                 margin: 0.5rem 0 0 0;
-                font-size: 1.1rem;
+                font-size: clamp(0.7rem, 1.8cqw, 1.1rem);
                 color: #B0B0B0;
                 letter-spacing: 0.1em;
                 text-transform: uppercase;
                 font-weight: 500;
             }}
-            /* Mobile responsive header */
-            @media (max-width: 768px) {{
+            /* Container query: stacked layout when container is narrow */
+            @container header (max-width: 600px) {{
                 .dashboard-header {{
-                    flex-direction: column !important;
-                    align-items: center !important;
-                    text-align: center !important;
-                    gap: 1rem !important;
-                    padding: 1rem !important;
+                    flex-direction: column;
+                    align-items: center;
+                    text-align: center;
+                    gap: 1rem;
+                    padding: 1rem;
                 }}
                 .dashboard-logo {{
-                    width: 100px !important;
+                    width: 100px;
                 }}
                 .dashboard-text {{
-                    width: 100% !important;
-                    text-align: center !important;
-                    padding: 0 !important;
-                    margin: 0 !important;
+                    width: 100%;
+                    text-align: center;
                 }}
                 .dashboard-title {{
-                    font-size: 1.6rem !important;
-                    text-align: center !important;
-                    margin: 0 auto !important;
-                    padding: 0 !important;
-                    display: flex !important;
-                    justify-content: center !important;
+                    text-align: center;
+                    font-size: 1.5rem !important;
                 }}
                 .dashboard-subtitle {{
-                    font-size: 0.85rem !important;
-                    letter-spacing: 0.05em !important;
-                    text-align: center !important;
+                    letter-spacing: 0.05em;
+                    text-align: center;
                 }}
-                /* Hide Streamlit's heading anchor link on mobile */
+            }}
+            /* Container query: small container fixed sizes */
+            @container header (max-width: 400px) {{
+                .dashboard-title {{
+                    font-size: 1.3rem !important;
+                }}
+                .dashboard-subtitle {{
+                    font-size: 0.75rem;
+                }}
+            }}
+            /* Fallback media query for hiding anchor on narrow viewports */
+            @media (max-width: 768px) {{
                 [data-testid="stHeaderActionElements"] {{
                     display: none !important;
                 }}
             }}
         </style>
-        <div class="dashboard-header">
-            <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
-            <div class="dashboard-text">
-                <h1 class="dashboard-title">DFTL Ranking Dashboard</h1>
-                <p class="dashboard-subtitle">Track Elo ratings, compare players, and analyze performance trends</p>
+        <div class="header-container">
+            <div class="dashboard-header">
+                <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
+                <div class="dashboard-text">
+                    <h1 class="dashboard-title">DFTL Ranking Dashboard</h1>
+                    <p class="dashboard-subtitle">Track Elo ratings, compare players, and analyze performance trends</p>
+                </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1216,23 +1460,41 @@ def main():
                 else:
                     display_cols = ['rank', 'player_name', 'score']
 
-                # Display table
-                column_config = {
-                    "rank": st.column_config.NumberColumn("Daily Rank", format="%d"),
-                    "player_name": st.column_config.TextColumn("Player"),
-                    "score": st.column_config.NumberColumn("Score", format="%d"),
-                    "rating": st.column_config.NumberColumn("Elo Rating", format="%.1f"),
-                    "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f")
+                # Sort controls
+                sort_options = {
+                    "Daily Rank": ("rank", True),
+                    "Score": ("score", False),
+                    "Elo Rating": ("rating", False),
+                    "Rating Change": ("rating_change", False),
                 }
                 if 'active_rank' in df_day.columns:
-                    column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
+                    sort_options["Elo Rank"] = ("active_rank", True)
 
-                st.dataframe(
-                    df_day[display_cols],
-                    width='stretch',
-                    hide_index=True,
-                    column_config=column_config
-                )
+                sort_col1, sort_col2 = st.columns([3, 1])
+                with sort_col1:
+                    selected_sort = st.selectbox(
+                        "Sort by",
+                        options=list(sort_options.keys()),
+                        index=0,
+                        key="leaderboard_sort"
+                    )
+                with sort_col2:
+                    sort_column, default_asc = sort_options[selected_sort]
+                    sort_direction = st.selectbox(
+                        "Order",
+                        options=["Best", "Worst"],
+                        index=0,
+                        key="leaderboard_sort_dir"
+                    )
+
+                sort_ascending = default_asc if sort_direction == "Best" else not default_asc
+                df_day_sorted = df_day.sort_values(sort_column, ascending=sort_ascending, na_position='last')
+
+                # Display as cards
+                has_rating = 'rating' in df_day.columns
+                has_active_rank = 'active_rank' in df_day.columns
+                cards_html = generate_leaderboard_cards(df_day_sorted, has_rating=has_rating, has_active_rank=has_active_rank)
+                st.markdown(f'<div class="ranking-cards">{cards_html}</div>', unsafe_allow_html=True)
         else:
             st.warning("No data available for the selected date range.")
 
@@ -1314,30 +1576,6 @@ def main():
 
                 # Sort cards by selected option
                 df_cards_display = df_filtered.sort_values(sort_column, ascending=sort_ascending, na_position='last')
-
-                column_config = {
-                    "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
-                    "player_name": st.column_config.TextColumn("Player"),
-                    "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                    "games_played": st.column_config.NumberColumn("Games", format="%d", help="Top 30 Daily Runs"),
-                    "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                    "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
-                    "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
-                    "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
-                    "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
-                    "last_7": st.column_config.NumberColumn("7-Game Avg", format="%.1f", help="Average Daily Rank over last 7 games"),
-                    "consistency": st.column_config.NumberColumn("Stability", format="%.1f", help="Rank variation over last 14 games (lower = more stable)"),
-                    "days_inactive": st.column_config.NumberColumn("Inactive", format="%d")
-                }
-
-                # Desktop view: dataframe table (hidden via CSS, kept for potential future use)
-                st.markdown('<div class="desktop-rankings-table"></div>', unsafe_allow_html=True)
-                st.dataframe(
-                    df_cards_display,
-                    width='stretch',
-                    hide_index=True,
-                    column_config=column_config
-                )
 
                 # Card layout (responsive: 8 stats on desktop, 4x2 on mobile)
                 # Uses Streamlit CSS variables for automatic theme adaptation
@@ -1689,40 +1927,41 @@ def main():
                         )
                         st.plotly_chart(fig_rank, width='stretch')
 
-                        # --- Game History Table ---
+                        # --- Game History Cards ---
                         st.subheader("Game History")
 
-                        display_cols = ['date', 'rank', 'score', 'rating', 'rating_change']
-                        if has_active_rank:
-                            display_cols.append('active_rank')
-                        display_cols.extend(['games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency'])
-
-                        df_table = df_player_played.sort_values('date', ascending=False)
-
-                        column_config = {
-                            "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
-                            "rank": st.column_config.NumberColumn("Daily Rank", format="%d"),
-                            "score": st.column_config.NumberColumn("Score", format="%d"),
-                            "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                            "rating_change": st.column_config.NumberColumn("Rating Change", format="%+.1f"),
-                            "games_played": st.column_config.NumberColumn("Games", format="%d", help="Top 30 Daily Runs"),
-                            "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                            "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
-                            "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
-                            "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
-                            "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
-                            "last_7": st.column_config.NumberColumn("7-Game Avg", format="%.1f", help="Average Daily Rank over last 7 games"),
-                            "consistency": st.column_config.NumberColumn("Stability", format="%.1f", help="Rank variation over last 14 games (lower = more stable)")
+                        # Sort controls
+                        sort_options = {
+                            "Date": ("date", False),
+                            "Daily Rank": ("rank", True),
+                            "Score": ("score", False),
+                            "Rating": ("rating", False),
+                            "Rating Change": ("rating_change", False),
                         }
-                        if has_active_rank:
-                            column_config["active_rank"] = st.column_config.NumberColumn("Elo Rank", format="%d")
 
-                        st.dataframe(
-                            df_table[display_cols],
-                            width='stretch',
-                            hide_index=True,
-                            column_config=column_config
-                        )
+                        sort_col1, sort_col2 = st.columns([3, 1])
+                        with sort_col1:
+                            selected_sort = st.selectbox(
+                                "Sort by",
+                                options=list(sort_options.keys()),
+                                index=0,
+                                key="history_sort"
+                            )
+                        with sort_col2:
+                            sort_column, default_asc = sort_options[selected_sort]
+                            sort_direction = st.selectbox(
+                                "Order",
+                                options=["Best", "Worst"] if selected_sort != "Date" else ["Recent", "Oldest"],
+                                index=0,
+                                key="history_sort_dir"
+                            )
+
+                        sort_ascending = default_asc if sort_direction in ["Best", "Oldest"] else not default_asc
+                        df_table = df_player_played.sort_values(sort_column, ascending=sort_ascending, na_position='last')
+
+                        # Display as cards
+                        cards_html = generate_game_history_cards(df_table, has_active_rank=has_active_rank)
+                        st.markdown(f'<div class="ranking-cards">{cards_html}</div>', unsafe_allow_html=True)
                     else:
                         st.info(f"No game history found for {selected_player}.")
                 else:
@@ -2281,29 +2520,41 @@ def main():
 
                         st.plotly_chart(fig_score, width='stretch')
 
-                        # Display the duel table
+                        # Display the duel cards
                         st.subheader("Game-by-Game Comparison")
 
-                        # Build column config
-                        column_config = {
-                            "Date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
-                            "Winner": st.column_config.TextColumn("Winner"),
-                            f"{player1} Daily Rank": st.column_config.NumberColumn(f"{player1} Daily Rank", format="%d"),
-                            f"{player2} Daily Rank": st.column_config.NumberColumn(f"{player2} Daily Rank", format="%d"),
-                            f"{player1} Score": st.column_config.NumberColumn(f"{player1} Score", format="%d"),
-                            f"{player2} Score": st.column_config.NumberColumn(f"{player2} Score", format="%d"),
-                            f"{player1} Active Rank": st.column_config.NumberColumn(f"{player1} Elo Rank", format="%d"),
-                            f"{player2} Active Rank": st.column_config.NumberColumn(f"{player2} Elo Rank", format="%d"),
-                            f"{player1} Elo": st.column_config.NumberColumn(f"{player1} Elo", format="%.1f"),
-                            f"{player2} Elo": st.column_config.NumberColumn(f"{player2} Elo", format="%.1f"),
+                        # Sort controls
+                        sort_options = {
+                            "Date": ("Date", False),
+                            f"{player1} Daily Rank": (f"{player1} Daily Rank", True),
+                            f"{player2} Daily Rank": (f"{player2} Daily Rank", True),
+                            f"{player1} Score": (f"{player1} Score", False),
+                            f"{player2} Score": (f"{player2} Score", False),
                         }
 
-                        st.dataframe(
-                            df_duel,
-                            width='stretch',
-                            hide_index=True,
-                            column_config=column_config
-                        )
+                        sort_col1, sort_col2 = st.columns([3, 1])
+                        with sort_col1:
+                            selected_sort = st.selectbox(
+                                "Sort by",
+                                options=list(sort_options.keys()),
+                                index=0,
+                                key="duel_sort"
+                            )
+                        with sort_col2:
+                            sort_column, default_asc = sort_options[selected_sort]
+                            sort_direction = st.selectbox(
+                                "Order",
+                                options=["Best", "Worst"] if selected_sort != "Date" else ["Recent", "Oldest"],
+                                index=0,
+                                key="duel_sort_dir"
+                            )
+
+                        sort_ascending = default_asc if sort_direction in ["Best", "Oldest"] else not default_asc
+                        df_duel_sorted = df_duel.sort_values(sort_column, ascending=sort_ascending, na_position='last')
+
+                        # Display as cards
+                        cards_html = generate_duel_cards(df_duel_sorted, player1, player2)
+                        st.markdown(f'<div class="ranking-cards">{cards_html}</div>', unsafe_allow_html=True)
             else:
                 st.info("Select two players to compare their head-to-head performance.")
         else:
