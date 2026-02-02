@@ -1045,6 +1045,79 @@ CUSTOM_CSS = """
     }
 }
 
+/* ===== Radio-as-Tabs Styling ===== */
+/* Style horizontal radio buttons to look like native Streamlit tabs */
+/* Center the tab bar by making container full-width and centering content */
+[data-testid="stElementContainer"]:has([data-testid="stRadio"]) {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    position: relative !important;
+}
+/* Full-width divider line below tabs */
+[data-testid="stElementContainer"]:has([data-testid="stRadio"])::after {
+    content: "" !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 1px !important;
+    background: rgba(128, 128, 128, 0.3) !important;
+}
+[data-testid="stRadio"] [role="radiogroup"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 0 !important;
+    justify-content: center !important;
+}
+[data-testid="stRadio"] [role="radiogroup"] > label {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0.5rem 0.6rem !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    font-weight: 500 !important;
+    font-size: 0.75rem !important;
+    color: var(--text-color) !important;
+    opacity: 0.6 !important;
+    border-bottom: 2px solid transparent !important;
+    transition: opacity 0.2s, border-color 0.2s !important;
+    white-space: nowrap !important;
+}
+[data-testid="stRadio"] [role="radiogroup"] > label:hover {
+    opacity: 1 !important;
+}
+/* Selected tab styling - use :has(input:checked) */
+[data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
+    opacity: 1 !important;
+    border-bottom-color: #FF6B6B !important;
+    font-weight: 600 !important;
+}
+/* Hide the actual radio circle */
+[data-testid="stRadio"] [role="radiogroup"] > label > div:first-child {
+    display: none !important;
+}
+/* Mobile sm (≤600px): compact tabs to fit on one row */
+@media (max-width: 600px) {
+    [data-testid="stRadio"] [role="radiogroup"] > label {
+        padding: 0.3rem 0 !important;
+        font-size: 0.6rem !important;
+        transform: scale(0.85) !important;
+        transform-origin: center !important;
+        margin: 0 -6px !important;
+    }
+}
+/* Mobile xs (≤450px): extra compact tabs for narrow screens */
+@media (max-width: 450px) {
+    [data-testid="stRadio"] [role="radiogroup"] > label {
+        transform: scale(0.78) !important;
+        margin: 0 -10px !important;
+    }
+}
+
 /* ===== Dividers with Gradient ===== */
 .main hr {
     border: none;
@@ -1772,6 +1845,7 @@ def main():
 
         # Export Data section
         st.markdown("---")
+        st.markdown('<div style="padding-top: 0.3rem;"></div>', unsafe_allow_html=True)
         st.header("📥 Export Data")
 
         # Export leaderboard data (always use full dataset for complete data)
@@ -1789,6 +1863,15 @@ def main():
             )
             st.markdown(download_html, unsafe_allow_html=True)
 
+        # Help link
+        st.markdown("---")
+        st.markdown(
+            '<div style="padding: 0.5rem 0;">'
+            '<a href="https://github.com/NPrime808/DFTL_Ranking_Dashboard#faq" target="_blank">📖 FAQ & Glossary</a>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+
         # Attribution
         st.markdown("---")
         st.caption("Made with 🫶 by N Prime")
@@ -1797,20 +1880,46 @@ def main():
     df_filtered = df_leaderboard.copy()
 
     # --- Main Content ---
-    st.markdown(f"**Active dataset:** {dataset_label}")
+    # Tab options (radio-as-tabs for persistence)
+    TAB_OPTIONS = [
+        "🏅 Rankings",
+        "⚔️ Duels",
+        "👤 Tracker",
+        "📊 Dailies",
+        "🏆 Hall of Fame"
+    ]
 
-    # Create tabs (Elo Rankings first for main use case)
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "🏅 Elo Rankings",
-        "⚔️ Daily Duels",
-        "👤 Player Tracker",
-        "📊 Steam Leaderboards",
-        "🏆 Top 10 History",
-        "📖 FAQ / Glossary"
-    ])
+    # Tab name to URL slug mapping (for cleaner URLs)
+    TAB_SLUGS = {
+        "🏅 Rankings": "rankings",
+        "⚔️ Duels": "duels",
+        "👤 Tracker": "tracker",
+        "📊 Dailies": "dailies",
+        "🏆 Hall of Fame": "hall-of-fame"
+    }
+    SLUG_TO_TAB = {v: k for k, v in TAB_SLUGS.items()}
+
+    # Read tab from URL query params (persists across reloads)
+    url_tab = st.query_params.get("tab", "rankings")
+    default_tab = SLUG_TO_TAB.get(url_tab, TAB_OPTIONS[0])
+
+    # Radio buttons styled as tabs (CSS makes them look like native tabs)
+    active_tab = st.radio(
+        "Navigation",
+        TAB_OPTIONS,
+        index=TAB_OPTIONS.index(default_tab),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="tab_selector"
+    )
+
+    # Update URL when tab changes (without triggering rerun)
+    new_slug = TAB_SLUGS.get(active_tab, "rankings")
+    if url_tab != new_slug:
+        st.query_params["tab"] = new_slug
 
     # --- Tab 4: Steam Leaderboards ---
-    with tab4:
+    if active_tab == "📊 Dailies":
 
         # Date selector for specific day
         available_dates = sorted(df_filtered['date'].dt.date.unique(), reverse=True)
@@ -1859,7 +1968,7 @@ def main():
             st.warning("No data available for the selected date range.")
 
     # --- Tab 1: Elo Rankings ---
-    with tab1:
+    if active_tab == "🏅 Rankings":
         if df_history is not None and 'active_rank' in df_history.columns:
             # Date picker and sort on same row
             available_dates = sorted(df_history['date'].dt.date.unique(), reverse=True)
@@ -2046,14 +2155,22 @@ def main():
             st.warning("Ratings data not available.")
 
     # --- Tab 3: Player Tracker ---
-    with tab3:
+    if active_tab == "👤 Tracker":
 
         if df_history is not None:
+            # Pre-select random player from top 10 on first load (persists during session)
+            if 'tracker_default_player' not in st.session_state:
+                top_n = min(10, len(players_by_rating))
+                if top_n >= 1:
+                    st.session_state.tracker_default_player = random.randint(0, top_n - 1)
+                else:
+                    st.session_state.tracker_default_player = None
+
             # Player selector (single selection)
             selected_player = st.selectbox(
                 "Select a player",
                 options=players_by_rating,
-                index=None,
+                index=st.session_state.tracker_default_player,
                 placeholder="Choose a player...",
                 key="tab4_player_select"
             )
@@ -2312,7 +2429,7 @@ def main():
             st.warning("History data not available.")
 
     # --- Tab 5: Top 10 History ---
-    with tab5:
+    if active_tab == "🏆 Hall of Fame":
 
         if df_history is not None and 'active_rank' in df_history.columns:
             # Use pre-computed active_rank from history data
@@ -2403,7 +2520,7 @@ def main():
             st.warning("Active rank history data not available.")
 
     # --- Tab 2: Daily Duels ---
-    with tab2:
+    if active_tab == "⚔️ Duels":
 
         if df_history is not None:
             # Pre-select random duo from top 10 on first load (persists during session)
@@ -2751,165 +2868,6 @@ def main():
                 st.info("Select two players to compare their head-to-head performance.")
         else:
             st.warning("History data not available.")
-
-    # --- Tab 6: FAQ / Glossary ---
-    with tab6:
-        st.subheader("Frequently Asked Questions")
-
-        with st.expander("What is Elo rating?", expanded=True):
-            st.markdown("""
-            **Elo** is a rating system originally designed for chess that measures relative skill levels.
-            Here, I use a modified pairwise Elo system that compares players based on their daily leaderboard performance.
-
-            - **Starting Rating**: All players begin at **1500** (the baseline/median)
-            - **Rating Range**: From **1000** (floor) to **3000** (theoretical ceiling)
-            - **How it works**: When you finish higher than another player on the daily leaderboard, you "win" against them. Your rating increases, theirs decreases. The amount depends on the rating difference and score margin.
-            """)
-
-        with st.expander("What do the ratings mean?"):
-            st.markdown("""
-            Ratings reflects actual skill gaps between players (the better the player the higher the rating), and roughly matches with expected performance:
-
-            | Rating | Typical Rank |
-            |--------|--------------|
-            | **2800+** | Top 1 |
-            | **2500-2800** | Top 5 |
-            | **2000-2500** | Top 10 |
-            | **1500** | ~Rank 15-20 |
-            | **1200-1500** | Rank 20-25 |
-            | **1000-1200** | Rank 25-30 |
-            """)
-
-        with st.expander("How are Elo Rankings calculated?"):
-            st.markdown("""
-            Each day, all players on the leaderboard are compared pairwise:
-            1. Player A finishes 5th. They beat the 25 players below them, and lost to the 4 above
-            2. Rating changes are calculated using a modified Elo formula
-            3. Score is taken into account. Domination means more points, narrow wins mean less
-            4. Players with more games have more stable ratings (dynamic K-factor)
-            5. Uncertainty increases with inactivity, so you'll face big rating swings on return
-
-            After 7 daily leaderboard appearances, you become Ranked.
-            Your Elo rank is determined by your rating compared to the other Ranked players.
-
-            After 7 days without a leaderboard appearance, you are considered inactive, and you become Unranked.
-            Don't worry, your rating is preserved.
-            At this point, a single top 30 result is enough to get you back in the rankings.
-            """)
-
-        with st.expander("Why did my rating change so much/little?"):
-            st.markdown("""
-            Several factors:
-            - **Opponent ratings**: Beating higher-rated players = bigger gains
-            - **Score margin**: Dominating performances give more weight
-            - **Games played**: New players (<10 games) have larger swings to find their true rating
-            - **Your rating level**: Gains shrink as you climb
-            - **Number of opponents**: Placing #1 means you beat 29 opponents, #30 means you beat none
-            """)
-
-        st.markdown("---")
-        st.subheader("System Design Philosophy")
-
-        with st.expander("Why use Elo instead of other rating systems?"):
-            st.markdown("""
-            The true answer is that I'm a former chess player and I'll always be biased in favor of the Elo system.
-            I did consider and/or try several other rating systems though:
-
-            | System | Pros | Why I didn't use it |
-            |--------|------|---------------------|
-            | **Glicko/Glicko-2** | Popular, tracks rating uncertainty | Designed for 1v1 matches, not 30-player daily competitions |
-            | **TrueSkill** | Robust skill-based matchmaking algorithm  | Overkill for our use case. Also it's patented by Microsoft and I don't have "Microsoft lawyer" money |
-            | **Simple averages** | Easy to understand, easy to implement | "Underkill" for our use case. Doesn't account for opponent strength or improvement over time |
-            | **ELO** | Battle-tested, intuitive | Not quite perfect without some tweaks |
-
-            **Why Pairwise Elo works here:**
-            - Chess proved that Elo accurately ranks players over time through repeated competition
-            - My pairwise adaptation treats each daily leaderboard as 435 simultaneous "matches" (30 players = 30×29/2 pairs)
-            - The system is self-correcting: beat strong players, gain more; lose to weak players, lose more
-            - It's popular and intuitive: everyone understands "higher number = better"
-            """)
-
-        with st.expander("Why pairwise comparisons instead of just using daily rank?"):
-            st.markdown("""
-            Skill comparisons felt important to highlight
-            Daily rank is simply less effective to make those evaluations:
-
-            - Finishing 1st against 29 weak players = same as 1st against 29 strong players
-            - A rank of 5th tells you nothing about who you beat or lost to
-            - No way to compare across different days with different player pools
-
-            **Why pairwise works better:**
-            - Beat a 2500-rated player? Big gain.
-            - Lose to a 1200-rated player? Big loss.
-            - The gains and losses depend on *who* you competed against.
-            """)
-
-        with st.expander("How do you handle only seeing the top 30 each day?"):
-            st.markdown("""
-            That shaped the system design a lot actually.
-
-            **The limitation:**
-            Players ranked 31st or lower are invisible: I don't know their scores, their identities, or even how many of them there are.
-
-            **Why this is actually fine for Elo:**
-            The pairwise system only compares players *who both appear on the same day*. If you're in the top 30, you get compared to the other 29 players. If you're not, you simply don't participate that day.
-
-            **Key implications:**
-            - **No penalty for missing days**: If you don't appear, your rating stays untouched
-            - **Appearing matters**: To gain or lose rating, you must show up in the top 30
-            - **Bottom of top 30 is meaningful**: Rank 30 means you made it, but barely. There is still some road ahead
-
-            **What I *can't* measure:**
-            - Players who never crack the top 30
-            - How much above the rest of the field the top 30 is
-            - The "true" skill of players who rarely appear
-            """)
-
-        with st.expander("What's the deal with rating compression?"):
-            st.markdown("""
-            Raw Elo scores are processed and then compressed using a hybrid system:
-            - Below 2700: Gentle logarithmic scaling (diminishing returns)
-            - Above 2700: Hyperbolic tangent compression toward the 3000 ceiling
-                        
-            This allows the high end of the distribution curve to mimic chess Elo, in the sense that:
-            - **2800+** is genuinely elite
-            - **2900** is legendary
-            - **3000** is the theoretical limits of human ability
-                        
-            While mostly aesthetics (compared to the raw ratings), it prevents runaway ratings while preserving meaningful differences
-            """)
-
-        st.markdown("---")
-        st.subheader("Glossary of Terms")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown("""
-            | Term | Definition |
-            |------|------------|
-            | **Ranked** | Players in the main leaderboard (active + enough games) |
-            | **Unranked** | Players not in main leaderboard (<7 games or inactive >7 days) |
-            | **Elo Rank** | Your position among ranked players by Elo rating |
-            | **Rating** | Your compressed Elo score (higher = better) |
-            | **Raw Rating** | Your uncompressed Elo score (used internally) |
-            | **Games** | Top 30 Daily Runs |
-            | **Confidence** | How reliable your rating is (based on games played) |
-            """)
-
-        with col2:
-            st.markdown("""
-            | Term | Definition |
-            |------|------------|
-            | **Avg Rank** | Average Daily Rank over all games |
-            | **7-Game Avg** | Average Daily Rank over last 7 games |
-            | **Stability** | Rank variation over last 14 games (lower = more stable) |
-            | **Daily Rank** | Your position on a specific day's leaderboard |
-            | **Rating Change** | How much your Elo changed that day |
-            | **Baseline** | The starting/median rating of 1500 |
-            | **Compression** | System that maps raw ratings to display ratings |
-            """)
-
 
 if __name__ == "__main__":
     main()
