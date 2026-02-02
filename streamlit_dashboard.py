@@ -1,6 +1,7 @@
 import math
 import base64
 import html
+import random
 
 import streamlit as st
 import pandas as pd
@@ -82,7 +83,7 @@ def generate_ranking_cards(df):
     status_label_style = f"font-size:0.65rem;font-weight:400;margin-top:0.15rem;color:{inactive_blue};"
 
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
-    label_style = "font-size:0.8rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);font-weight:500;"
+    label_style = "font-size:0.8rem;text-transform:uppercase;color:var(--text-color);font-weight:500;"
     value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
     def safe_str(val, fmt=None):
@@ -161,7 +162,7 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
     card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
 
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
-    label_style = "font-size:0.8rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);font-weight:500;"
+    label_style = "font-size:0.8rem;text-transform:uppercase;color:var(--text-color);font-weight:500;"
     value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
     def safe_str(val, fmt=None):
@@ -223,7 +224,7 @@ def generate_game_history_cards(df, has_active_rank=True):
     card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.12) 100%);"
 
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
-    label_style = "font-size:0.8rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);font-weight:500;"
+    label_style = "font-size:0.8rem;text-transform:uppercase;color:var(--text-color);font-weight:500;"
     value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
     def safe_str(val, fmt=None):
@@ -282,7 +283,7 @@ def generate_game_history_cards(df, has_active_rank=True):
     return "".join(cards)
 
 
-def generate_duel_cards(df, player1, player2, colors=None, limit=None):
+def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_encounter_label=False):
     """
     Generate HTML cards for head-to-head comparison (Tab 2).
     Shows: Date, Winner, both players' ranks/scores/elo side-by-side.
@@ -291,13 +292,14 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None):
     Args:
         colors: Theme colors dict from get_theme_colors(). If None, uses defaults.
         limit: If set, only render first N cards (but use full df for cumulative win calculation).
+        last_encounter_label: If True, adds "(last encounter)" after the date on the first card.
     """
     if df.empty:
         return "<p>No data available</p>"
 
     # Match Tab 1 typography (design system compliant)
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;min-width:60px;"
-    label_style = "font-size:0.8rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);font-weight:500;"
+    label_style = "font-size:0.8rem;text-transform:uppercase;color:var(--text-color);font-weight:500;"
     value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
     # Theme-adaptive player colors (Cyan + Amber)
@@ -348,6 +350,9 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None):
             date_str = date_val.strftime('%Y-%m-%d')
         else:
             date_str = str(date_val)[:10]
+        # Add "(most recent)" label to first card if requested
+        if last_encounter_label and idx == 0:
+            date_str += " (most recent)"
 
         winner = row.get('Winner', 'Tie')
 
@@ -365,8 +370,8 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None):
             card_bg = f"background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba({tie_rgb},0.1) 100%);"
             winner_color = tie_color
 
-        # Match Tab 1 card base styling
-        card_base = f"border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);{card_bg}"
+        # Match Tab 1 card base styling (compact padding for mobile)
+        card_base = f"border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.75rem;margin-bottom:0.5rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);{card_bg}"
 
         p1_rank = safe_str(row.get(f'{player1} Daily Rank'))
         p2_rank = safe_str(row.get(f'{player2} Daily Rank'))
@@ -378,7 +383,7 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None):
         # Header: Win counts on sides, Date and Winner centered
         # 3-column grid: p1 wins | date+winner | p2 wins
         header_html = f'''
-        <div class="duel-header" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
+        <div class="duel-header" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;margin-bottom:0.75rem;padding:0 0.5rem 0.5rem 0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
             <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
                 <span class="duel-win-count" style="font-weight:700;font-size:1.4rem;color:{p1_color};">{p1_cumulative}</span>
                 <span class="duel-win-label" style="font-size:0.7rem;text-transform:uppercase;font-weight:600;color:{p1_color};">Duel Wins</span>
@@ -399,7 +404,7 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None):
         stats_html = f'''
         <div class="duel-stats" style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.5rem;align-items:start;max-width:700px;margin:0 auto;">
             <div style="text-align:center;">
-                <div class="duel-player-name" style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player1)} <span style="opacity:0.8;font-weight:500;">({p1_elo})</span></div>
+                <div class="duel-player-name" style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player1)} <span style="font-weight:500;">({p1_elo})</span></div>
                 <div class="duel-player-stats" style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Daily Rank</span><span class="duel-stat-value" style="{value_style}">#{p1_rank}</span></div>
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Score</span><span class="duel-stat-value" style="{value_style}">{p1_score}</span></div>
@@ -407,7 +412,7 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None):
             </div>
             <div class="duel-vs" style="display:flex;align-items:center;justify-content:center;font-size:2rem;padding-top:0.25rem;">⚔️</div>
             <div style="text-align:center;">
-                <div class="duel-player-name" style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player2)} <span style="opacity:0.8;font-weight:500;">({p2_elo})</span></div>
+                <div class="duel-player-name" style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player2)} <span style="font-weight:500;">({p2_elo})</span></div>
                 <div class="duel-player-stats" style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Daily Rank</span><span class="duel-stat-value" style="{value_style}">#{p2_rank}</span></div>
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Score</span><span class="duel-stat-value" style="{value_style}">{p2_score}</span></div>
@@ -834,8 +839,8 @@ CUSTOM_CSS = """
     font-weight: 600 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.1em !important;
-    color: var(--text-color) !important;
-    opacity: 0.7 !important;
+    color-scheme: inherit;
+    color: light-dark(#6B7280, #9CA3AF) !important;
 }
 
 [data-testid="stMetric"] [data-testid="stMetricValue"] {
@@ -919,7 +924,7 @@ CUSTOM_CSS = """
     letter-spacing: 0.02em;
     border-bottom: 2px solid transparent !important;
     background: transparent !important;
-    opacity: 0.7;
+    opacity: 0.85;
     transition: opacity 0.15s ease !important;
     /* Prevent tabs from shrinking on narrow screens */
     flex-shrink: 0 !important;
@@ -927,7 +932,7 @@ CUSTOM_CSS = """
 }
 
 .stTabs [data-baseweb="tab"]:hover {
-    opacity: 0.9;
+    opacity: 0.95;
     background: transparent !important;
     color: inherit !important;
 }
@@ -1008,6 +1013,21 @@ CUSTOM_CSS = """
 [data-testid="stHorizontalBlock"]:has([data-testid="stDateInput"]) [data-testid="stColumn"] {
     min-width: 0 !important;
 }
+/* Tab 2 duel pickers: keep side-by-side even on mobile */
+[data-testid="stHorizontalBlock"]:has([data-testid="stSelectbox"]) {
+    flex-wrap: nowrap !important;
+}
+[data-testid="stHorizontalBlock"]:has([data-testid="stSelectbox"]) [data-testid="stColumn"] {
+    min-width: 0 !important;
+}
+/* Remove margin between player label and selectbox in duel pickers */
+[data-testid="stHorizontalBlock"]:has([data-testid="stSelectbox"]) [data-testid="stElementContainer"]:has([data-testid="stHtml"]) {
+    margin-bottom: 0 !important;
+}
+/* Reduce vertical spacing in Tab 2 (duel pickers, cards, charts) */
+[data-testid="stVerticalBlock"]:has([data-testid="stSelectbox"]) > [data-testid="stElementContainer"] {
+    margin-bottom: 0.5rem !important;
+}
 /* Vertical divider between side-by-side chart columns */
 [data-testid="stHorizontalBlock"]:has(.stPlotlyChart) {
     color-scheme: inherit;
@@ -1018,10 +1038,10 @@ CUSTOM_CSS = """
     border-right: 1px solid light-dark(#C0C0C0, #404040);
     padding-right: 1rem;
 }
-/* Mobile: allow vertical scrolling through Plotly charts */
-@media (max-width: 768px) {
+/* Mobile (sm): fully disable chart interaction to prevent scroll hijacking */
+@media (max-width: 600px) {
     .stPlotlyChart {
-        touch-action: pan-y !important;
+        pointer-events: none !important;
     }
 }
 
@@ -1673,8 +1693,8 @@ def main():
                 font-size: 0.55rem;
                 font-weight: 400;
                 line-height: 1.2;
-                color: var(--text-color);
-                opacity: 0.6;
+                color-scheme: inherit;
+                color: light-dark(#6B7280, #9CA3AF);
                 margin: 0 !important;
                 padding: 0 !important;
                 letter-spacing: 0.04em;
@@ -1683,8 +1703,8 @@ def main():
             .dashboard-title [data-testid="stHeaderActionElements"] {{
                 display: none !important;
             }}
-            /* Hide Streamlit header action elements on mobile */
-            @media (max-width: 768px) {{
+            /* Hide Streamlit header action elements on mobile (sm) */
+            @media (max-width: 600px) {{
                 [data-testid="stHeaderActionElements"] {{
                     display: none !important;
                 }}
@@ -1868,7 +1888,7 @@ def main():
                 )
             with col_sort:
                 selected_sort = st.selectbox(
-                    "Sort",
+                    "Sort by",
                     options=list(sort_options.keys()),
                     index=0,
                     key="card_sort"
@@ -2113,7 +2133,7 @@ def main():
                             st.markdown(f"""
                             <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.2) 100%);
                                         border: 1px solid {ACCENT_COLORS['info']}; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">First Game</div>
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-color); margin-bottom: 0.25rem;">First Game</div>
                                 <div style="font-size: 1.25rem; font-weight: 700;">{first_date_str}</div>
                                 <div style="font-size: 0.875rem; color: {ACCENT_COLORS['info']};">Daily Rank #{first_rank} | Rating: {first_rating:.0f}</div>
                             </div>
@@ -2129,7 +2149,7 @@ def main():
                             st.markdown(f"""
                             <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.2) 100%);
                                         border: 1px solid {ACCENT_COLORS['primary']}; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">Last Game</div>
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-color); margin-bottom: 0.25rem;">Last Game</div>
                                 <div style="font-size: 1.25rem; font-weight: 700;">{last_date_str}</div>
                                 <div style="font-size: 0.875rem; color: {ACCENT_COLORS['primary']};">Daily Rank #{last_rank} | Rating: {last_rating:.0f}</div>
                             </div>
@@ -2386,27 +2406,44 @@ def main():
     with tab2:
 
         if df_history is not None:
-            col_p1, col_vs, col_p2 = st.columns([1, 0.15, 1])
+            # Pre-select random duo from top 10 on first load (persists during session)
+            if 'duel_default_p1' not in st.session_state:
+                top_n = min(10, len(players_by_rating))
+                if top_n >= 2:
+                    idx1, idx2 = random.sample(range(top_n), 2)
+                    st.session_state.duel_default_p1 = idx1
+                    st.session_state.duel_default_p2 = idx2
+                else:
+                    st.session_state.duel_default_p1 = None
+                    st.session_state.duel_default_p2 = None
+
+            # Get theme colors (same source as duel cards for consistency)
+            duel_colors = get_theme_colors()
+            p1_label_color = duel_colors.get("player1", "#0891B2")
+            p2_label_color = duel_colors.get("player2", "#B45309")
+
+            col_p1, col_p2 = st.columns([1, 1])
 
             with col_p1:
+                st.html(f'<p style="font-size: 0.875rem; font-weight: 600; margin: 0; color: {p1_label_color};">Player 1</p>')
                 player1 = st.selectbox(
-                    "Select Player 1",
+                    "Player 1",
                     options=players_by_rating,
-                    index=None,
-                    placeholder="Choose Player 1...",
-                    key="duel_player1"
+                    index=st.session_state.duel_default_p1,
+                    placeholder="Choose player...",
+                    key="duel_player1",
+                    label_visibility="collapsed"
                 )
 
-            with col_vs:
-                st.markdown("<div style='display:flex;align-items:center;justify-content:center;height:100%;padding-top:1.75rem;'><span style='font-size:1.5rem;font-weight:700;opacity:0.6;'>vs.</span></div>", unsafe_allow_html=True)
-
             with col_p2:
+                st.html(f'<p style="font-size: 0.875rem; font-weight: 600; margin: 0; color: {p2_label_color};">Player 2</p>')
                 player2 = st.selectbox(
-                    "Select Player 2",
+                    "Player 2",
                     options=players_by_rating,
-                    index=None,
-                    placeholder="Choose Player 2...",
-                    key="duel_player2"
+                    index=st.session_state.duel_default_p2,
+                    placeholder="Choose player...",
+                    key="duel_player2",
+                    label_visibility="collapsed"
                 )
 
             if player1 and player2:
@@ -2562,10 +2599,9 @@ def main():
                         df_duel = pd.DataFrame(duel_rows)
 
                         # Last Encounter section - show most recent duel card with full win tally
-                        st.subheader("Last Encounter")
                         df_duel_recent_first = df_duel.sort_values('Date', ascending=False)
                         theme_colors = get_theme_colors()
-                        last_card_html = generate_duel_cards(df_duel_recent_first, player1, player2, colors=theme_colors, limit=1)
+                        last_card_html = generate_duel_cards(df_duel_recent_first, player1, player2, colors=theme_colors, limit=1, last_encounter_label=True)
                         st.html(f'<div class="ranking-cards">{last_card_html}</div>')
 
                         # --- Prepare both charts data first, then display side-by-side ---
@@ -2597,10 +2633,10 @@ def main():
                             hovermode='x unified',
                             height=280,
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(weight=600)),
-                            margin=dict(l=20, r=20, t=30, b=20)
+                            margin=dict(l=20, r=60, t=30, b=20)
                         )
-                        # Compact axes for narrow screens, limit ticks to prevent overlap
-                        fig_elo.update_xaxes(title="", tickformat="%m/%d", tickangle=0, nticks=5)
+                        # X-axis shows one tick per month; hover shows full date
+                        fig_elo.update_xaxes(title="", tickformat="%b", hoverformat="%b %d, %Y", tickangle=0, dtick="M1")
                         fig_elo.update_yaxes(title="")
                         fig_elo.add_hline(y=1500, line_dash="dash", line_color="rgba(128, 128, 128, 0.5)", annotation_text="Baseline", annotation_font=dict(weight=600))
 
@@ -2656,15 +2692,11 @@ def main():
                         fig_score.update_layout(
                             barmode='relative', hovermode='x unified', height=280, bargap=0.15,
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(weight=600)),
-                            margin=dict(l=20, r=20, t=30, b=20),
+                            margin=dict(l=20, r=60, t=30, b=20),
                         )
 
-                        # Compact x-axis: limit ticks to prevent overlap
-                        if len(dates_sorted) <= 5:
-                            fig_score.update_xaxes(title="", tickformat="%m/%d", tickvals=dates_sorted, tickangle=0)
-                        else:
-                            # Auto-space with max 5 ticks to prevent collision
-                            fig_score.update_xaxes(title="", tickformat="%m/%d", tickangle=0, nticks=5)
+                        # X-axis shows one tick per month; hover shows full date
+                        fig_score.update_xaxes(title="", tickformat="%b", hoverformat="%b %d, %Y", tickangle=0, dtick="M1")
 
                         # Abbreviated y-axis labels (60K instead of 60,000) for narrow screens
                         def format_score_tick(val):
@@ -2691,6 +2723,7 @@ def main():
                         col_elo, col_score = st.columns(2)
                         with col_elo:
                             st.subheader("Elo Rating Comparison")
+                            st.html('<p style="color-scheme: inherit; color: light-dark(#555555, #A0A0A0); font-size: 0.75rem; font-weight: 500; margin: -0.5rem 0 0.5rem 0;">1500 = starting rating</p>')
                             st.plotly_chart(fig_elo, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
                         with col_score:
                             st.subheader("Score Comparison")
