@@ -568,6 +568,36 @@ def get_theme_css():
         [data-testid="stSidebar"] hr {
             border-color: rgba(255, 255, 255, 0.15) !important;
         }
+        /* Sidebar spacing */
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+            gap: 0.5rem !important;
+        }
+        /* Section headings */
+        [data-testid="stSidebar"] h2 {
+            margin-top: 0 !important;
+            margin-bottom: 0.25rem !important;
+        }
+        /* Captions stack tightly together */
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+            margin-bottom: 0 !important;
+        }
+        /* Caption containers stack tightly */
+        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has([data-testid="stCaptionContainer"]) {
+            margin-bottom: 0 !important;
+        }
+        /* Dividers: symmetrical spacing to center content between them */
+        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(hr) {
+            margin-top: var(--space-md) !important;
+            margin-bottom: var(--space-md) !important;
+        }
+        /* Selectbox container - reduce default margin for tighter layout */
+        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has([data-testid="stSelectbox"]) {
+            margin-bottom: var(--space-sm) !important;
+        }
         </style>
         """
     else:
@@ -652,6 +682,35 @@ def get_theme_css():
         }
         [data-testid="stSidebar"] hr {
             border-color: rgba(0, 0, 0, 0.1) !important;
+        }
+        /* Sidebar spacing */
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+            gap: 0.5rem !important;
+        }
+        [data-testid="stSidebar"] h2 {
+            margin-top: 0 !important;
+            margin-bottom: 0.25rem !important;
+        }
+        /* Captions stack tightly together */
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+            margin-bottom: 0 !important;
+        }
+        /* Caption containers stack tightly */
+        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has([data-testid="stCaptionContainer"]) {
+            margin-bottom: 0 !important;
+        }
+        /* Dividers: symmetrical spacing to center content between them */
+        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(hr) {
+            margin-top: var(--space-md) !important;
+            margin-bottom: var(--space-md) !important;
+        }
+        /* Selectbox container - reduce default margin for tighter layout */
+        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has([data-testid="stSelectbox"]) {
+            margin-bottom: var(--space-sm) !important;
         }
 
         /* Sidebar expand button (when collapsed) - make visible in light mode */
@@ -936,12 +995,29 @@ CUSTOM_CSS = """
 
 /* ===== Spacing ===== */
 .block-container {
-    padding-top: 2rem;
+    padding-top: 3rem;
     padding-bottom: 2rem;
 }
 
 .element-container {
     margin-bottom: 0.5rem;
+}
+
+/* Tighter vertical spacing - use --space-xs (4px) for related controls */
+[data-testid="stVerticalBlock"] {
+    gap: 0.25rem !important;
+}
+/* Horizontal blocks: allow wrapping by default for charts to stack on mobile */
+[data-testid="stHorizontalBlock"] {
+    gap: 0.5rem !important;
+}
+/* Tab 1 controls (with date input): keep side-by-side even on mobile */
+[data-testid="stHorizontalBlock"]:has([data-testid="stDateInput"]) {
+    flex-wrap: nowrap !important;
+}
+/* Only remove min-width for Tab 1 control columns, not chart columns */
+[data-testid="stHorizontalBlock"]:has([data-testid="stDateInput"]) [data-testid="stColumn"] {
+    min-width: 0 !important;
 }
 
 /* ===== Dividers with Gradient ===== */
@@ -1053,7 +1129,7 @@ CUSTOM_CSS = """
     font-size: 0.75rem !important;  /* Label sm size */
     opacity: 1 !important;  /* Full opacity for accessibility - overrides Streamlit's 0.6 */
     margin-top: 0 !important;
-    margin-bottom: var(--space-xs) !important;  /* Tight spacing between related captions */
+    margin-bottom: 0 !important;  /* No gap - let elements stack tightly */
 }
 
 /* Consecutive captions - even tighter */
@@ -1062,9 +1138,9 @@ CUSTOM_CSS = """
     margin-top: calc(-1 * var(--space-xs)) !important;
 }
 
-/* Sidebar dividers - accent gradient with compact spacing */
+/* Sidebar dividers - accent gradient, container handles spacing */
 [data-testid="stSidebar"] hr {
-    margin: var(--space-sm) 0 !important;  /* Compact: --space-sm instead of --space-md */
+    margin: 0 !important;  /* Container provides balanced spacing */
     border: none !important;
     height: 1px !important;
     background: linear-gradient(90deg, transparent 0%, rgba(255, 107, 107, 0.4) 50%, transparent 100%) !important;
@@ -1188,7 +1264,19 @@ CUSTOM_CSS = """
 /* Sort controls */
 .sort-controls {
     display: block;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Tab 1 controls compression - related controls use --space-sm */
+[data-testid="stDateInput"] {
+    margin-bottom: 0.5rem !important;
+}
+[data-testid="stDateInput"] + div [data-testid="stHorizontalBlock"] {
+    margin-top: 0 !important;
+}
+.sort-controls + div [data-testid="stToggle"] {
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.5rem !important;
 }
 
 /* Removed: Hidden table CSS - tables now fully removed from code */
@@ -1612,7 +1700,6 @@ def main():
         else:
             players_by_rating = all_players  # Fallback to alphabetical
 
-        st.markdown("---")
         st.caption(f"Data range: {min_date} to {max_date}")
         st.caption(f"Players in Dataset: {len(all_players)}")
 
@@ -1693,35 +1780,8 @@ def main():
                 else:
                     display_cols = ['rank', 'player_name', 'score']
 
-                # Sort controls
-                sort_options = {
-                    "Daily Rank": ("rank", True),
-                    "Score": ("score", False),
-                    "Elo Rating": ("rating", False),
-                    "Rating Change": ("rating_change", False),
-                }
-                if 'active_rank' in df_day.columns:
-                    sort_options["Elo Rank"] = ("active_rank", True)
-
-                sort_col1, sort_col2 = st.columns([3, 1])
-                with sort_col1:
-                    selected_sort = st.selectbox(
-                        "Sort by",
-                        options=list(sort_options.keys()),
-                        index=0,
-                        key="leaderboard_sort"
-                    )
-                with sort_col2:
-                    sort_column, default_asc = sort_options[selected_sort]
-                    sort_direction = st.selectbox(
-                        "Order",
-                        options=["Best", "Worst"],
-                        index=0,
-                        key="leaderboard_sort_dir"
-                    )
-
-                sort_ascending = default_asc if sort_direction == "Best" else not default_asc
-                df_day_sorted = df_day.sort_values(sort_column, ascending=sort_ascending, na_position='last')
+                # Sort by daily rank (natural order for leaderboard)
+                df_day_sorted = df_day.sort_values('rank', ascending=True, na_position='last')
 
                 # Display as cards
                 has_rating = 'rating' in df_day.columns
@@ -1734,16 +1794,38 @@ def main():
     # --- Tab 1: Elo Rankings ---
     with tab1:
         if df_history is not None and 'active_rank' in df_history.columns:
-            # Date picker for historical rankings
+            # Date picker and sort on same row
             available_dates = sorted(df_history['date'].dt.date.unique(), reverse=True)
 
-            selected_ranking_date = st.date_input(
-                "Date",
-                value=available_dates[0],
-                min_value=available_dates[-1],
-                max_value=available_dates[0],
-                key="elo_ranking_date"
-            )
+            # Sort options: display name -> (column, default_ascending)
+            sort_options = {
+                "Rating": ("rating", False),
+                "Games": ("games_played", False),
+                "Wins": ("wins", False),
+                "Win %": ("win_rate", False),
+                "Top 10": ("top_10s", False),
+                "Top 10 %": ("top_10s_rate", False),
+                "Avg Rank": ("avg_daily_rank", True),
+                "7-Game Avg": ("last_7", True),
+                "Stability": ("consistency", True),
+            }
+
+            col_date, col_sort = st.columns([2, 3])
+            with col_date:
+                selected_ranking_date = st.date_input(
+                    "Date",
+                    value=available_dates[0],
+                    min_value=available_dates[-1],
+                    max_value=available_dates[0],
+                    key="elo_ranking_date"
+                )
+            with col_sort:
+                selected_sort = st.selectbox(
+                    "Sort",
+                    options=list(sort_options.keys()),
+                    index=0,
+                    key="card_sort"
+                )
 
             # Load data for selected date
             df_date_history = df_history[df_history['date'].dt.date == selected_ranking_date].copy()
@@ -1751,50 +1833,11 @@ def main():
             if df_date_history.empty:
                 st.info(f"No ranking data for {selected_ranking_date}. Try another date.")
             else:
-                # Leaderboard section
-                date_str = selected_ranking_date.strftime("%b %d, %Y")
-                st.subheader(f"Elo Ranking Leaderboard - {date_str} Ratings")
-
-                # Toggle to show unranked players (sticky via CSS targeting aria-label)
+                # Toggle to show unranked players
                 show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
 
-                # Sort controls for card view
-                # Sort options: display name -> (column, default_ascending)
-                # ascending=True means lower values first (good for ranks)
-                # ascending=False means higher values first (good for ratings, counts)
-                sort_options = {
-                    "Rating": ("rating", False),
-                    "Games": ("games_played", False),
-                    "Wins": ("wins", False),
-                    "Win %": ("win_rate", False),
-                    "Top 10": ("top_10s", False),
-                    "Top 10 %": ("top_10s_rate", False),
-                    "Avg Rank": ("avg_daily_rank", True),
-                    "7-Game Avg": ("last_7", True),
-                    "Stability": ("consistency", True),
-                }
-
-                st.markdown('<div class="sort-controls">', unsafe_allow_html=True)
-                sort_col1, sort_col2 = st.columns([3, 1])
-                with sort_col1:
-                    selected_sort = st.selectbox(
-                        "Sort by",
-                        options=list(sort_options.keys()),
-                        index=0,  # Default to Rating
-                        key="card_sort"
-                    )
-                with sort_col2:
-                    sort_column, default_asc = sort_options[selected_sort]
-                    sort_direction = st.selectbox(
-                        "Order",
-                        options=["Best", "Worst"],
-                        index=0,
-                        key="card_sort_dir"
-                    )
-                st.markdown('</div>', unsafe_allow_html=True)
-
-                # Determine sort direction based on selection
-                sort_ascending = default_asc if sort_direction == "Best" else not default_asc
+                # Use "Best" sort direction (defined in sort_options)
+                sort_column, sort_ascending = sort_options[selected_sort]
 
                 # Columns to display (defined once, reused)
                 display_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'wins', 'win_rate', 'top_10s', 'top_10s_rate', 'avg_daily_rank', 'last_7', 'consistency']
@@ -2163,34 +2206,31 @@ def main():
                         # --- Game History Cards ---
                         st.subheader("Game History")
 
-                        # Sort controls
+                        # Sort controls - column and direction combined
                         sort_options = {
-                            "Date": ("date", False),
+                            "Recent": ("date", False),
+                            "Oldest": ("date", True),
                             "Daily Rank": ("rank", True),
                             "Score": ("score", False),
-                            "Rating": ("rating", False),
-                            "Rating Change": ("rating_change", False),
                         }
 
-                        sort_col1, sort_col2 = st.columns([3, 1])
-                        with sort_col1:
-                            selected_sort = st.selectbox(
-                                "Sort by",
-                                options=list(sort_options.keys()),
-                                index=0,
-                                key="history_sort"
-                            )
-                        with sort_col2:
-                            sort_column, default_asc = sort_options[selected_sort]
-                            sort_direction = st.selectbox(
-                                "Order",
-                                options=["Best", "Worst"] if selected_sort != "Date" else ["Recent", "Oldest"],
-                                index=0,
-                                key="history_sort_dir"
-                            )
+                        selected_sort = st.selectbox(
+                            "Sort by",
+                            options=list(sort_options.keys()),
+                            index=0,
+                            key="history_sort"
+                        )
 
-                        sort_ascending = default_asc if sort_direction in ["Best", "Oldest"] else not default_asc
-                        df_table = df_player_played.sort_values(sort_column, ascending=sort_ascending, na_position='last')
+                        sort_column, sort_ascending = sort_options[selected_sort]
+                        # Daily Rank: secondary sort by score (highest first within same rank)
+                        if selected_sort == "Daily Rank":
+                            df_table = df_player_played.sort_values(
+                                ['rank', 'score'],
+                                ascending=[True, False],
+                                na_position='last'
+                            )
+                        else:
+                            df_table = df_player_played.sort_values(sort_column, ascending=sort_ascending, na_position='last')
 
                         # Display as cards
                         cards_html = generate_game_history_cards(df_table, has_active_rank=has_active_rank)
@@ -2512,6 +2552,9 @@ def main():
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(weight=600)),
                             margin=dict(l=20, r=20, t=30, b=20)
                         )
+                        # Compact axes for narrow screens, limit ticks to prevent overlap
+                        fig_elo.update_xaxes(title="", tickformat="%m/%d", tickangle=0, nticks=5)
+                        fig_elo.update_yaxes(title="")
                         fig_elo.add_hline(y=1500, line_dash="dash", line_color="rgba(128, 128, 128, 0.5)", annotation_text="Baseline", annotation_font=dict(weight=600))
 
                         # Score chart data
@@ -2569,10 +2612,18 @@ def main():
                             margin=dict(l=20, r=20, t=30, b=20),
                         )
 
-                        if len(dates_sorted) <= 10:
-                            fig_score.update_xaxes(title="Date", tickformat="%b %d, %Y", tickvals=dates_sorted)
+                        # Compact x-axis: limit ticks to prevent overlap
+                        if len(dates_sorted) <= 5:
+                            fig_score.update_xaxes(title="", tickformat="%m/%d", tickvals=dates_sorted, tickangle=0)
                         else:
-                            fig_score.update_xaxes(title="Date", tickformat="%b %d")
+                            # Auto-space with max 5 ticks to prevent collision
+                            fig_score.update_xaxes(title="", tickformat="%m/%d", tickangle=0, nticks=5)
+
+                        # Abbreviated y-axis labels (60K instead of 60,000) for narrow screens
+                        def format_score_tick(val):
+                            if val >= 1000:
+                                return f"{int(val/1000)}K"
+                            return str(int(val))
 
                         tick_step = 10 ** math.floor(math.log10(max(score_cap, 1000)))
                         if score_cap / tick_step < 3:
@@ -2580,12 +2631,12 @@ def main():
                         tick_data = []
                         val = 0
                         while val <= score_cap * 1.1:
-                            tick_data.append((val, f"{int(val):,}"))
+                            tick_data.append((val, format_score_tick(val)))
                             if val > 0:
-                                tick_data.append((-val, f"{int(val):,}"))
+                                tick_data.append((-val, format_score_tick(val)))
                             val += tick_step
                         tick_data.sort(key=lambda x: x[0])
-                        fig_score.update_yaxes(title="Score", range=[-score_cap * 1.1, score_cap * 1.1],
+                        fig_score.update_yaxes(title="", range=[-score_cap * 1.1, score_cap * 1.1],
                             tickvals=[t[0] for t in tick_data], ticktext=[t[1] for t in tick_data])
                         fig_score.add_hline(y=0, line_width=1, line_color="rgba(128, 128, 128, 0.5)")
 
