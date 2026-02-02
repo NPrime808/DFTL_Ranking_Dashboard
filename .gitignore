@@ -1,6 +1,7 @@
 # Claude Code
 .claude
 CLAUDE.md
+.screenshots/
 
 # Python
 __pycache__/

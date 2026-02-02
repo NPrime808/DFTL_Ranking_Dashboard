@@ -69,7 +69,8 @@ def generate_ranking_cards(df):
 
     # Theme-adaptive styles using Streamlit CSS variables
     # Base card styling (border, radius, shadow) - background varies by active status
-    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.875rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);"
+    # Uses spacing token: --space-md (1rem) for padding
+    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);"
     # Active player: coral accent gradient
     active_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
     # Inactive player (N/R): muted gray gradient to visually distinguish
@@ -81,8 +82,8 @@ def generate_ranking_cards(df):
     status_label_style = f"font-size:0.65rem;font-weight:400;margin-top:0.15rem;color:{inactive_blue};"
 
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
-    label_style = "font-size:0.65rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);"
-    value_style = "font-size:0.9rem;font-weight:600;color:var(--text-color);"
+    label_style = "font-size:0.8rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);font-weight:500;"
+    value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
     def safe_str(val, fmt=None):
         if pd.isna(val):
@@ -157,11 +158,11 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
     if df.empty:
         return "<p>No data available</p>"
 
-    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.875rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
+    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
 
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
-    label_style = "font-size:0.65rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);"
-    value_style = "font-size:0.9rem;font-weight:600;color:var(--text-color);"
+    label_style = "font-size:0.8rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);font-weight:500;"
+    value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
     def safe_str(val, fmt=None):
         if pd.isna(val):
@@ -219,11 +220,11 @@ def generate_game_history_cards(df, has_active_rank=True):
     if df.empty:
         return "<p>No data available</p>"
 
-    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.875rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.12) 100%);"
+    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.12) 100%);"
 
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
-    label_style = "font-size:0.65rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);"
-    value_style = "font-size:0.9rem;font-weight:600;color:var(--text-color);"
+    label_style = "font-size:0.8rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);font-weight:500;"
+    value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
     def safe_str(val, fmt=None):
         if pd.isna(val):
@@ -281,17 +282,39 @@ def generate_game_history_cards(df, has_active_rank=True):
     return "".join(cards)
 
 
-def generate_duel_cards(df, player1, player2):
+def generate_duel_cards(df, player1, player2, colors=None, limit=None):
     """
     Generate HTML cards for head-to-head comparison (Tab 2).
     Shows: Date, Winner, both players' ranks/scores/elo side-by-side.
+    Styled to match Tab 1 ranking cards for consistency.
+
+    Args:
+        colors: Theme colors dict from get_theme_colors(). If None, uses defaults.
+        limit: If set, only render first N cards (but use full df for cumulative win calculation).
     """
     if df.empty:
         return "<p>No data available</p>"
 
+    # Match Tab 1 typography (design system compliant)
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;min-width:60px;"
-    label_style = "font-size:0.6rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);"
-    value_style = "font-size:0.85rem;font-weight:600;color:var(--text-color);"
+    label_style = "font-size:0.8rem;text-transform:uppercase;opacity:0.75;color:var(--text-color);font-weight:500;"
+    value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
+
+    # Theme-adaptive player colors (Cyan + Amber)
+    # Dark mode: bright cyan #22D3EE, golden amber #FBBF24
+    # Light mode: muted cyan #0891B2, burnt amber #B45309
+    if colors:
+        p1_color = colors.get("player1", "#0891B2")
+        p2_color = colors.get("player2", "#B45309")
+        p1_rgb = colors.get("player1_rgb", "8, 145, 178")
+        p2_rgb = colors.get("player2_rgb", "180, 83, 9")
+    else:
+        p1_color = "#0891B2"
+        p2_color = "#B45309"
+        p1_rgb = "8, 145, 178"
+        p2_rgb = "180, 83, 9"
+    tie_color = "#525252"
+    tie_rgb = "82, 82, 82"
 
     def safe_str(val, fmt=None):
         if pd.isna(val):
@@ -300,8 +323,26 @@ def generate_duel_cards(df, player1, player2):
             return fmt.format(val)
         return str(int(val))
 
+    # Pre-compute cumulative wins by date (chronological order)
+    df_sorted_by_date = df.sort_values('Date')
+    cumulative_wins = {}
+    p1_wins = 0
+    p2_wins = 0
+    for _, row in df_sorted_by_date.iterrows():
+        winner = row.get('Winner', 'Tie')
+        if winner == player1:
+            p1_wins += 1
+        elif winner == player2:
+            p2_wins += 1
+        # Store cumulative wins as of this date
+        date_val = row.get('Date')
+        cumulative_wins[date_val] = (p1_wins, p2_wins)
+
     cards = []
-    for _, row in df.iterrows():
+    for idx, (_, row) in enumerate(df.iterrows()):
+        # Respect limit parameter if set
+        if limit is not None and idx >= limit:
+            break
         date_val = row.get('Date')
         if hasattr(date_val, 'strftime'):
             date_str = date_val.strftime('%Y-%m-%d')
@@ -310,18 +351,22 @@ def generate_duel_cards(df, player1, player2):
 
         winner = row.get('Winner', 'Tie')
 
-        # Determine card style based on winner
-        if winner == player1:
-            card_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.2) 100%);"
-            winner_color = "#3B82F6"
-        elif winner == player2:
-            card_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(245,158,11,0.2) 100%);"
-            winner_color = "#F59E0B"
-        else:
-            card_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(128,128,128,0.15) 100%);"
-            winner_color = "#888888"
+        # Get cumulative wins as of this date
+        p1_cumulative, p2_cumulative = cumulative_wins.get(date_val, (0, 0))
 
-        card_base = f"border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.875rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);{card_bg}"
+        # Determine card style based on winner (match Tab 1 gradient style)
+        if winner == player1:
+            card_bg = f"background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba({p1_rgb},0.15) 100%);"
+            winner_color = p1_color
+        elif winner == player2:
+            card_bg = f"background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba({p2_rgb},0.15) 100%);"
+            winner_color = p2_color
+        else:
+            card_bg = f"background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba({tie_rgb},0.1) 100%);"
+            winner_color = tie_color
+
+        # Match Tab 1 card base styling
+        card_base = f"border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);{card_bg}"
 
         p1_rank = safe_str(row.get(f'{player1} Daily Rank'))
         p2_rank = safe_str(row.get(f'{player2} Daily Rank'))
@@ -330,32 +375,43 @@ def generate_duel_cards(df, player1, player2):
         p1_elo = safe_str(row.get(f'{player1} Elo'), "{:.0f}")
         p2_elo = safe_str(row.get(f'{player2} Elo'), "{:.0f}")
 
-        # Header: Date and Winner
+        # Header: Win counts on sides, Date and Winner centered
+        # 3-column grid: p1 wins | date+winner | p2 wins
+        win_label_style = "font-size:0.7rem;text-transform:uppercase;font-weight:600;"
         header_html = f'''
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
-            <span style="font-weight:600;font-size:1rem;color:var(--text-color);">{date_str}</span>
-            <span style="font-weight:700;color:{winner_color};">🏆 {winner}</span>
+        <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
+            <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
+                <span style="font-weight:700;font-size:1.4rem;color:{p1_color};">{p1_cumulative}</span>
+                <span style="{win_label_style}color:{p1_color};">Wins</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25rem;">
+                <span style="font-weight:600;font-size:1rem;color:var(--text-color);">{date_str}</span>
+                <span style="font-weight:700;color:{winner_color};">🏆 {winner}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
+                <span style="font-weight:700;font-size:1.4rem;color:{p2_color};">{p2_cumulative}</span>
+                <span style="{win_label_style}color:{p2_color};">Wins</span>
+            </div>
         </div>
         '''
 
-        # Two-column layout for players
-        p1_color = "#3B82F6"
-        p2_color = "#F59E0B"
-
+        # Three-column layout: Player 1 | Crossed Swords | Player 2
+        # max-width prevents excessive spreading on wide screens
         stats_html = f'''
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.5rem;align-items:start;max-width:700px;margin:0 auto;">
             <div style="text-align:center;">
-                <div style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:0.85rem;">{html.escape(player1)}</div>
+                <div style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player1)}</div>
                 <div style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
-                    <div style="{stat_layout}"><span style="{label_style}">Rank</span><span style="{value_style}">#{p1_rank}</span></div>
+                    <div style="{stat_layout}"><span style="{label_style}">Daily Rank</span><span style="{value_style}">#{p1_rank}</span></div>
                     <div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{p1_score}</span></div>
                     <div style="{stat_layout}"><span style="{label_style}">Elo</span><span style="{value_style}">{p1_elo}</span></div>
                 </div>
             </div>
+            <div style="display:flex;align-items:center;justify-content:center;font-size:2rem;padding-top:0.25rem;">⚔️</div>
             <div style="text-align:center;">
-                <div style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:0.85rem;">{html.escape(player2)}</div>
+                <div style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player2)}</div>
                 <div style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
-                    <div style="{stat_layout}"><span style="{label_style}">Rank</span><span style="{value_style}">#{p2_rank}</span></div>
+                    <div style="{stat_layout}"><span style="{label_style}">Daily Rank</span><span style="{value_style}">#{p2_rank}</span></div>
                     <div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{p2_score}</span></div>
                     <div style="{stat_layout}"><span style="{label_style}">Elo</span><span style="{value_style}">{p2_elo}</span></div>
                 </div>
@@ -377,6 +433,11 @@ DARK_THEME = {
     "text_primary": "#FAFAFA",
     "text_secondary": "#E0E0E0",  # Improved: ~11:1 contrast vs bg_primary
     "text_muted": "#A0A0A0",       # Improved: ~7:1 contrast vs bg_primary
+    # Player colors - Cyan + Amber (vibrant for dark backgrounds)
+    "player1": "#22D3EE",         # Cyan 400 - 11.4:1 contrast
+    "player2": "#FBBF24",         # Amber 400 - 12.4:1 contrast
+    "player1_rgb": "34, 211, 238",  # For rgba() backgrounds
+    "player2_rgb": "251, 191, 36",
 }
 
 LIGHT_THEME = {
@@ -386,6 +447,11 @@ LIGHT_THEME = {
     "text_primary": "#262730",
     "text_secondary": "#404040",  # Improved: ~10:1 contrast vs bg_primary
     "text_muted": "#666666",       # Improved: ~5.7:1 contrast vs bg_primary
+    # Player colors - Cyan + Amber (muted for light backgrounds)
+    "player1": "#0891B2",         # Cyan 600 - 4.5:1 contrast
+    "player2": "#B45309",         # Amber 700 - 4.8:1 contrast
+    "player1_rgb": "8, 145, 178",   # For rgba() backgrounds
+    "player2_rgb": "180, 83, 9",
 }
 
 
@@ -637,7 +703,7 @@ def create_download_link(data: str, filename: str, label: str, is_dark: bool = T
         hover_bg = "rgba(240,240,240,1)"
 
     # Compact single-line HTML for reliable Streamlit rendering
-    style = f"display:inline-block;padding:0.5rem 1rem;background:{bg_color};color:{text_color};text-decoration:none;border:1px solid {border_color};border-radius:0.5rem;font-family:Rajdhani,sans-serif;font-weight:600;font-size:0.9rem;cursor:pointer;width:100%;text-align:center;box-sizing:border-box;"
+    style = f"display:inline-block;padding:0.5rem 1rem;background:{bg_color};color:{text_color};text-decoration:none;border:1px solid {border_color};border-radius:0.5rem;font-family:'Source Sans',sans-serif;font-weight:600;font-size:0.9rem;cursor:pointer;width:100%;text-align:center;box-sizing:border-box;"
 
     return f'<a href="data:text/csv;base64,{b64}" download="{filename}" style="{style}">{label}</a>'
 
@@ -645,17 +711,22 @@ def create_download_link(data: str, filename: str, label: str, is_dark: bool = T
 # Custom CSS for visual hierarchy and spacing
 # Includes: Gothic fonts, glassmorphism, animations, gradient effects
 CUSTOM_CSS = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* ===== Google Fonts - Gothic/Fantasy Theme ===== */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap');
-
-/* ===== CSS Variables ===== */
 :root {
-    --font-display: 'Cinzel', serif;
-    --font-body: 'Rajdhani', sans-serif;
+    --font-display: 'Source Sans', sans-serif;
+    --font-body: 'Source Sans', sans-serif;
     --primary-glow: 0 0 20px rgba(255, 107, 107, 0.4);
     --glass-bg: rgba(38, 39, 48, 0.7);
     --glass-border: rgba(255, 107, 107, 0.2);
+    /* Spacing tokens */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
 }
 
 /* ===== Typography Hierarchy ===== */
@@ -920,33 +991,132 @@ CUSTOM_CSS = """
 
 /* ===== Sidebar Styling ===== */
 /* Sidebar text styling handled dynamically via get_theme_css() */
+/* Typography uses design system scale: Card heading (1.1/1/0.95rem), Label (0.8/0.75/0.7rem) */
+[data-testid="stSidebar"] {
+    padding: var(--space-sm) !important;  /* Compact: --space-sm instead of --space-md */
+    max-width: 360px !important;
+}
+
+/* Only set min-width when sidebar is expanded */
+[data-testid="stSidebar"][aria-expanded="true"] {
+    min-width: 320px !important;
+}
+
+/* Collapse sidebar properly when closed */
+[data-testid="stSidebar"][aria-expanded="false"] {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    width: 100% !important;
+    max-width: 360px !important;
+}
+
+/* Sidebar headers - Card heading scale with consistent vertical rhythm */
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
-    font-family: var(--font-body) !important;  /* Rajdhani - more conventional than gothic */
+    font-family: var(--font-body) !important;
     font-weight: 600 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
+    letter-spacing: 0.08em !important;
+    font-size: 1rem !important;  /* Card heading sm size */
+    margin-top: 0 !important;
+    margin-bottom: var(--space-sm) !important;
+    padding-top: 0 !important;
 }
 
-/* Text elements - exclude Material icons by not targeting bare spans */
-[data-testid="stSidebar"] .stCaption,
+/* Sidebar metadata text - Label scale */
 [data-testid="stSidebar"] p,
 [data-testid="stSidebar"] label,
-[data-testid="stSidebar"] .stMarkdown span,
-[data-testid="stSidebar"] .stSelectbox span {
+[data-testid="stSidebar"] .stMarkdown span {
     font-family: var(--font-body) !important;
     font-weight: 500 !important;
+    font-size: 0.8rem !important;  /* Label lg size */
 }
 
-/* Sidebar dividers - color handled dynamically via get_theme_css() */
+/* Sidebar selectbox value - Body xs scale (fits on one line) */
+[data-testid="stSidebar"] .stSelectbox span {
+    font-family: var(--font-body) !important;
+    font-weight: 400 !important;
+    font-size: 0.9rem !important;  /* Body xs size */
+}
+
+/* Sidebar captions - Label sm scale with WCAG-compliant contrast */
+[data-testid="stSidebar"] .stCaption,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+    font-family: var(--font-body) !important;
+    font-weight: 500 !important;
+    font-size: 0.75rem !important;  /* Label sm size */
+    opacity: 1 !important;  /* Full opacity for accessibility - overrides Streamlit's 0.6 */
+    margin-top: 0 !important;
+    margin-bottom: var(--space-xs) !important;  /* Tight spacing between related captions */
+}
+
+/* Consecutive captions - even tighter */
+[data-testid="stSidebar"] .stCaption + .stCaption,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] + [data-testid="stCaptionContainer"] {
+    margin-top: calc(-1 * var(--space-xs)) !important;
+}
+
+/* Sidebar dividers - accent gradient with compact spacing */
 [data-testid="stSidebar"] hr {
-    margin: 1rem 0 !important;
+    margin: var(--space-sm) 0 !important;  /* Compact: --space-sm instead of --space-md */
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 107, 107, 0.4) 50%, transparent 100%) !important;
+}
+
+/* Sidebar selectbox - consistent spacing and no truncation */
+[data-testid="stSidebar"] [data-testid="stSelectbox"] {
+    margin-bottom: var(--space-sm) !important;
+}
+
+/* Sidebar download button - Label scale with card styling */
+[data-testid="stSidebar"] .stDownloadButton button,
+[data-testid="stSidebar"] a.download-link {
+    font-family: var(--font-body) !important;
+    font-weight: 600 !important;
+    font-size: 0.8rem !important;  /* Label lg size */
+    letter-spacing: 0.02em;
+    border-radius: 8px !important;
+    padding: var(--space-sm) var(--space-md) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Responsive sidebar typography */
+@media (max-width: 400px) {
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        font-size: 0.95rem !important;  /* Card heading xs size */
+    }
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] .stMarkdown span {
+        font-size: 0.75rem !important;  /* Label sm size */
+    }
+    [data-testid="stSidebar"] .stSelectbox span {
+        font-size: 0.9rem !important;  /* Body xs size */
+    }
+    [data-testid="stSidebar"] .stCaption {
+        font-size: 0.7rem !important;  /* Label xs size */
+    }
+    [data-testid="stSidebar"] .stDownloadButton button,
+    [data-testid="stSidebar"] a.download-link {
+        font-size: 0.75rem !important;  /* Label sm size */
+        padding: var(--space-xs) var(--space-sm) !important;
+    }
 }
 
 /* ===== Ranking Cards ===== */
 .ranking-cards {
     display: block;
+    container-type: inline-size;
+    container-name: cards;
 }
 
 /* Responsive stats grid: 8 columns on desktop, 4 on mobile */
@@ -955,6 +1125,18 @@ CUSTOM_CSS = """
     grid-template-columns: repeat(8, 1fr);
     gap: 0.5rem;
     margin-top: 0.5rem;
+}
+
+/* Align stat values to bottom when labels wrap */
+.stats-grid > div {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    min-height: 3.5rem;
+}
+.stats-grid > div span:last-child {
+    margin-top: auto;
 }
 
 /* Responsive card header: matches stats grid columns */
@@ -1046,10 +1228,11 @@ CUSTOM_CSS = """
     transform: scale(0.95);
 }
 
-/* Mobile responsive: 4-column grid */
-@media (max-width: 768px) {
+/* Container-responsive: 4-column grid when container ≤600px */
+@container cards (max-width: 600px) {
     .stats-grid {
         grid-template-columns: repeat(4, 1fr) !important;
+        gap: 0.375rem !important;
     }
     .card-header {
         grid-template-columns: repeat(4, 1fr) !important;
@@ -1065,7 +1248,7 @@ CUSTOM_CSS = """
         text-align: center !important;
     }
     .card-name-text {
-        font-size: 0.875rem !important;
+        font-size: 0.95rem !important;
     }
     .card-rating {
         grid-column: 4 !important;
@@ -1073,12 +1256,47 @@ CUSTOM_CSS = """
         text-align: center !important;
         font-size: 1rem !important;
     }
+    /* Design system: sm breakpoint typography */
+    .stats-grid > div span:first-child {
+        font-size: 0.75rem !important;
+    }
+    .stats-grid > div span:last-child {
+        font-size: 1.2rem !important;
+    }
+    /* Design system: sm breakpoint padding (0.75rem) */
+    .ranking-cards > div {
+        padding: 0.75rem !important;
+    }
 }
 
-/* Large viewport: bigger card content */
-@media (min-width: 1200px) {
+/* Container-responsive: extra compact when container ≤400px */
+@container cards (max-width: 400px) {
     .card-name-text {
-        font-size: 1.15rem !important;
+        font-size: 0.9rem !important;
+    }
+    .card-rating {
+        font-size: 0.95rem !important;
+    }
+    /* Design system: xs breakpoint typography */
+    .stats-grid > div span:first-child {
+        font-size: 0.7rem !important;
+    }
+    .stats-grid > div span:last-child {
+        font-size: 1.1rem !important;
+    }
+    /* Design system: xs breakpoint padding (0.5rem) */
+    .ranking-cards > div {
+        padding: 0.5rem !important;
+    }
+    .stats-grid {
+        gap: 0.25rem !important;
+    }
+}
+
+/* Large viewport (lg breakpoint >900px) */
+@media (min-width: 900px) {
+    .card-name-text {
+        font-size: 1.1rem !important;
     }
     .card-rating {
         font-size: 1.25rem !important;
@@ -1086,21 +1304,27 @@ CUSTOM_CSS = """
     .card-rank {
         font-size: 1.1rem !important;
     }
-    .stats-grid > div span:last-child {
-        font-size: 1rem !important;
-    }
+    /* Data values already 1.4rem via inline styles - no override needed */
 }
 </style>
 """
 
 
 def apply_plotly_style(fig, add_gradient_fill=False):
-    """Apply consistent styling to Plotly figures with theme-adaptive text colors.
+    """Apply consistent styling to Plotly figures following the design system.
+
+    Typography (from CLAUDE.md design system):
+    - Font: System font stack (matches "System" in design system)
+    - Label: 0.8rem (~13px), weight 500
+    - Data value: 1.4rem (~22px), weight 700
 
     Text colors are NOT explicitly set, allowing Streamlit to inject theme-aware
     colors automatically. Only structural elements (grids, backgrounds) use
     explicit neutral colors.
     """
+    # System font stack (design system "System" font)
+    system_font = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+
     # Structural colors that work on both light and dark backgrounds
     grid_color = "rgba(128, 128, 128, 0.4)"  # Neutral gray grid
     line_color = "rgba(128, 128, 128, 0.3)"  # Neutral gray lines
@@ -1108,40 +1332,46 @@ def apply_plotly_style(fig, add_gradient_fill=False):
     hover_bg = "rgba(50, 50, 50, 0.9)"  # Dark hover for readability
     hover_text = "#FFFFFF"  # White text on dark hover background
 
-    # Bold font weight for better readability
-    bold_weight = 600
+    # Design system font weights
+    label_weight = 500   # Label style
+    heading_weight = 600  # Card heading style
+
+    # Design system font sizes (converted from rem, assuming 16px base)
+    label_size = 13      # 0.8rem ≈ 13px
+    body_size = 16       # 1rem = 16px
 
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Rajdhani, sans-serif", weight=bold_weight),
+        font=dict(family=system_font, size=body_size, weight=label_weight),
         xaxis=dict(
             gridcolor=grid_color,
             linecolor=line_color,
-            tickfont=dict(family="Rajdhani", size=12, weight=bold_weight),
-            title_font=dict(weight=bold_weight),
+            tickfont=dict(family=system_font, size=label_size, weight=label_weight),
+            title_font=dict(family=system_font, size=label_size, weight=heading_weight),
             showgrid=True,
             zeroline=False,
         ),
         yaxis=dict(
             gridcolor=grid_color,
             linecolor=line_color,
-            tickfont=dict(family="Rajdhani", size=12, weight=bold_weight),
-            title_font=dict(weight=bold_weight),
+            tickfont=dict(family=system_font, size=label_size, weight=label_weight),
+            title_font=dict(family=system_font, size=label_size, weight=heading_weight),
             showgrid=True,
             zeroline=False,
         ),
         legend=dict(
-            font=dict(family="Rajdhani", weight=bold_weight),
-            bgcolor=legend_bg,
-            bordercolor=line_color,
-            borderwidth=1,
+            title_text="",  # Remove "Player" title
+            font=dict(family=system_font, size=label_size, weight=heading_weight),
+            bgcolor="rgba(0,0,0,0)",  # Transparent background
+            borderwidth=0,  # No border
         ),
         hoverlabel=dict(
             bgcolor=hover_bg,
-            bordercolor=ACCENT_COLORS["primary"],
-            font=dict(color=hover_text, family="Rajdhani", weight=bold_weight),
+            bordercolor="rgba(0,0,0,0)",  # No border
+            font=dict(color=hover_text, family=system_font, size=14, weight=heading_weight),
         ),
+        dragmode=False,  # Disable pan/zoom to prevent scroll hijacking on mobile
     )
 
     # Add gradient fill under line charts if requested
@@ -1220,8 +1450,8 @@ def get_available_datasets():
 
 # --- Main App ---
 def main():
-    # Inject custom CSS (static)
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    # Inject custom CSS (static) - use st.html() to avoid markdown parsing of CSS comments
+    st.html(CUSTOM_CSS)
 
     # Inject theme-specific CSS (dynamic based on current theme)
     st.markdown(get_theme_css(), unsafe_allow_html=True)
@@ -1250,15 +1480,15 @@ def main():
                 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
             }}
             .dashboard-logo {{
-                width: 140px;
+                width: 120px;  /* Design system: lg = 120px */
                 height: auto;
                 filter: drop-shadow(0 0 15px rgba(255, 107, 107, 0.4));
                 flex-shrink: 0;
             }}
             .dashboard-title {{
-                font-family: 'Cinzel', serif;
-                font-size: clamp(1.4rem, 5cqw, 2.8rem) !important;
-                font-weight: 700;
+                font-family: 'Source Sans', sans-serif !important;  /* Clean sans-serif per user preference */
+                font-size: clamp(1.3rem, 5cqw, 2.4rem) !important;  /* Design system: lg=2.4rem, xs=1.3rem */
+                font-weight: 700 !important;
                 margin: 0;
                 padding: 0;
                 background: linear-gradient(135deg, #FAFAFA 0%, #FF6B6B 50%, #FFD700 100%);
@@ -1269,9 +1499,9 @@ def main():
                 letter-spacing: 0.05em;
             }}
             .dashboard-subtitle {{
-                font-family: 'Rajdhani', sans-serif;
+                font-family: 'Source Sans', sans-serif;
                 margin: 0.5rem 0 0 0;
-                font-size: clamp(0.7rem, 1.8cqw, 1.1rem);
+                font-size: clamp(0.65rem, 1.5cqw, 0.8rem);  /* Smaller for better hierarchy */
                 color: #B0B0B0;
                 letter-spacing: 0.1em;
                 text-transform: uppercase;
@@ -1304,6 +1534,9 @@ def main():
             }}
             /* Container query: small container fixed sizes */
             @container header (max-width: 400px) {{
+                .dashboard-logo {{
+                    width: 80px;  /* Design system: xs = 80px */
+                }}
                 .dashboard-title {{
                     font-size: 1.3rem !important;
                 }}
@@ -1616,7 +1849,7 @@ def main():
                     annotation_text=f"Median: {df_ratings['rating'].median():.0f}",
                     annotation_font=dict(color=ACCENT_COLORS["warning"], weight=600)
                 )
-                st.plotly_chart(fig_dist, width='stretch')
+                st.plotly_chart(fig_dist, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
             # Toggle to show unranked players
             show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
@@ -1868,7 +2101,7 @@ def main():
                             name='Peak',
                             hovertemplate=f"<b>Peak Rating</b><br>{peak_row['rating']:.0f}<extra></extra>"
                         )
-                        st.plotly_chart(fig_rating, width='stretch')
+                        st.plotly_chart(fig_rating, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # --- Daily Rank History Chart (Bar Chart) ---
                         st.subheader("Daily Rank History")
@@ -1925,7 +2158,7 @@ def main():
                             annotation_font=dict(color="rgba(59, 130, 246, 1)", weight=600),
                             annotation_xshift=5,  # Small shift to ensure text is in margin area
                         )
-                        st.plotly_chart(fig_rank, width='stretch')
+                        st.plotly_chart(fig_rank, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # --- Game History Cards ---
                         st.subheader("Game History")
@@ -2029,7 +2262,7 @@ def main():
                         tickfont=dict(weight=600)
                     )
                 )
-                st.plotly_chart(fig_rank1, width='stretch')
+                st.plotly_chart(fig_rank1, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
             # Pivot to get ranks as columns for table
             df_pivot = df_top10.pivot(
@@ -2066,7 +2299,7 @@ def main():
     with tab2:
 
         if df_history is not None:
-            col_p1, col_p2 = st.columns(2)
+            col_p1, col_vs, col_p2 = st.columns([1, 0.15, 1])
 
             with col_p1:
                 player1 = st.selectbox(
@@ -2076,6 +2309,9 @@ def main():
                     placeholder="Choose Player 1...",
                     key="duel_player1"
                 )
+
+            with col_vs:
+                st.markdown("<div style='display:flex;align-items:center;justify-content:center;height:100%;padding-top:1.75rem;'><span style='font-size:1.5rem;font-weight:700;opacity:0.6;'>vs.</span></div>", unsafe_allow_html=True)
 
             with col_p2:
                 player2 = st.selectbox(
@@ -2238,117 +2474,23 @@ def main():
 
                         df_duel = pd.DataFrame(duel_rows)
 
-                        # Summary statistics
-                        st.subheader("Head-to-Head Summary")
-                        ties = len(common_dates) - p1_wins - p2_wins
+                        # Last Encounter section - show most recent duel card with full win tally
+                        st.subheader("Last Encounter")
+                        df_duel_recent_first = df_duel.sort_values('Date', ascending=False)
+                        theme_colors = get_theme_colors()
+                        last_card_html = generate_duel_cards(df_duel_recent_first, player1, player2, colors=theme_colors, limit=1)
+                        st.html(f'<div class="ranking-cards">{last_card_html}</div>')
 
-                        col1, col2, col3, col4 = st.columns(4)
+                        # --- Prepare both charts data first, then display side-by-side ---
 
-                        with col1:
-                            st.metric("Matchups", len(common_dates))
-                        with col2:
-                            st.metric(f"{player1} Wins", p1_wins)
-                        with col3:
-                            st.metric(f"{player2} Wins", p2_wins)
-                        with col4:
-                            st.metric("Ties", ties)
-
-                        # First and Last Encounter
-                        sorted_dates = sorted(common_dates)
-                        first_date = sorted_dates[0]
-                        last_date = sorted_dates[-1]
-
-                        # Get first encounter winner
-                        first_p1 = df_p1_played[df_p1_played['date'].dt.date == first_date].iloc[0]
-                        first_p2 = df_p2_played[df_p2_played['date'].dt.date == first_date].iloc[0]
-                        if first_p1['rank'] < first_p2['rank']:
-                            first_winner = player1
-                        elif first_p2['rank'] < first_p1['rank']:
-                            first_winner = player2
-                        else:
-                            first_winner = "Tie"
-
-                        # Get last encounter winner
-                        last_p1 = df_p1_played[df_p1_played['date'].dt.date == last_date].iloc[0]
-                        last_p2 = df_p2_played[df_p2_played['date'].dt.date == last_date].iloc[0]
-                        if last_p1['rank'] < last_p2['rank']:
-                            last_winner = player1
-                        elif last_p2['rank'] < last_p1['rank']:
-                            last_winner = player2
-                        else:
-                            last_winner = "Tie"
-
-                        # Display encounter badges (theme-aware using CSS variables)
-                        col_first, col_last = st.columns(2)
-                        with col_first:
-                            st.markdown(f"""
-                            <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.2) 100%);
-                                        border: 1px solid {ACCENT_COLORS['info']}; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">First Encounter</div>
-                                <div style="font-size: 1.25rem; font-weight: 700;">{first_date.strftime('%Y-%m-%d')}</div>
-                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['info']};">Winner: {first_winner}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        with col_last:
-                            st.markdown(f"""
-                            <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.2) 100%);
-                                        border: 1px solid {ACCENT_COLORS['primary']}; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 0.25rem;">Last Encounter</div>
-                                <div style="font-size: 1.25rem; font-weight: 700;">{last_date.strftime('%Y-%m-%d')}</div>
-                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['primary']};">Winner: {last_winner}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                        # Win distribution pie chart (below encounter badges)
-                        if len(common_dates) > 0:
-                            pie_data = pd.DataFrame({
-                                'Result': [player1, player2, 'Tie'],
-                                'Count': [p1_wins, p2_wins, ties]
-                            })
-                            pie_data = pie_data[pie_data['Count'] > 0]
-
-                            fig_pie = px.pie(
-                                pie_data,
-                                values='Count',
-                                names='Result',
-                                hole=0.4,
-                                color_discrete_sequence=[ACCENT_COLORS["info"], ACCENT_COLORS["warning"], ACCENT_COLORS["success"]]
-                            )
-                            fig_pie.update_traces(
-                                textposition='inside',
-                                textinfo='percent+value',
-                                textfont=dict(color='white', size=14),
-                                hovertemplate='%{label}: %{value} wins<extra></extra>'
-                            )
-                            apply_plotly_style(fig_pie)
-                            fig_pie.update_layout(
-                                height=250,
-                                margin=dict(l=20, r=20, t=20, b=40),
-                                showlegend=True,
-                                legend=dict(
-                                    orientation="h",
-                                    yanchor="top",
-                                    y=-0.05,
-                                    xanchor="center",
-                                    x=0.5,
-                                    font=dict(size=12, weight=600)
-                                )
-                            )
-                            st.plotly_chart(fig_pie, width='stretch')
-
-                        st.markdown("")  # Spacer
-
-                        # Comparative Elo Graph - both players' ratings over time
-                        st.subheader("Elo Rating Comparison")
-
-                        # Get full history for both players (all days they played, not just common)
+                        # Elo chart data
                         df_p1_chart = df_p1_played[['date', 'rating']].copy()
                         df_p1_chart['player'] = player1
                         df_p2_chart = df_p2_played[['date', 'rating']].copy()
                         df_p2_chart['player'] = player2
-
                         df_elo_compare = pd.concat([df_p1_chart, df_p2_chart]).sort_values('date')
 
+                        elo_colors = get_theme_colors()
                         fig_elo = px.line(
                             df_elo_compare,
                             x='date',
@@ -2356,43 +2498,24 @@ def main():
                             color='player',
                             markers=True,
                             labels={'date': 'Date', 'rating': 'Elo Rating', 'player': 'Player'},
-                            color_discrete_map={player1: ACCENT_COLORS["info"], player2: ACCENT_COLORS["warning"]}
+                            color_discrete_map={player1: elo_colors["player1"], player2: elo_colors["player2"]}
                         )
                         fig_elo.update_traces(
                             hovertemplate='%{fullData.name}: %{y:.0f}<extra></extra>',
-                            marker=dict(
-                                size=10,
-                                line=dict(width=2, color='rgba(255, 255, 255, 0.3)'),
-                            ),
-                            line=dict(width=3),
+                            marker=dict(size=8, line=dict(width=1, color='rgba(255, 255, 255, 0.3)')),
+                            line=dict(width=2),
                         )
                         apply_plotly_style(fig_elo)
                         fig_elo.update_layout(
                             hovermode='x unified',
-                            height=350,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=1.02,
-                                xanchor="center",
-                                x=0.5,
-                                font=dict(weight=600),
-                            ),
-                            margin=dict(l=20, r=20, t=40, b=20)
+                            height=280,
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(weight=600)),
+                            margin=dict(l=20, r=20, t=30, b=20)
                         )
-                        fig_elo.add_hline(
-                            y=1500,
-                            line_dash="dash",
-                            line_color="rgba(128, 128, 128, 0.5)",
-                            annotation_text="Baseline",
-                            annotation_font=dict(weight=600)
-                        )
-                        st.plotly_chart(fig_elo, width='stretch')
+                        fig_elo.add_hline(y=1500, line_dash="dash", line_color="rgba(128, 128, 128, 0.5)", annotation_text="Baseline", annotation_font=dict(weight=600))
 
-                        # Score Comparison (Diverging Bar Chart with Winner Highlighting)
-                        st.subheader("Score Comparison")
-
-                        # Build diverging score data: P1 positive, P2 negative
+                        # Score chart data
+                        score_colors = get_theme_colors()
                         dates_sorted = sorted(common_dates)
                         p1_scores_raw = []
                         p2_scores_raw = []
@@ -2403,158 +2526,95 @@ def main():
                             p1_scores_raw.append(p1_data['score'])
                             p2_scores_raw.append(p2_data['score'])
 
-                        # Calculate adaptive cap based on 90th percentile
                         all_scores = p1_scores_raw + p2_scores_raw
-                        if len(all_scores) > 0:
-                            score_cap = np.percentile(all_scores, 90) * 1.5  # 1.5x the 90th percentile
-                            score_cap = max(score_cap, 1000)  # Minimum cap to avoid tiny charts
-                        else:
-                            score_cap = 50000
+                        score_cap = np.percentile(all_scores, 90) * 1.5 if len(all_scores) > 0 else 50000
+                        score_cap = max(score_cap, 1000)
 
-                        # Build display data with capping
-                        p1_scores_display = []
-                        p2_scores_display = []
-                        p1_colors = []
-                        p2_colors = []
-                        p1_patterns = []
-                        p2_patterns = []
+                        p1_scores_display, p2_scores_display = [], []
+                        p1_colors, p2_colors = [], []
+                        p1_patterns, p2_patterns = [], []
 
                         for i, date in enumerate(dates_sorted):
-                            p1_score = p1_scores_raw[i]
-                            p2_score = p2_scores_raw[i]
+                            p1_score, p2_score = p1_scores_raw[i], p2_scores_raw[i]
+                            p1_scores_display.append(min(p1_score, score_cap))
+                            p2_scores_display.append(-min(p2_score, score_cap))
 
-                            # Cap scores for display (keep actual for hover)
-                            p1_capped = min(p1_score, score_cap)
-                            p2_capped = min(p2_score, score_cap)
-                            p1_scores_display.append(p1_capped)
-                            p2_scores_display.append(-p2_capped)  # Negative for diverging
-
-                            # Determine winner and color accordingly
                             if p1_score > p2_score:
-                                p1_colors.append(ACCENT_COLORS["info"])  # Winner: highlighted
-                                p2_colors.append("rgba(128, 128, 128, 0.4)")  # Loser: muted
+                                p1_colors.append(score_colors["player1"])
+                                p2_colors.append("rgba(128, 128, 128, 0.4)")
                             elif p2_score > p1_score:
-                                p1_colors.append("rgba(128, 128, 128, 0.4)")  # Loser: muted
-                                p2_colors.append(ACCENT_COLORS["warning"])  # Winner: highlighted
-                            else:  # Tie
+                                p1_colors.append("rgba(128, 128, 128, 0.4)")
+                                p2_colors.append(score_colors["player2"])
+                            else:
                                 p1_colors.append("rgba(128, 128, 128, 0.6)")
                                 p2_colors.append("rgba(128, 128, 128, 0.6)")
 
-                            # Add stripe pattern for capped bars
                             p1_patterns.append("/" if p1_score > score_cap else "")
                             p2_patterns.append("/" if p2_score > score_cap else "")
 
                         fig_score = go.Figure()
-
-                        # P1 bars (positive, above zero line)
-                        fig_score.add_trace(go.Bar(
-                            name=player1,
-                            x=dates_sorted,
-                            y=p1_scores_display,
-                            marker=dict(
-                                color=p1_colors,
-                                line=dict(width=1, color='rgba(255,255,255,0.3)'),
-                                pattern=dict(shape=p1_patterns, solidity=0.5),
-                            ),
-                            customdata=p1_scores_raw,
-                            hovertemplate=f'{player1}: %{{customdata:,.0f}}<extra></extra>',
-                            showlegend=False,
-                        ))
-
-                        # P2 bars (negative, below zero line)
-                        fig_score.add_trace(go.Bar(
-                            name=player2,
-                            x=dates_sorted,
-                            y=p2_scores_display,
-                            marker=dict(
-                                color=p2_colors,
-                                line=dict(width=1, color='rgba(255,255,255,0.3)'),
-                                pattern=dict(shape=p2_patterns, solidity=0.5),
-                            ),
-                            customdata=p2_scores_raw,
-                            hovertemplate=f'{player2}: %{{customdata:,.0f}}<extra></extra>',
-                            showlegend=False,
-                        ))
-
-                        # Add invisible traces for legend with consistent player colors
-                        fig_score.add_trace(go.Scatter(
-                            x=[None], y=[None],
-                            mode='markers',
-                            marker=dict(size=10, color=ACCENT_COLORS["info"]),
-                            name=player1,
-                            showlegend=True,
-                        ))
-                        fig_score.add_trace(go.Scatter(
-                            x=[None], y=[None],
-                            mode='markers',
-                            marker=dict(size=10, color=ACCENT_COLORS["warning"]),
-                            name=player2,
-                            showlegend=True,
-                        ))
+                        fig_score.add_trace(go.Bar(name=player1, x=dates_sorted, y=p1_scores_display,
+                            marker=dict(color=p1_colors, line=dict(width=1, color='rgba(255,255,255,0.3)'), pattern=dict(shape=p1_patterns, solidity=0.5)),
+                            customdata=p1_scores_raw, hovertemplate=f'{player1}: %{{customdata:,.0f}}<extra></extra>', showlegend=False))
+                        fig_score.add_trace(go.Bar(name=player2, x=dates_sorted, y=p2_scores_display,
+                            marker=dict(color=p2_colors, line=dict(width=1, color='rgba(255,255,255,0.3)'), pattern=dict(shape=p2_patterns, solidity=0.5)),
+                            customdata=p2_scores_raw, hovertemplate=f'{player2}: %{{customdata:,.0f}}<extra></extra>', showlegend=False))
+                        fig_score.add_trace(go.Scatter(x=[None], y=[None], mode='markers', marker=dict(size=10, color=score_colors["player1"]), name=f"{player1} win", showlegend=True))
+                        fig_score.add_trace(go.Scatter(x=[None], y=[None], mode='markers', marker=dict(size=10, color=score_colors["player2"]), name=f"{player2} win", showlegend=True))
 
                         apply_plotly_style(fig_score)
                         fig_score.update_layout(
-                            barmode='relative',
-                            hovermode='x unified',
-                            height=300,
-                            bargap=0.15,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=1.02,
-                                xanchor="center",
-                                x=0.5,
-                                font=dict(weight=600),
-                            ),
-                            margin=dict(l=20, r=20, t=40, b=20),
-                            yaxis=dict(
-                                title="Score",
-                                tickformat=",d",
-                                range=[-score_cap * 1.1, score_cap * 1.1],  # Symmetric range
-                            ),
-                            xaxis=dict(title="Date"),
+                            barmode='relative', hovermode='x unified', height=280, bargap=0.15,
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(weight=600)),
+                            margin=dict(l=20, r=20, t=30, b=20),
                         )
 
-                        # Add zero line for visual clarity
+                        if len(dates_sorted) <= 10:
+                            fig_score.update_xaxes(title="Date", tickformat="%b %d, %Y", tickvals=dates_sorted)
+                        else:
+                            fig_score.update_xaxes(title="Date", tickformat="%b %d")
+
+                        tick_step = 10 ** math.floor(math.log10(max(score_cap, 1000)))
+                        if score_cap / tick_step < 3:
+                            tick_step = tick_step / 2
+                        tick_data = []
+                        val = 0
+                        while val <= score_cap * 1.1:
+                            tick_data.append((val, f"{int(val):,}"))
+                            if val > 0:
+                                tick_data.append((-val, f"{int(val):,}"))
+                            val += tick_step
+                        tick_data.sort(key=lambda x: x[0])
+                        fig_score.update_yaxes(title="Score", range=[-score_cap * 1.1, score_cap * 1.1],
+                            tickvals=[t[0] for t in tick_data], ticktext=[t[1] for t in tick_data])
                         fig_score.add_hline(y=0, line_width=1, line_color="rgba(128, 128, 128, 0.5)")
 
-                        st.plotly_chart(fig_score, width='stretch')
+                        # Display charts side-by-side
+                        col_elo, col_score = st.columns(2)
+                        with col_elo:
+                            st.subheader("Elo Rating Comparison")
+                            st.plotly_chart(fig_elo, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                        with col_score:
+                            st.subheader("Score Comparison")
+                            st.plotly_chart(fig_score, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # Display the duel cards
                         st.subheader("Game-by-Game Comparison")
 
-                        # Sort controls
-                        sort_options = {
-                            "Date": ("Date", False),
-                            f"{player1} Daily Rank": (f"{player1} Daily Rank", True),
-                            f"{player2} Daily Rank": (f"{player2} Daily Rank", True),
-                            f"{player1} Score": (f"{player1} Score", False),
-                            f"{player2} Score": (f"{player2} Score", False),
-                        }
+                        # Sort control - just Recent/Oldest by date
+                        sort_direction = st.selectbox(
+                            "Sort by",
+                            options=["Recent", "Oldest"],
+                            index=0,
+                            key="duel_sort"
+                        )
+                        sort_ascending = sort_direction == "Oldest"
+                        df_duel_sorted = df_duel.sort_values("Date", ascending=sort_ascending, na_position='last')
 
-                        sort_col1, sort_col2 = st.columns([3, 1])
-                        with sort_col1:
-                            selected_sort = st.selectbox(
-                                "Sort by",
-                                options=list(sort_options.keys()),
-                                index=0,
-                                key="duel_sort"
-                            )
-                        with sort_col2:
-                            sort_column, default_asc = sort_options[selected_sort]
-                            sort_direction = st.selectbox(
-                                "Order",
-                                options=["Best", "Worst"] if selected_sort != "Date" else ["Recent", "Oldest"],
-                                index=0,
-                                key="duel_sort_dir"
-                            )
-
-                        sort_ascending = default_asc if sort_direction in ["Best", "Oldest"] else not default_asc
-                        df_duel_sorted = df_duel.sort_values(sort_column, ascending=sort_ascending, na_position='last')
-
-                        # Display as cards
-                        cards_html = generate_duel_cards(df_duel_sorted, player1, player2)
-                        st.markdown(f'<div class="ranking-cards">{cards_html}</div>', unsafe_allow_html=True)
+                        # Display as cards (with theme-adaptive player colors)
+                        theme_colors = get_theme_colors()
+                        cards_html = generate_duel_cards(df_duel_sorted, player1, player2, colors=theme_colors)
+                        st.html(f'<div class="ranking-cards">{cards_html}</div>')
             else:
                 st.info("Select two players to compare their head-to-head performance.")
         else:
