@@ -144,7 +144,7 @@ def generate_ranking_cards(df):
         # Build card with CSS-class-based responsive header
         # Rating class: 'active' (coral) for ranked, 'inactive' (muted) for unranked
         rating_class = "inactive" if is_inactive else "active"
-        card = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating {rating_class}">{rating}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Games</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Wins</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Win%</span><span style="{value_style}">{win_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10</span><span style="{value_style}">{top10}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10%</span><span style="{value_style}">{top10_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Avg Rank</span><span style="{value_style}">{avg_r}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last7}</span></div><div style="{stat_layout}"><span style="{label_style}">Stability</span><span style="{value_style}">{consist}</span></div></div></div>'
+        card = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating {rating_class}"><span class="rating-label">Elo</span>{rating}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Games</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Wins</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Win%</span><span style="{value_style}">{win_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10</span><span style="{value_style}">{top10}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10%</span><span style="{value_style}">{top10_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Avg Rank</span><span style="{value_style}">{avg_r}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last7}</span></div><div style="{stat_layout}"><span style="{label_style}">Stability</span><span style="{value_style}">{consist}</span></div></div></div>'
         cards.append(card)
 
     return "".join(cards)
@@ -649,14 +649,6 @@ def get_theme_css():
         .dashboard-header {
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 242, 246, 0.98) 100%) !important;
             border-color: rgba(0, 0, 0, 0.1) !important;
-        }
-        .dashboard-title {
-            background: linear-gradient(135deg, #262730 0%, #404040 100%) !important;
-            -webkit-background-clip: text !important;
-            -webkit-text-fill-color: transparent !important;
-        }
-        .dashboard-subtitle {
-            color: #555555 !important;
         }
 
         /* Sidebar - Light mode: high contrast dark text */
@@ -1253,6 +1245,16 @@ CUSTOM_CSS = """
     font-weight: 700;
     font-size: 1.1rem;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.card-rating .rating-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    /* No opacity - inherits color from parent for WCAG compliance */
 }
 .card-rating.active {
     color: #FF6B6B;
@@ -1552,110 +1554,79 @@ def main():
         st.markdown(f"""
         <style>
             /* Container query context */
-            .header-container {{
-                container-type: inline-size;
-                container-name: header;
-            }}
-            .dashboard-header {{
+            /* Banner header - compact, full-width, always horizontal, centered */
+            .dashboard-banner {{
                 display: flex;
                 align-items: center;
-                gap: 2rem;
-                margin-bottom: 1rem;
-                padding: 1.5rem;
-                background: linear-gradient(135deg, rgba(38, 39, 48, 0.9) 0%, rgba(14, 17, 23, 0.95) 100%);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 107, 107, 0.2);
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+                justify-content: center;
+                gap: 0.75rem;
+                padding: 0 0 0.5rem 0;
+                margin-bottom: 0.5rem;
+                border-bottom: 1px solid rgba(255, 107, 107, 0.2);
             }}
             .dashboard-logo {{
-                width: 120px;  /* Design system: lg = 120px */
+                width: 50px;
                 height: auto;
-                filter: drop-shadow(0 0 15px rgba(255, 107, 107, 0.4));
+                filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.3));
                 flex-shrink: 0;
             }}
+            .dashboard-title-group {{
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0;
+            }}
             .dashboard-title {{
-                font-family: 'Source Sans', sans-serif !important;  /* Clean sans-serif per user preference */
-                font-size: clamp(1.3rem, 5cqw, 2.4rem) !important;  /* Design system: lg=2.4rem, xs=1.3rem */
+                font-family: 'Source Sans', sans-serif !important;
+                font-size: 1.25rem !important;
                 font-weight: 700 !important;
-                margin: 0;
-                padding: 0;
-                background: linear-gradient(135deg, #FAFAFA 0%, #FF6B6B 50%, #FFD700 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                text-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
-                letter-spacing: 0.05em;
+                line-height: 1.1 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                color-scheme: inherit;
+                --gradient-start: light-dark(#8B2942, #FAFAFA);
+                --gradient-mid: light-dark(#C53030, #FF6B6B);
+                --gradient-end: light-dark(#92400E, #FFD700);
+                background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%) !important;
+                -webkit-background-clip: text !important;
+                -webkit-text-fill-color: transparent !important;
+                background-clip: text !important;
+                letter-spacing: 0.02em;
             }}
             .dashboard-subtitle {{
-                font-family: 'Source Sans', sans-serif;
-                margin: 0.5rem 0 0 0;
-                font-size: clamp(0.65rem, 1.5cqw, 0.8rem);  /* Smaller for better hierarchy */
-                color: #B0B0B0;
-                letter-spacing: 0.1em;
-                text-transform: uppercase;
-                font-weight: 500;
+                font-size: 0.55rem;
+                font-weight: 400;
+                line-height: 1.2;
+                color: var(--text-color);
+                opacity: 0.6;
+                margin: 0 !important;
+                padding: 0 !important;
+                letter-spacing: 0.04em;
             }}
-            /* Container query: stacked layout when container is narrow */
-            @container header (max-width: 600px) {{
-                .dashboard-header {{
-                    flex-direction: column;
-                    align-items: center;
-                    text-align: center;
-                    gap: 1rem;
-                    padding: 1rem;
-                }}
-                .dashboard-logo {{
-                    width: 100px;
-                }}
-                .dashboard-text {{
-                    width: 100%;
-                    text-align: center;
-                }}
-                .dashboard-title {{
-                    text-align: center;
-                    font-size: 1.5rem !important;
-                }}
-                .dashboard-subtitle {{
-                    letter-spacing: 0.05em;
-                    text-align: center;
-                }}
+            /* Hide the anchor link inside the title */
+            .dashboard-title [data-testid="stHeaderActionElements"] {{
+                display: none !important;
             }}
-            /* Container query: small container fixed sizes */
-            @container header (max-width: 400px) {{
-                .dashboard-logo {{
-                    width: 80px;  /* Design system: xs = 80px */
-                }}
-                .dashboard-title {{
-                    font-size: 1.3rem !important;
-                }}
-                .dashboard-subtitle {{
-                    font-size: 0.75rem;
-                }}
-            }}
-            /* Fallback media query for hiding anchor on narrow viewports */
+            /* Hide Streamlit header action elements on mobile */
             @media (max-width: 768px) {{
                 [data-testid="stHeaderActionElements"] {{
                     display: none !important;
                 }}
             }}
         </style>
-        <div class="header-container">
-            <div class="dashboard-header">
-                <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
-                <div class="dashboard-text">
-                    <h1 class="dashboard-title">DFTL Ranking Dashboard</h1>
-                    <p class="dashboard-subtitle">Track Elo ratings, compare players, and analyze performance trends</p>
-                </div>
+        <div class="dashboard-banner">
+            <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
+            <div class="dashboard-title-group">
+                <h1 class="dashboard-title">DFTL Rankings</h1>
+                <p class="dashboard-subtitle">Elo-based leaderboard</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.title("DFTL Ranking Dashboard")
-        st.caption("Track Elo ratings, compare players, and analyze performance trends")
+        st.title("DFTL Rankings")
 
     # Back-to-top anchor and button (always rendered)
     st.markdown('<a id="top"></a><a href="#top" class="back-to-top" title="Back to top">↑</a>', unsafe_allow_html=True)
-    st.markdown("---")
 
     # Check for available datasets
     available_datasets = get_available_datasets()
@@ -1799,7 +1770,7 @@ def main():
 
             # Sort options: display name -> (column, default_ascending)
             sort_options = {
-                "Rating": ("rating", False),
+                "Elo": ("rating", False),
                 "Games": ("games_played", False),
                 "Wins": ("wins", False),
                 "Win %": ("win_rate", False),
