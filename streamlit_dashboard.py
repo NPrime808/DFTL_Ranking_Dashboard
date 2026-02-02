@@ -377,20 +377,19 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None):
 
         # Header: Win counts on sides, Date and Winner centered
         # 3-column grid: p1 wins | date+winner | p2 wins
-        win_label_style = "font-size:0.7rem;text-transform:uppercase;font-weight:600;"
         header_html = f'''
-        <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
+        <div class="duel-header" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
             <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
-                <span style="font-weight:700;font-size:1.4rem;color:{p1_color};">{p1_cumulative}</span>
-                <span style="{win_label_style}color:{p1_color};">Wins</span>
+                <span class="duel-win-count" style="font-weight:700;font-size:1.4rem;color:{p1_color};">{p1_cumulative}</span>
+                <span class="duel-win-label" style="font-size:0.7rem;text-transform:uppercase;font-weight:600;color:{p1_color};">Duel Wins</span>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;gap:0.25rem;">
-                <span style="font-weight:600;font-size:1rem;color:var(--text-color);">{date_str}</span>
-                <span style="font-weight:700;color:{winner_color};">🏆 {winner}</span>
+                <span class="duel-date" style="font-weight:600;font-size:1rem;color:var(--text-color);">{date_str}</span>
+                <span class="duel-winner" style="font-weight:700;color:{winner_color};">🏆 {winner}</span>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
-                <span style="font-weight:700;font-size:1.4rem;color:{p2_color};">{p2_cumulative}</span>
-                <span style="{win_label_style}color:{p2_color};">Wins</span>
+                <span class="duel-win-count" style="font-weight:700;font-size:1.4rem;color:{p2_color};">{p2_cumulative}</span>
+                <span class="duel-win-label" style="font-size:0.7rem;text-transform:uppercase;font-weight:600;color:{p2_color};">Duel Wins</span>
             </div>
         </div>
         '''
@@ -398,28 +397,26 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None):
         # Three-column layout: Player 1 | Crossed Swords | Player 2
         # max-width prevents excessive spreading on wide screens
         stats_html = f'''
-        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.5rem;align-items:start;max-width:700px;margin:0 auto;">
+        <div class="duel-stats" style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.5rem;align-items:start;max-width:700px;margin:0 auto;">
             <div style="text-align:center;">
-                <div style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player1)}</div>
-                <div style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
-                    <div style="{stat_layout}"><span style="{label_style}">Daily Rank</span><span style="{value_style}">#{p1_rank}</span></div>
-                    <div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{p1_score}</span></div>
-                    <div style="{stat_layout}"><span style="{label_style}">Elo</span><span style="{value_style}">{p1_elo}</span></div>
+                <div class="duel-player-name" style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player1)} <span style="opacity:0.8;font-weight:500;">({p1_elo})</span></div>
+                <div class="duel-player-stats" style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Daily Rank</span><span class="duel-stat-value" style="{value_style}">#{p1_rank}</span></div>
+                    <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Score</span><span class="duel-stat-value" style="{value_style}">{p1_score}</span></div>
                 </div>
             </div>
-            <div style="display:flex;align-items:center;justify-content:center;font-size:2rem;padding-top:0.25rem;">⚔️</div>
+            <div class="duel-vs" style="display:flex;align-items:center;justify-content:center;font-size:2rem;padding-top:0.25rem;">⚔️</div>
             <div style="text-align:center;">
-                <div style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player2)}</div>
-                <div style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
-                    <div style="{stat_layout}"><span style="{label_style}">Daily Rank</span><span style="{value_style}">#{p2_rank}</span></div>
-                    <div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{p2_score}</span></div>
-                    <div style="{stat_layout}"><span style="{label_style}">Elo</span><span style="{value_style}">{p2_elo}</span></div>
+                <div class="duel-player-name" style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player2)} <span style="opacity:0.8;font-weight:500;">({p2_elo})</span></div>
+                <div class="duel-player-stats" style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Daily Rank</span><span class="duel-stat-value" style="{value_style}">#{p2_rank}</span></div>
+                    <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Score</span><span class="duel-stat-value" style="{value_style}">{p2_score}</span></div>
                 </div>
             </div>
         </div>
         '''
 
-        card = f'<div style="{card_base}">{header_html}{stats_html}</div>'
+        card = f'<div class="duel-card" style="{card_base}">{header_html}{stats_html}</div>'
         cards.append(card)
 
     return "".join(cards)
@@ -1011,6 +1008,22 @@ CUSTOM_CSS = """
 [data-testid="stHorizontalBlock"]:has([data-testid="stDateInput"]) [data-testid="stColumn"] {
     min-width: 0 !important;
 }
+/* Vertical divider between side-by-side chart columns */
+[data-testid="stHorizontalBlock"]:has(.stPlotlyChart) {
+    color-scheme: inherit;
+    gap: 1.5rem !important;
+}
+[data-testid="stHorizontalBlock"]:has(.stPlotlyChart) > [data-testid="stColumn"]:first-child {
+    color-scheme: inherit;
+    border-right: 1px solid light-dark(#C0C0C0, #404040);
+    padding-right: 1rem;
+}
+/* Mobile: allow vertical scrolling through Plotly charts */
+@media (max-width: 768px) {
+    .stPlotlyChart {
+        touch-action: pan-y !important;
+    }
+}
 
 /* ===== Dividers with Gradient ===== */
 .main hr {
@@ -1320,6 +1333,7 @@ CUSTOM_CSS = """
 
 /* Container-responsive: 4-column grid when container ≤600px */
 @container cards (max-width: 600px) {
+    /* Tab 1 ranking cards */
     .stats-grid {
         grid-template-columns: repeat(4, 1fr) !important;
         gap: 0.375rem !important;
@@ -1357,10 +1371,36 @@ CUSTOM_CSS = """
     .ranking-cards > div {
         padding: 0.75rem !important;
     }
+    /* Tab 2 duel cards - sm breakpoint */
+    .duel-player-name {
+        font-size: 0.95rem !important;
+    }
+    .duel-stat-label {
+        font-size: 0.75rem !important;
+    }
+    .duel-stat-value {
+        font-size: 1.2rem !important;
+    }
+    .duel-win-count {
+        font-size: 1.2rem !important;
+    }
+    .duel-win-label {
+        font-size: 0.65rem !important;
+    }
+    .duel-date {
+        font-size: 0.9rem !important;
+    }
+    .duel-vs {
+        font-size: 1.5rem !important;
+    }
+    .duel-player-stats {
+        gap: 0.5rem !important;
+    }
 }
 
 /* Container-responsive: extra compact when container ≤400px */
 @container cards (max-width: 400px) {
+    /* Tab 1 ranking cards */
     .card-name-text {
         font-size: 0.9rem !important;
     }
@@ -1381,10 +1421,36 @@ CUSTOM_CSS = """
     .stats-grid {
         gap: 0.25rem !important;
     }
+    /* Tab 2 duel cards - xs breakpoint */
+    .duel-player-name {
+        font-size: 0.9rem !important;
+    }
+    .duel-stat-label {
+        font-size: 0.7rem !important;
+    }
+    .duel-stat-value {
+        font-size: 1.1rem !important;
+    }
+    .duel-win-count {
+        font-size: 1.1rem !important;
+    }
+    .duel-win-label {
+        font-size: 0.6rem !important;
+    }
+    .duel-date {
+        font-size: 0.85rem !important;
+    }
+    .duel-vs {
+        font-size: 1.25rem !important;
+    }
+    .duel-player-stats {
+        gap: 0.35rem !important;
+    }
 }
 
 /* Large viewport (lg breakpoint >900px) */
 @media (min-width: 900px) {
+    /* Tab 1 ranking cards */
     .card-name-text {
         font-size: 1.1rem !important;
     }
@@ -1395,6 +1461,16 @@ CUSTOM_CSS = """
         font-size: 1.1rem !important;
     }
     /* Data values already 1.4rem via inline styles - no override needed */
+    /* Tab 2 duel cards - lg breakpoint */
+    .duel-player-name {
+        font-size: 1.1rem !important;
+    }
+    .duel-stat-value {
+        font-size: 1.4rem !important;
+    }
+    .duel-win-count {
+        font-size: 1.4rem !important;
+    }
 }
 </style>
 """
@@ -2573,8 +2649,8 @@ def main():
                         fig_score.add_trace(go.Bar(name=player2, x=dates_sorted, y=p2_scores_display,
                             marker=dict(color=p2_colors, line=dict(width=1, color='rgba(255,255,255,0.3)'), pattern=dict(shape=p2_patterns, solidity=0.5)),
                             customdata=p2_scores_raw, hovertemplate=f'{player2}: %{{customdata:,.0f}}<extra></extra>', showlegend=False))
-                        fig_score.add_trace(go.Scatter(x=[None], y=[None], mode='markers', marker=dict(size=10, color=score_colors["player1"]), name=f"{player1} win", showlegend=True))
-                        fig_score.add_trace(go.Scatter(x=[None], y=[None], mode='markers', marker=dict(size=10, color=score_colors["player2"]), name=f"{player2} win", showlegend=True))
+                        fig_score.add_trace(go.Scatter(x=[None], y=[None], mode='markers', marker=dict(size=10, color=score_colors["player1"]), name=player1, showlegend=True))
+                        fig_score.add_trace(go.Scatter(x=[None], y=[None], mode='markers', marker=dict(size=10, color=score_colors["player2"]), name=player2, showlegend=True))
 
                         apply_plotly_style(fig_score)
                         fig_score.update_layout(
@@ -2618,6 +2694,7 @@ def main():
                             st.plotly_chart(fig_elo, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
                         with col_score:
                             st.subheader("Score Comparison")
+                            st.html('<p style="color-scheme: inherit; color: light-dark(#555555, #A0A0A0); font-size: 0.75rem; font-weight: 500; margin: -0.5rem 0 0.5rem 0;">Color = duel winner</p>')
                             st.plotly_chart(fig_score, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # Display the duel cards
