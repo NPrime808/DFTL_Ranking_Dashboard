@@ -1118,6 +1118,132 @@ CUSTOM_CSS = """
     }
 }
 
+/* ===== Player Tracker Summary Card ===== */
+.tracker-summary {
+    background: var(--secondary-background-color);
+    border-radius: 12px;
+    padding: 1rem;
+    border-left: 4px solid #FF6B6B;
+}
+.tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+.tracker-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+.tracker-rank-badge {
+    font-size: 0.875rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    color: white;
+}
+.tracker-rating {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color-scheme: inherit;
+    color: light-dark(#D93636, #FF6B6B);
+    line-height: 1.1;
+}
+.tracker-rating-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color-scheme: inherit;
+    color: light-dark(#666666, #999999);
+    margin-bottom: 0.75rem;
+}
+.tracker-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.tracker-stat {
+    text-align: center;
+    padding: 0.4rem;
+    background: rgba(128, 128, 128, 0.1);
+    border-radius: 6px;
+}
+.tracker-stat-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+.tracker-stat-label {
+    display: block;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color-scheme: inherit;
+    color: light-dark(#666666, #999999);
+}
+.tracker-timeline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(128, 128, 128, 0.2);
+}
+.tracker-timeline-item {
+    flex: 1;
+    text-align: center;
+    padding: 0.4rem;
+    border-radius: 6px;
+}
+.tracker-timeline-item.tracker-first {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.tracker-timeline-item.tracker-last {
+    background: rgba(255, 107, 107, 0.15);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+}
+.tracker-timeline-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color-scheme: inherit;
+    color: light-dark(#666666, #999999);
+}
+.tracker-timeline-date {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+.tracker-timeline-detail {
+    font-size: 0.7rem;
+    color-scheme: inherit;
+    color: light-dark(#666666, #999999);
+}
+.tracker-timeline-arrow {
+    font-size: 1rem;
+    color-scheme: inherit;
+    color: light-dark(#999999, #666666);
+}
+.tracker-chart-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0.75rem 0 0.25rem 0;
+    padding: 0;
+}
+@media (max-width: 400px) {
+    .tracker-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .tracker-rating {
+        font-size: 1.8rem;
+    }
+}
+
 /* ===== Dividers with Gradient ===== */
 .main hr {
     border: none;
@@ -2190,92 +2316,99 @@ def main():
                         latest = df_player_played.sort_values('date', ascending=False).iloc[0]
                         has_active_rank = 'active_rank' in df_player_played.columns
 
-                        # --- Key Metrics Section ---
-                        st.subheader("Player Summary")
+                        # Get current Elo rank
+                        current_player_rating = df_ratings[df_ratings['player_name'] == selected_player]
+                        if not current_player_rating.empty and pd.notna(current_player_rating.iloc[0]['active_rank']):
+                            elo_rank = int(current_player_rating.iloc[0]['active_rank'])
+                            elo_rank_str = f"#{elo_rank}"
+                        else:
+                            elo_rank_str = "—"
 
-                        col1, col2, col3, col4 = st.columns(4)
+                        # Prepare metric values
+                        current_rating = latest['rating']
+                        games = int(latest['games_played'])
+                        wins = int(latest['wins'])
+                        win_rate = latest['win_rate']
+                        top_10s = int(latest['top_10s'])
+                        top_10_rate = latest['top_10s_rate']
+                        avg_rank = latest['avg_daily_rank']
+                        last_7 = latest['last_7']
+                        consistency = latest['consistency']
 
-                        with col1:
-                            current_rating = latest['rating']
-                            st.metric("Current Rating", f"{current_rating:.0f}")
-                        with col2:
-                            games = int(latest['games_played'])
-                            st.metric("Games Played", games, help="Top 30 Daily Runs")
-                        with col3:
-                            wins = int(latest['wins'])
-                            win_rate = latest['win_rate']
-                            st.metric("Wins", wins, help=f"Win Rate: {win_rate:.1f}%")
-                        with col4:
-                            top_10s = int(latest['top_10s'])
-                            top_10_rate = latest['top_10s_rate']
-                            st.metric("Top 10", top_10s, help=f"Top 10 Rate: {top_10_rate:.1f}%")
+                        # Pre-format optional values for f-string
+                        avg_rank_str = f"{avg_rank:.1f}" if pd.notna(avg_rank) else "N/A"
+                        last_7_str = f"{last_7:.1f}" if pd.notna(last_7) else "N/A"
+                        consistency_str = f"{consistency:.1f}" if pd.notna(consistency) else "N/A"
 
-                        # Second row of metrics
-                        col5, col6, col7, col8 = st.columns(4)
-
-                        with col5:
-                            avg_rank = latest['avg_daily_rank']
-                            st.metric("Avg Rank", f"{avg_rank:.1f}" if pd.notna(avg_rank) else "N/A", help="Average Daily Rank over all games")
-                        with col6:
-                            last_7 = latest['last_7']
-                            st.metric("7-Game Avg", f"{last_7:.1f}" if pd.notna(last_7) else "N/A", help="Average Daily Rank over last 7 games")
-                        with col7:
-                            consistency = latest['consistency']
-                            st.metric("Stability", f"{consistency:.1f}" if pd.notna(consistency) else "N/A", help="Rank variation over last 14 games (lower = more stable)")
-                        with col8:
-                            # Get CURRENT Elo rank from current ratings (not from last game history)
-                            current_player_rating = df_ratings[df_ratings['player_name'] == selected_player]
-                            if not current_player_rating.empty and pd.notna(current_player_rating.iloc[0]['active_rank']):
-                                current_rank = int(current_player_rating.iloc[0]['active_rank'])
-                                st.metric("Elo Rank", f"#{current_rank}")
-                            else:
-                                st.metric("Elo Rank", "Inactive", help="Not ranked (inactive >7 days or <7 games)")
-
-                        st.markdown("")  # Spacer
-
-                        # --- First and Last Game Badges ---
+                        # First/Last game data
                         sorted_games = df_player_played.sort_values('date')
                         first_game = sorted_games.iloc[0]
                         last_game = sorted_games.iloc[-1]
 
-                        col_first, col_last = st.columns(2)
-                        with col_first:
-                            first_date = first_game['date']
-                            if hasattr(first_date, 'strftime'):
-                                first_date_str = first_date.strftime('%Y-%m-%d')
-                            else:
-                                first_date_str = str(first_date)[:10]
-                            first_rank = int(first_game['rank'])
-                            first_rating = first_game['rating']
-                            st.markdown(f"""
-                            <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.2) 100%);
-                                        border: 1px solid {ACCENT_COLORS['info']}; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-color); margin-bottom: 0.25rem;">First Game</div>
-                                <div style="font-size: 1.25rem; font-weight: 700;">{first_date_str}</div>
-                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['info']};">Daily Rank #{first_rank} | Rating: {first_rating:.0f}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        with col_last:
-                            last_date = last_game['date']
-                            if hasattr(last_date, 'strftime'):
-                                last_date_str = last_date.strftime('%Y-%m-%d')
-                            else:
-                                last_date_str = str(last_date)[:10]
-                            last_rank = int(last_game['rank'])
-                            last_rating = last_game['rating']
-                            st.markdown(f"""
-                            <div style="background: linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.2) 100%);
-                                        border: 1px solid {ACCENT_COLORS['primary']}; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-color); margin-bottom: 0.25rem;">Last Game</div>
-                                <div style="font-size: 1.25rem; font-weight: 700;">{last_date_str}</div>
-                                <div style="font-size: 0.875rem; color: {ACCENT_COLORS['primary']};">Daily Rank #{last_rank} | Rating: {last_rating:.0f}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                        first_date = first_game['date']
+                        first_date_str = first_date.strftime('%Y-%m-%d') if hasattr(first_date, 'strftime') else str(first_date)[:10]
+                        first_rank = int(first_game['rank'])
+                        first_rating = first_game['rating']
 
-                        st.markdown("")  # Spacer
+                        last_date = last_game['date']
+                        last_date_str = last_date.strftime('%Y-%m-%d') if hasattr(last_date, 'strftime') else str(last_date)[:10]
+                        last_rank = int(last_game['rank'])
+                        last_rating = last_game['rating']
+
+                        # --- Compact Player Summary Card ---
+                        summary_html = f"""
+                        <div class="tracker-summary">
+                            <div class="tracker-header">
+                                <div class="tracker-name">{selected_player}</div>
+                                <div class="tracker-rank-badge" style="background: {ACCENT_COLORS['primary']};">{elo_rank_str}</div>
+                            </div>
+                            <div class="tracker-rating">{current_rating:.0f}</div>
+                            <div class="tracker-rating-label">Elo Rating</div>
+                            <div class="tracker-stats-grid">
+                                <div class="tracker-stat">
+                                    <span class="tracker-stat-value">{games}</span>
+                                    <span class="tracker-stat-label">Games</span>
+                                </div>
+                                <div class="tracker-stat">
+                                    <span class="tracker-stat-value">{wins}</span>
+                                    <span class="tracker-stat-label">Wins ({win_rate:.0f}%)</span>
+                                </div>
+                                <div class="tracker-stat">
+                                    <span class="tracker-stat-value">{top_10s}</span>
+                                    <span class="tracker-stat-label">Top 10 ({top_10_rate:.0f}%)</span>
+                                </div>
+                                <div class="tracker-stat">
+                                    <span class="tracker-stat-value">{avg_rank_str}</span>
+                                    <span class="tracker-stat-label">Avg Rank</span>
+                                </div>
+                                <div class="tracker-stat">
+                                    <span class="tracker-stat-value">{last_7_str}</span>
+                                    <span class="tracker-stat-label">7-Game Avg</span>
+                                </div>
+                                <div class="tracker-stat">
+                                    <span class="tracker-stat-value">{consistency_str}</span>
+                                    <span class="tracker-stat-label">Stability</span>
+                                </div>
+                            </div>
+                            <div class="tracker-timeline">
+                                <div class="tracker-timeline-item tracker-first">
+                                    <div class="tracker-timeline-label">First</div>
+                                    <div class="tracker-timeline-date">{first_date_str}</div>
+                                    <div class="tracker-timeline-detail">#{first_rank} • {first_rating:.0f}</div>
+                                </div>
+                                <div class="tracker-timeline-arrow">→</div>
+                                <div class="tracker-timeline-item tracker-last">
+                                    <div class="tracker-timeline-label">Last</div>
+                                    <div class="tracker-timeline-date">{last_date_str}</div>
+                                    <div class="tracker-timeline-detail">#{last_rank} • {last_rating:.0f}</div>
+                                </div>
+                            </div>
+                        </div>
+                        """
+                        st.html(summary_html)
 
                         # --- Rating Trajectory Chart ---
-                        st.subheader("Elo Rating History")
+                        st.html('<p class="tracker-chart-label">Elo Rating History</p>')
                         df_chart = df_player_played.sort_values('date')
 
                         fig_rating = px.line(
@@ -2331,7 +2464,7 @@ def main():
                         st.plotly_chart(fig_rating, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # --- Daily Rank History Chart (Bar Chart) ---
-                        st.subheader("Daily Rank History")
+                        st.html('<p class="tracker-chart-label">Daily Rank History</p>')
 
                         # Bars grow from bottom (rank 31) UPWARD toward rank 1
                         # Better ranks (closer to 1) = taller bars
@@ -2388,8 +2521,6 @@ def main():
                         st.plotly_chart(fig_rank, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # --- Game History Cards ---
-                        st.subheader("Game History")
-
                         # Sort controls - column and direction combined
                         sort_options = {
                             "Recent": ("date", False),
@@ -2398,12 +2529,17 @@ def main():
                             "Score": ("score", False),
                         }
 
-                        selected_sort = st.selectbox(
-                            "Sort by",
-                            options=list(sort_options.keys()),
-                            index=0,
-                            key="history_sort"
-                        )
+                        col_label, col_sort = st.columns([1, 2])
+                        with col_label:
+                            st.html('<p class="tracker-chart-label" style="margin-top: 0.5rem;">Game History</p>')
+                        with col_sort:
+                            selected_sort = st.selectbox(
+                                "Sort",
+                                options=list(sort_options.keys()),
+                                index=0,
+                                key="history_sort",
+                                label_visibility="collapsed"
+                            )
 
                         sort_column, sort_ascending = sort_options[selected_sort]
                         # Daily Rank: secondary sort by score (highest first within same rank)
@@ -2443,7 +2579,7 @@ def main():
             df_rank1 = df_top10[df_top10['active_rank'] == 1].copy()
             df_rank1 = df_rank1.sort_values('date')
 
-            st.subheader("Elo Rank #1 History")
+            st.html('<p class="tracker-chart-label">Elo Rank #1 History</p>')
 
             if not df_rank1.empty:
                 # Get all unique players who held #1
@@ -2487,35 +2623,6 @@ def main():
                     )
                 )
                 st.plotly_chart(fig_rank1, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
-
-            # Pivot to get ranks as columns for table
-            df_pivot = df_top10.pivot(
-                index='date',
-                columns='active_rank',
-                values='player_name'
-            ).reset_index()
-
-            # Rename columns to indicate Elo rankings
-            df_pivot.columns = ['Date'] + [f'Elo #{int(i)}' for i in df_pivot.columns[1:]]
-
-            # Sort by date descending (most recent first)
-            df_pivot = df_pivot.sort_values('Date', ascending=False)
-
-            # Build column config dynamically
-            column_config = {
-                "Date": st.column_config.DateColumn("Date", format="YYYY-MM-DD")
-            }
-            for i in range(1, 11):
-                col_name = f'Elo #{i}'
-                if col_name in df_pivot.columns:
-                    column_config[col_name] = st.column_config.TextColumn(col_name)
-
-            st.dataframe(
-                df_pivot,
-                width='stretch',
-                hide_index=True,
-                column_config=column_config
-            )
         else:
             st.warning("Active rank history data not available.")
 
