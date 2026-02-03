@@ -2,6 +2,7 @@ import math
 import base64
 import html
 import random
+from urllib.parse import quote
 
 import streamlit as st
 import pandas as pd
@@ -38,6 +39,19 @@ ACCENT_COLORS = {
     ],
 }
 
+# --- Share URL Configuration ---
+# Detect base URL dynamically from request headers (falls back to localhost for dev)
+def get_share_base_url():
+    """Get the base URL for shareable links from request headers."""
+    try:
+        headers = st.context.headers
+        host = headers.get("host", headers.get("Host", "localhost:8501"))
+        # Use https unless it's localhost
+        protocol = "http" if "localhost" in host or "127.0.0.1" in host else "https"
+        return f"{protocol}://{host}"
+    except Exception:
+        return "http://localhost:8501"
+
 # --- Leaderboard Flourishes ---
 # Icons and decorations for top players
 RANK_ICONS = {
@@ -57,6 +71,126 @@ def get_rank_badge_html(rank):
     info = RANK_ICONS[rank]
     badge_style = f'display:inline-flex;align-items:center;gap:0.3rem;font-weight:700;color:{info["color"]};text-shadow:0 0 10px {info["color"]}40;'
     return f'<span style="{badge_style}"><span style="font-size:1.2rem;">{info["icon"]}</span>#{rank}</span>'
+
+
+def build_url_with_params(new_params):
+    """
+    Build a URL query string with only params relevant to the target tab.
+    Keeps URLs clean while allowing deep linking to specific views.
+    """
+    # Define which params are relevant to each tab
+    TAB_PARAMS = {
+        "rankings": ["date"],
+        "duels": ["player1", "player2"],
+        "tracker": ["player"],
+        "dailies": ["date"],
+        "hall-of-fame": [],
+    }
+
+    # Determine target tab from new_params
+    target_tab = new_params.get("tab", "rankings")
+    relevant_params = TAB_PARAMS.get(target_tab, [])
+
+    # Start with tab param
+    result_params = {"tab": target_tab}
+
+    # Only include params relevant to the target tab
+    for param in relevant_params:
+        if param in new_params:
+            result_params[param] = new_params[param]
+
+    # Build query string
+    query_parts = [f"{quote(str(k))}={quote(str(v))}" for k, v in result_params.items()]
+    return "?" + "&".join(query_parts) if query_parts else ""
+
+
+def player_link(name, display_text=None):
+    """
+    Generate an anchor link to the Tracker tab for a player.
+    The link uses query params: ?tab=tracker&player=PlayerName
+    Preserves other existing query params for navigation context.
+    target="_self" ensures navigation stays in the same browser tab.
+    """
+    if display_text is None:
+        display_text = name
+    url = build_url_with_params({"tab": "tracker", "player": name})
+    escaped_display = html.escape(display_text)
+    return f'<a href="{url}" target="_self" class="player-link">{escaped_display}</a>'
+
+
+def duel_link(player1, player2, display_text=None):
+    """
+    Generate an anchor link to the Duels tab with a specific matchup.
+    The link uses query params: ?tab=duels&player1=Name1&player2=Name2
+    Preserves other existing query params for navigation context.
+    target="_self" ensures navigation stays in the same browser tab.
+    """
+    if display_text is None:
+        display_text = f"{player1} vs {player2}"
+    url = build_url_with_params({"tab": "duels", "player1": player1, "player2": player2})
+    escaped_display = html.escape(display_text)
+    return f'<a href="{url}" target="_self" class="player-link">{escaped_display}</a>'
+
+
+def daily_link(date_val, display_text=None):
+    """
+    Generate an anchor link to the Dailies tab with a specific date selected.
+    The link uses query params: ?tab=dailies&date=YYYY-MM-DD
+    Preserves other existing query params for navigation context.
+    target="_self" ensures navigation stays in the same browser tab.
+    """
+    # Handle various date formats
+    if hasattr(date_val, 'strftime'):
+        date_str = date_val.strftime('%Y-%m-%d')
+    else:
+        date_str = str(date_val)[:10]
+
+    if display_text is None:
+        display_text = date_str
+
+    url = build_url_with_params({"tab": "dailies", "date": date_str})
+    escaped_display = html.escape(str(display_text))
+    return f'<a href="{url}" target="_self" class="date-link">{escaped_display}</a>'
+
+
+def render_floating_share_button(current_tab_slug):
+    """
+    Render a floating share button that shows a copyable URL for the current view.
+    Uses st.popover() with st.code() for native clipboard support.
+    CSS positions this as a fixed floating button.
+
+    Args:
+        current_tab_slug: Current tab's URL slug (e.g., "rankings", "dailies")
+    """
+    # Widget-to-param mapping for each tab
+    WIDGET_MAPS = {
+        "rankings": {"elo_ranking_date": "date"},
+        "dailies": {"dailies_date": "date"},
+        "tracker": {"tab4_player_select": "player"},
+        "duels": {"duel_player1": "player1", "duel_player2": "player2"},
+        "hall-of-fame": {},
+    }
+
+    # Build share params from current widget values
+    share_params = {"tab": current_tab_slug}
+    widget_map = WIDGET_MAPS.get(current_tab_slug, {})
+    for widget_key, param in widget_map.items():
+        if widget_key in st.session_state and st.session_state[widget_key] is not None:
+            value = st.session_state[widget_key]
+            if hasattr(value, 'strftime'):
+                value = value.strftime('%Y-%m-%d')
+            share_params[param] = value
+
+    share_path = build_url_with_params(share_params)
+
+    # Construct full shareable URL (detect domain from request headers)
+    base_url = get_share_base_url()
+    share_url = f"{base_url}/{share_path.lstrip('/')}"
+
+    # Render popover with share URL (CSS will float this)
+    with st.popover("🔗", use_container_width=False, help="Share this view"):
+        st.caption("Copy this link to share:")
+        st.code(share_url, language=None)
 
 
 def generate_ranking_cards(df):
@@ -116,7 +250,8 @@ def generate_ranking_cards(df):
                 rank_html = f'<span style="color:#FF6B6B;">#{rank_int}</span>'
 
         # Player name with status indicator (stacked vertically for small viewports)
-        name = html.escape(str(row.get('player_name', 'Unknown')))
+        raw_name = str(row.get('player_name', 'Unknown'))
+        name_link = player_link(raw_name)
         games_played = row.get('games_played', 0)
         games_count = int(games_played) if pd.notna(games_played) else 0
 
@@ -127,9 +262,9 @@ def generate_ranking_cards(df):
                 status_text = "(not enough games)"
             else:
                 status_text = "(inactive)"
-            name_html = f'<span class="card-name-text">{name}</span><span style="{status_label_style}">{status_text}</span>'
+            name_html = f'<span class="card-name-text">{name_link}</span><span style="{status_label_style}">{status_text}</span>'
         else:
-            name_html = f'<span class="card-name-text">{name}</span>'
+            name_html = f'<span class="card-name-text">{name_link}</span>'
 
         # Stats
         rating = safe_str(row.get('rating'), "{:.1f}")
@@ -184,7 +319,8 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
         else:
             rank_html = f'<span style="color:#FF6B6B;">#{rank_int}</span>'
 
-        name = html.escape(str(row.get('player_name', 'Unknown')))
+        raw_name = str(row.get('player_name', 'Unknown'))
+        name_link = player_link(raw_name)
         score = safe_str(row.get('score'))
 
         # Build stats grid based on available columns
@@ -207,7 +343,7 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
             elo_color = "#FF6B6B" if pd.notna(elo_rank) else "#6B9AFF"
             stats_html += f'<div style="{stat_layout}"><span style="{label_style}">Elo Rank</span><span style="{value_style};color:{elo_color};">{elo_rank_str}</span></div>'
 
-        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name"><span class="card-name-text">{name}</span></div><div class="card-rating active">{score}</div></div><div class="stats-grid" style="grid-template-columns:repeat(4, 1fr);">{stats_html}</div></div>'
+        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name"><span class="card-name-text">{name_link}</span></div><div class="card-rating active">{score}</div></div><div class="stats-grid" style="grid-template-columns:repeat(4, 1fr);">{stats_html}</div></div>'
         cards.append(card)
 
     return "".join(cards)
@@ -236,12 +372,9 @@ def generate_game_history_cards(df, has_active_rank=True):
 
     cards = []
     for _, row in df.iterrows():
-        # Date as header
+        # Date as header (clickable link to Dailies tab)
         date_val = row.get('date')
-        if hasattr(date_val, 'strftime'):
-            date_str = date_val.strftime('%Y-%m-%d')
-        else:
-            date_str = str(date_val)[:10]
+        date_link_html = daily_link(date_val)
 
         rank = row.get('rank')
         rank_int = int(rank) if pd.notna(rank) else 0
@@ -277,7 +410,7 @@ def generate_game_history_cards(df, has_active_rank=True):
         <div style="{stat_layout}"><span style="{label_style}">Stability</span><span style="{value_style}">{safe_str(row.get('consistency'), "{:.1f}")}</span></div>
         '''
 
-        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name"><span class="card-name-text">{date_str}</span></div><div class="card-rating active">{rating}</div></div><div class="stats-grid">{stats_html}</div></div>'
+        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name"><span class="card-name-text">{date_link_html}</span></div><div class="card-rating active">{rating}</div></div><div class="stats-grid">{stats_html}</div></div>'
         cards.append(card)
 
     return "".join(cards)
@@ -346,13 +479,15 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
         if limit is not None and idx >= limit:
             break
         date_val = row.get('Date')
+        # Generate date string for display
         if hasattr(date_val, 'strftime'):
             date_str = date_val.strftime('%Y-%m-%d')
         else:
             date_str = str(date_val)[:10]
         # Add "(most recent)" label to first card if requested
-        if last_encounter_label and idx == 0:
-            date_str += " (most recent)"
+        display_date = date_str + " (most recent)" if last_encounter_label and idx == 0 else date_str
+        # Create clickable date link
+        date_link_html = daily_link(date_val, display_date)
 
         winner = row.get('Winner', 'Tie')
 
@@ -382,6 +517,8 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
 
         # Header: Win counts on sides, Date and Winner centered
         # 3-column grid: p1 wins | date+winner | p2 wins
+        # Winner link (only if not a tie)
+        winner_display = player_link(winner) if winner in (player1, player2) else html.escape(winner)
         header_html = f'''
         <div class="duel-header" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;margin-bottom:0.75rem;padding:0 0.5rem 0.5rem 0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
             <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
@@ -389,8 +526,8 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
                 <span class="duel-win-label" style="font-size:0.7rem;text-transform:uppercase;font-weight:600;color:{p1_color};">Duel Wins</span>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;gap:0.25rem;">
-                <span class="duel-date" style="font-weight:600;font-size:1rem;color:var(--text-color);">{date_str}</span>
-                <span class="duel-winner" style="font-weight:700;color:{winner_color};">🏆 {winner}</span>
+                <span class="duel-date" style="font-weight:600;font-size:1rem;color:var(--text-color);">{date_link_html}</span>
+                <span class="duel-winner" style="font-weight:700;color:{winner_color};">🏆 {winner_display}</span>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
                 <span class="duel-win-count" style="font-weight:700;font-size:1.4rem;color:{p2_color};">{p2_cumulative}</span>
@@ -401,10 +538,12 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
 
         # Three-column layout: Player 1 | Crossed Swords | Player 2
         # max-width prevents excessive spreading on wide screens
+        p1_link = player_link(player1)
+        p2_link = player_link(player2)
         stats_html = f'''
         <div class="duel-stats" style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.5rem;align-items:start;max-width:700px;margin:0 auto;">
             <div style="text-align:center;">
-                <div class="duel-player-name" style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player1)} <span style="font-weight:500;">({p1_elo})</span></div>
+                <div class="duel-player-name" style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;">{p1_link} <span style="font-weight:500;">({p1_elo})</span></div>
                 <div class="duel-player-stats" style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Daily Rank</span><span class="duel-stat-value" style="{value_style}">#{p1_rank}</span></div>
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Score</span><span class="duel-stat-value" style="{value_style}">{p1_score}</span></div>
@@ -412,7 +551,7 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
             </div>
             <div class="duel-vs" style="display:flex;align-items:center;justify-content:center;font-size:2rem;padding-top:0.25rem;">⚔️</div>
             <div style="text-align:center;">
-                <div class="duel-player-name" style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;">{html.escape(player2)} <span style="font-weight:500;">({p2_elo})</span></div>
+                <div class="duel-player-name" style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;">{p2_link} <span style="font-weight:500;">({p2_elo})</span></div>
                 <div class="duel-player-stats" style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Daily Rank</span><span class="duel-stat-value" style="{value_style}">#{p2_rank}</span></div>
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Score</span><span class="duel-stat-value" style="{value_style}">{p2_score}</span></div>
@@ -810,6 +949,28 @@ CUSTOM_CSS = """
 /* Body text uses Rajdhani for readability */
 .main p, .main span, .main label, .main div {
     font-family: var(--font-body), sans-serif;
+}
+
+/* ===== Player Links (click to view in Tracker) ===== */
+.player-link {
+    color: inherit !important;
+    text-decoration: none !important;
+    transition: color 0.15s ease;
+}
+.player-link:hover {
+    color: #FF6B6B !important;
+    text-decoration: underline !important;
+}
+
+/* ===== Date Links (click to view in Dailies) ===== */
+.date-link {
+    color: inherit !important;
+    text-decoration: none !important;
+    transition: color 0.15s ease;
+}
+.date-link:hover {
+    color: #3B82F6 !important;
+    text-decoration: underline !important;
 }
 
 /* ===== Section Containers ===== */
@@ -1515,9 +1676,19 @@ CUSTOM_CSS = """
 
 /* Removed: Hidden table CSS - tables now fully removed from code */
 
-/* Back to top anchor */
+/* Back to top anchor - hide container spacing */
 #top {
     scroll-margin-top: 100vh;
+}
+[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.back-to-top) {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 0 !important;
+    overflow: visible;
+}
+[data-testid="stMarkdownContainer"]:has(.back-to-top) p {
+    margin: 0 !important;
+    line-height: 0 !important;
 }
 
 /* Back to top button */
@@ -1548,6 +1719,114 @@ CUSTOM_CSS = """
 }
 .back-to-top:active {
     transform: scale(0.95);
+}
+
+/* Floating share button - position the popover container */
+[data-testid="stMain"] [data-testid="stPopover"] {
+    position: fixed !important;
+    bottom: 2rem !important;
+    left: 2rem !important;
+    width: 48px !important;
+    height: 48px !important;
+    z-index: 1000 !important;
+}
+/* Style the button as a circle */
+[data-testid="stMain"] [data-testid="stPopover"] button {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    border-radius: 50% !important;
+    background: #3B82F6 !important;
+    color: white !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+    transition: transform 0.2s, box-shadow 0.2s !important;
+    overflow: hidden !important;
+}
+[data-testid="stMain"] [data-testid="stPopover"] button:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5) !important;
+    background: #2563EB !important;
+}
+[data-testid="stMain"] [data-testid="stPopover"] button:active {
+    transform: scale(0.95) !important;
+}
+/* Hide the dropdown arrow - target by material icon testid */
+[data-testid="stMain"] [data-testid="stPopover"] [data-testid="stIconMaterial"] {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+/* Also hide the parent container of the arrow */
+[data-testid="stMain"] [data-testid="stPopover"] button > div > div:last-child {
+    display: none !important;
+}
+/* Center the emoji and make it bright */
+[data-testid="stMain"] [data-testid="stPopover"] button > div {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    text-align: center !important;
+    margin: 0 !important;  /* Remove -5px right margin Streamlit adds for arrow */
+}
+[data-testid="stMain"] [data-testid="stPopover"] button > div > div:first-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+[data-testid="stMain"] [data-testid="stPopover"] [data-testid="stMarkdownContainer"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+[data-testid="stMain"] [data-testid="stPopover"] [data-testid="stMarkdownContainer"] p {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 1.2rem !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    filter: brightness(1.3) saturate(1.2) !important;
+    text-shadow: 0 0 2px rgba(255,255,255,0.5) !important;
+}
+/* Hide the element container for the floating button */
+[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has([data-testid="stPopover"]) {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 0 !important;
+    overflow: visible !important;
+    width: 0 !important;
+}
+/* Share popover content - mobile responsive */
+[data-testid="stPopoverBody"] {
+    max-width: calc(100vw - 4rem) !important;
+    width: auto !important;
+    min-width: 200px !important;
+}
+[data-testid="stPopoverBody"] [data-testid="stCode"] {
+    max-width: 100% !important;
+}
+[data-testid="stPopoverBody"] [data-testid="stCode"] code {
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+    font-size: 0.8rem !important;
+}
+/* Make copy button always visible (parent has opacity:0 by default) */
+[data-testid="stPopoverBody"] div:has(> [data-testid="stCodeCopyButton"]) {
+    opacity: 1 !important;
+}
+[data-testid="stPopoverBody"] [data-testid="stCaptionContainer"] {
+    font-size: 0.85rem !important;
 }
 
 /* Container-responsive: 4-column grid when container ≤600px */
@@ -1855,9 +2134,29 @@ def main():
                 align-items: center;
                 justify-content: center;
                 gap: 0.75rem;
-                padding: 0 0 0.5rem 0;
-                margin-bottom: 0.5rem;
-                border-bottom: 1px solid rgba(255, 107, 107, 0.2);
+                padding: 0;
+                margin: 0 0 var(--space-md) 0;  /* 16px bottom margin per design system */
+            }}
+            .dashboard-banner-link,
+            .dashboard-banner-link:hover,
+            .dashboard-banner-link:visited {{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: inherit;
+                text-decoration: none !important;
+                color: inherit;
+                cursor: pointer;
+            }}
+            .dashboard-banner-link *,
+            .dashboard-banner-link:hover * {{
+                text-decoration: none !important;
+            }}
+            .dashboard-banner-link:hover {{
+                opacity: 0.85;
+            }}
+            [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.dashboard-banner) {{
+                margin: 0 !important;  /* Override Streamlit default - spacing controlled via .dashboard-banner */
             }}
             .dashboard-logo {{
                 width: 50px;
@@ -1898,6 +2197,21 @@ def main():
                 padding: 0 !important;
                 letter-spacing: 0.04em;
             }}
+            /* Scale up banner on wider viewports (sm breakpoint = 600px) */
+            @media (min-width: 600px) {{
+                .dashboard-banner {{
+                    gap: 1rem;  /* --space-md */
+                }}
+                .dashboard-logo {{
+                    width: 60px;
+                }}
+                .dashboard-title {{
+                    font-size: 1.5rem !important;
+                }}
+                .dashboard-subtitle {{
+                    font-size: 0.7rem;
+                }}
+            }}
             /* Hide the anchor link inside the title */
             .dashboard-title [data-testid="stHeaderActionElements"] {{
                 display: none !important;
@@ -1910,11 +2224,13 @@ def main():
             }}
         </style>
         <div class="dashboard-banner">
-            <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
-            <div class="dashboard-title-group">
-                <h1 class="dashboard-title">DFTL Rankings</h1>
-                <p class="dashboard-subtitle">Elo-based leaderboard</p>
-            </div>
+            <a href="?" class="dashboard-banner-link" target="_self" title="Clear filters and return to Rankings">
+                <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
+                <div class="dashboard-title-group">
+                    <h1 class="dashboard-title">DFTL Rankings</h1>
+                    <p class="dashboard-subtitle">Elo-based leaderboard</p>
+                </div>
+            </a>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -2025,6 +2341,16 @@ def main():
     }
     SLUG_TO_TAB = {v: k for k, v in TAB_SLUGS.items()}
 
+    # Define which query params are relevant to each tab
+    TAB_PARAMS = {
+        "rankings": ["date"],
+        "duels": ["player1", "player2"],
+        "tracker": ["player"],
+        "dailies": ["date"],
+        "hall-of-fame": [],
+    }
+    ALL_TAB_PARAMS = set(p for params in TAB_PARAMS.values() for p in params)
+
     # Read tab from URL query params (persists across reloads)
     url_tab = st.query_params.get("tab", "rankings")
     default_tab = SLUG_TO_TAB.get(url_tab, TAB_OPTIONS[0])
@@ -2039,24 +2365,71 @@ def main():
         key="tab_selector"
     )
 
-    # Update URL when tab changes (without triggering rerun)
+    # Map widget session state keys to their corresponding URL param names
+    # This allows saving widget values when switching tabs (without URL auto-sync)
+    WIDGET_TO_PARAM = {
+        "rankings": {"elo_ranking_date": "date"},
+        "dailies": {"dailies_date": "date"},
+        "tracker": {"tab4_player_select": "player"},
+        "duels": {"duel_player1": "player1", "duel_player2": "player2"},
+    }
+
+    # Smart tab switching: save/restore params per tab, keep URLs clean
     new_slug = TAB_SLUGS.get(active_tab, "rankings")
     if url_tab != new_slug:
+        # Save current tab's widget values to session state before switching
+        widget_map = WIDGET_TO_PARAM.get(url_tab, {})
+        for widget_key, param in widget_map.items():
+            if widget_key in st.session_state and st.session_state[widget_key] is not None:
+                value = st.session_state[widget_key]
+                # Format dates as strings
+                if hasattr(value, 'strftime'):
+                    value = value.strftime('%Y-%m-%d')
+                st.session_state[f"saved_param_{url_tab}_{param}"] = value
+
+        # Clear all tab-specific params from URL
+        for param in ALL_TAB_PARAMS:
+            if param in st.query_params:
+                del st.query_params[param]
+
+        # Restore saved params for the new tab (to URL for deep linking)
+        for param in TAB_PARAMS.get(new_slug, []):
+            saved_key = f"saved_param_{new_slug}_{param}"
+            if saved_key in st.session_state:
+                st.query_params[param] = st.session_state[saved_key]
+
+        # Update tab param
         st.query_params["tab"] = new_slug
 
     # --- Tab 4: Steam Leaderboards ---
     if active_tab == "📊 Dailies":
-
         # Date selector for specific day
         available_dates = sorted(df_filtered['date'].dt.date.unique(), reverse=True)
         if available_dates:
+            # Check for date in URL query params (e.g., ?tab=dailies&date=2024-01-15)
+            url_date = st.query_params.get("date", None)
+            default_date = available_dates[0]  # Most recent by default
+
+            if url_date:
+                try:
+                    from datetime import datetime
+                    parsed_date = datetime.strptime(url_date, '%Y-%m-%d').date()
+                    if parsed_date in available_dates:
+                        default_date = parsed_date
+                except ValueError:
+                    pass  # Invalid date format, use default
+
             # Calendar date picker
             selected_date = st.date_input(
                 "Select date",
-                value=available_dates[0],  # Default to most recent
+                value=default_date,
                 min_value=available_dates[-1],
-                max_value=available_dates[0]
+                max_value=available_dates[0],
+                key="dailies_date"
             )
+
+            # Note: Date is saved to session state on tab switch, not synced to URL on every change
+            # This prevents browser history pollution while still enabling deep linking via date clicks
 
             # Check if selected date has data
             df_day = df_filtered[df_filtered['date'].dt.date == selected_date].copy()
@@ -2099,6 +2472,19 @@ def main():
             # Date picker and sort on same row
             available_dates = sorted(df_history['date'].dt.date.unique(), reverse=True)
 
+            # Check for date in URL query params (shared with Dailies tab)
+            url_date = st.query_params.get("date", None)
+            default_ranking_date = available_dates[0]  # Most recent by default
+
+            if url_date:
+                try:
+                    from datetime import datetime
+                    parsed_date = datetime.strptime(url_date, '%Y-%m-%d').date()
+                    if parsed_date in available_dates:
+                        default_ranking_date = parsed_date
+                except ValueError:
+                    pass  # Invalid date format, use default
+
             # Sort options: display name -> (column, default_ascending)
             sort_options = {
                 "Elo": ("rating", False),
@@ -2116,11 +2502,12 @@ def main():
             with col_date:
                 selected_ranking_date = st.date_input(
                     "Date",
-                    value=available_dates[0],
+                    value=default_ranking_date,
                     min_value=available_dates[-1],
                     max_value=available_dates[0],
                     key="elo_ranking_date"
                 )
+                # Note: Date saved to session state on tab switch, not synced to URL on every change
             with col_sort:
                 selected_sort = st.selectbox(
                     "Sort by",
@@ -2282,24 +2669,33 @@ def main():
 
     # --- Tab 3: Player Tracker ---
     if active_tab == "👤 Tracker":
-
         if df_history is not None:
-            # Pre-select random player from top 10 on first load (persists during session)
-            if 'tracker_default_player' not in st.session_state:
+            # Check for player in URL query params (e.g., ?tab=tracker&player=Bidderlyn)
+            url_player = st.query_params.get("player", None)
+            player_index = None
+
+            if url_player and url_player in players_by_rating:
+                player_index = players_by_rating.index(url_player)
+            elif 'tracker_default_player' not in st.session_state:
+                # Pre-select random player from top 10 on first load (persists during session)
                 top_n = min(10, len(players_by_rating))
                 if top_n >= 1:
-                    st.session_state.tracker_default_player = random.randint(0, top_n - 1)
-                else:
-                    st.session_state.tracker_default_player = None
+                    player_index = random.randint(0, top_n - 1)
+                    st.session_state.tracker_default_player = player_index
+
+            # Use URL player, session state, or None
+            if player_index is None:
+                player_index = st.session_state.get('tracker_default_player', None)
 
             # Player selector (single selection)
             selected_player = st.selectbox(
                 "Select a player",
                 options=players_by_rating,
-                index=st.session_state.tracker_default_player,
+                index=player_index,
                 placeholder="Choose a player...",
                 key="tab4_player_select"
             )
+            # Note: Player saved to session state on tab switch, not synced to URL on every change
 
             if selected_player:
                 # Filter history for selected player
@@ -2346,12 +2742,12 @@ def main():
                         last_game = sorted_games.iloc[-1]
 
                         first_date = first_game['date']
-                        first_date_str = first_date.strftime('%Y-%m-%d') if hasattr(first_date, 'strftime') else str(first_date)[:10]
+                        first_date_link = daily_link(first_date)
                         first_rank = int(first_game['rank'])
                         first_rating = first_game['rating']
 
                         last_date = last_game['date']
-                        last_date_str = last_date.strftime('%Y-%m-%d') if hasattr(last_date, 'strftime') else str(last_date)[:10]
+                        last_date_link = daily_link(last_date)
                         last_rank = int(last_game['rank'])
                         last_rating = last_game['rating']
 
@@ -2393,13 +2789,13 @@ def main():
                             <div class="tracker-timeline">
                                 <div class="tracker-timeline-item tracker-first">
                                     <div class="tracker-timeline-label">First</div>
-                                    <div class="tracker-timeline-date">{first_date_str}</div>
+                                    <div class="tracker-timeline-date">{first_date_link}</div>
                                     <div class="tracker-timeline-detail">#{first_rank} • {first_rating:.0f}</div>
                                 </div>
                                 <div class="tracker-timeline-arrow">→</div>
                                 <div class="tracker-timeline-item tracker-last">
                                     <div class="tracker-timeline-label">Last</div>
-                                    <div class="tracker-timeline-date">{last_date_str}</div>
+                                    <div class="tracker-timeline-date">{last_date_link}</div>
                                     <div class="tracker-timeline-detail">#{last_rank} • {last_rating:.0f}</div>
                                 </div>
                             </div>
@@ -2566,7 +2962,6 @@ def main():
 
     # --- Tab 5: Top 10 History ---
     if active_tab == "🏆 Hall of Fame":
-
         if df_history is not None and 'active_rank' in df_history.columns:
             # Use pre-computed active_rank from history data
             # Filter to players with an active_rank (only active players have ranks)
@@ -2628,18 +3023,36 @@ def main():
 
     # --- Tab 2: Daily Duels ---
     if active_tab == "⚔️ Duels":
-
         if df_history is not None:
-            # Pre-select random duo from top 10 on first load (persists during session)
-            if 'duel_default_p1' not in st.session_state:
-                top_n = min(10, len(players_by_rating))
-                if top_n >= 2:
-                    idx1, idx2 = random.sample(range(top_n), 2)
-                    st.session_state.duel_default_p1 = idx1
-                    st.session_state.duel_default_p2 = idx2
-                else:
-                    st.session_state.duel_default_p1 = None
-                    st.session_state.duel_default_p2 = None
+            # Check for players in URL query params (e.g., ?tab=duels&player1=Bidderlyn&player2=Siker_7)
+            url_player1 = st.query_params.get("player1", None)
+            url_player2 = st.query_params.get("player2", None)
+
+            p1_index = None
+            p2_index = None
+
+            # If query params provided, use them
+            if url_player1 and url_player1 in players_by_rating:
+                p1_index = players_by_rating.index(url_player1)
+            if url_player2 and url_player2 in players_by_rating:
+                p2_index = players_by_rating.index(url_player2)
+
+            # If no query params (or invalid), use session state or random selection
+            if p1_index is None or p2_index is None:
+                if 'duel_default_p1' not in st.session_state:
+                    top_n = min(10, len(players_by_rating))
+                    if top_n >= 2:
+                        idx1, idx2 = random.sample(range(top_n), 2)
+                        st.session_state.duel_default_p1 = idx1
+                        st.session_state.duel_default_p2 = idx2
+                    else:
+                        st.session_state.duel_default_p1 = None
+                        st.session_state.duel_default_p2 = None
+
+                if p1_index is None:
+                    p1_index = st.session_state.get('duel_default_p1', None)
+                if p2_index is None:
+                    p2_index = st.session_state.get('duel_default_p2', None)
 
             # Get theme colors (same source as duel cards for consistency)
             duel_colors = get_theme_colors()
@@ -2653,7 +3066,7 @@ def main():
                 player1 = st.selectbox(
                     "Player 1",
                     options=players_by_rating,
-                    index=st.session_state.duel_default_p1,
+                    index=p1_index,
                     placeholder="Choose player...",
                     key="duel_player1",
                     label_visibility="collapsed"
@@ -2664,11 +3077,12 @@ def main():
                 player2 = st.selectbox(
                     "Player 2",
                     options=players_by_rating,
-                    index=st.session_state.duel_default_p2,
+                    index=p2_index,
                     placeholder="Choose player...",
                     key="duel_player2",
                     label_visibility="collapsed"
                 )
+            # Note: Players saved to session state on tab switch, not synced to URL on every change
 
             if player1 and player2:
                 if player1 == player2:
@@ -2975,6 +3389,9 @@ def main():
                 st.info("Select two players to compare their head-to-head performance.")
         else:
             st.warning("History data not available.")
+
+    # Floating share button (rendered last so CSS :last-of-type targets it)
+    render_floating_share_button(new_slug)
 
 if __name__ == "__main__":
     main()
