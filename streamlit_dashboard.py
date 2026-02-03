@@ -566,6 +566,254 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
     return "".join(cards)
 
 
+def compute_hall_of_fame_stats(df_history):
+    """
+    Compute Hall of Fame statistics from history data.
+    Returns dict with top 10 for each category (including all ties at 10th):
+    - most_wins: Players with most rank=1 finishes
+    - highest_scores: Single-game highest scores
+    - most_games: Players with most games played
+    - longest_streaks: Longest consecutive rank=1 win streaks
+    """
+    if df_history is None or df_history.empty:
+        return None
+
+    # Filter to rows where player actually played (has a rank/score)
+    df_played = df_history[df_history['rank'].notna()].copy()
+
+    if df_played.empty:
+        return None
+
+    def top_n_with_ties(df, value_col, n=10, cols=None):
+        """Get top N entries including all ties at the Nth position."""
+        if cols is None:
+            cols = ['player_name', value_col]
+        df_sorted = df.sort_values(value_col, ascending=False)
+        if len(df_sorted) <= n:
+            return df_sorted[cols].values.tolist()
+        # Find the value at the nth position
+        nth_value = df_sorted.iloc[n - 1][value_col]
+        # Include all entries with value >= nth_value
+        result = df_sorted[df_sorted[value_col] >= nth_value][cols]
+        return result.values.tolist()
+
+    # 1. Most Wins (total rank=1 finishes per player)
+    # Get latest row per player (cumulative wins column)
+    latest_per_player = df_history.sort_values('date').groupby('player_name').last().reset_index()
+    if 'wins' in latest_per_player.columns:
+        most_wins = top_n_with_ties(latest_per_player, 'wins', 10, ['player_name', 'wins'])
+    else:
+        # Fallback: count rank=1 occurrences
+        win_counts = df_played[df_played['rank'] == 1].groupby('player_name').size().reset_index(name='wins')
+        most_wins = top_n_with_ties(win_counts, 'wins', 10, ['player_name', 'wins'])
+
+    # 2. Highest Scores (single-game records)
+    df_with_scores = df_played[df_played['score'].notna()].copy()
+    highest_scores = top_n_with_ties(df_with_scores, 'score', 10, ['player_name', 'score', 'date'])
+
+    # 3. Most Games (total games played per player)
+    if 'games_played' in latest_per_player.columns:
+        most_games = top_n_with_ties(latest_per_player, 'games_played', 10, ['player_name', 'games_played'])
+    else:
+        # Fallback: count appearances
+        game_counts = df_played.groupby('player_name').size().reset_index(name='games_played')
+        most_games = top_n_with_ties(game_counts, 'games_played', 10, ['player_name', 'games_played'])
+
+    # 4. Longest Win Streaks (consecutive rank=1 days)
+    # Sort by player and date
+    df_sorted = df_played.sort_values(['player_name', 'date'])
+
+    streaks = []
+    for player, group in df_sorted.groupby('player_name'):
+        group = group.sort_values('date')
+        current_streak = 0
+        max_streak = 0
+        streak_end_date = None
+        current_streak_end = None
+
+        for _, row in group.iterrows():
+            if row['rank'] == 1:
+                current_streak += 1
+                current_streak_end = row['date']
+                if current_streak > max_streak:
+                    max_streak = current_streak
+                    streak_end_date = current_streak_end
+            else:
+                current_streak = 0
+
+        if max_streak > 0:
+            streaks.append((player, max_streak, streak_end_date))
+
+    # Sort by streak length and include all ties at 10th position
+    streaks.sort(key=lambda x: x[1], reverse=True)
+    if len(streaks) <= 10:
+        longest_streaks = streaks
+    else:
+        tenth_value = streaks[9][1]  # Value at 10th position
+        longest_streaks = [s for s in streaks if s[1] >= tenth_value]
+
+    # 5. Days at Elo #1 (all players who have held active_rank=1)
+    # Count days where each player was Elo #1
+    if 'active_rank' in df_history.columns:
+        df_elo_1 = df_history[df_history['active_rank'] == 1].copy()
+        days_at_elo_1_counts = df_elo_1.groupby('player_name').size().reset_index(name='days')
+        days_at_elo_1_counts = days_at_elo_1_counts.sort_values('days', ascending=False)
+        days_at_elo_1 = days_at_elo_1_counts[['player_name', 'days']].values.tolist()
+    else:
+        days_at_elo_1 = []
+
+    return {
+        'most_wins': most_wins,
+        'highest_scores': highest_scores,
+        'most_games': most_games,
+        'longest_streaks': longest_streaks,
+        'days_at_elo_1': days_at_elo_1,
+    }
+
+
+def generate_hall_of_fame_cards(stats):
+    """
+    Generate HTML cards for Hall of Fame leaderboards.
+    Each card shows top 5 players for a category.
+    """
+    if stats is None:
+        return ""
+
+    def format_number(val):
+        """Format large numbers with commas."""
+        if pd.isna(val):
+            return "-"
+        try:
+            return f"{int(val):,}"
+        except (ValueError, TypeError):
+            return str(val)
+
+    # Card styling (matches existing card styles)
+    card_style = """
+        background: var(--secondary-background-color);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    """
+
+    title_style = """
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 0 0 0.75rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(128,128,128,0.35);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    """
+
+    row_style = """
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.375rem 0;
+        border-bottom: 1px solid rgba(128,128,128,0.15);
+    """
+
+    rank_style = """
+        font-weight: 700;
+        font-size: 0.9rem;
+        min-width: 1.5rem;
+        color-scheme: inherit;
+        color: light-dark(#666666, #999999);
+    """
+
+    name_style = """
+        flex: 1;
+        font-weight: 500;
+        margin: 0 0.5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    """
+
+    value_style = """
+        font-weight: 700;
+        font-size: 1rem;
+        color-scheme: inherit;
+        color: light-dark(#D93636, #FF6B6B);
+    """
+
+    def build_card(title, icon, items, value_formatter=format_number):
+        """Build a single Hall of Fame card with proper tie handling."""
+        rows_html = ""
+        current_rank = 0
+        prev_value = None
+
+        for i, item in enumerate(items):
+            player = item[0]
+            value = item[1]
+
+            # Only increment rank if value is different from previous
+            if value != prev_value:
+                current_rank = i + 1
+                prev_value = value
+
+            # Special medal styling for top 3
+            if current_rank == 1:
+                rank_display = "🥇"
+            elif current_rank == 2:
+                rank_display = "🥈"
+            elif current_rank == 3:
+                rank_display = "🥉"
+            else:
+                rank_display = f"{current_rank}."
+
+            # Create player link
+            player_url = build_url_with_params({"tab": "tracker", "player": player})
+            player_link_html = f'<a href="{player_url}" target="_self" class="player-link" style="color: inherit; text-decoration: none;">{html.escape(player)}</a>'
+
+            rows_html += f'''
+                <div style="{row_style}">
+                    <span style="{rank_style}">{rank_display}</span>
+                    <span style="{name_style}">{player_link_html}</span>
+                    <span style="{value_style}">{value_formatter(value)}</span>
+                </div>
+            '''
+
+        return f'''
+            <div style="{card_style}">
+                <div style="{title_style}">
+                    <span style="font-size: 1.2rem;">{icon}</span>
+                    <span>{title}</span>
+                </div>
+                {rows_html}
+            </div>
+        '''
+
+    cards_html = '<div class="hof-cards-grid">'
+
+    # Most Wins card
+    if stats.get('most_wins'):
+        cards_html += build_card("Most Wins", "🏆", stats['most_wins'])
+
+    # Highest Scores card
+    if stats.get('highest_scores'):
+        cards_html += build_card("Highest Scores", "💯", stats['highest_scores'])
+
+    # Most Games card
+    if stats.get('most_games'):
+        cards_html += build_card("Most Games", "🎮", stats['most_games'])
+
+    # Longest Win Streaks card
+    if stats.get('longest_streaks'):
+        cards_html += build_card("Longest Win Streaks", "🔥", stats['longest_streaks'])
+
+    # Days at Elo #1 card (shows ALL players who have held #1, not just top 5)
+    if stats.get('days_at_elo_1'):
+        cards_html += build_card("Days at Elo #1", "👑", stats['days_at_elo_1'])
+
+    cards_html += '</div>'
+
+    return cards_html
+
+
 # Theme-specific colors (WCAG AA compliant contrast ratios)
 DARK_THEME = {
     "bg_primary": "#0E1117",
@@ -1970,6 +2218,57 @@ CUSTOM_CSS = """
         font-size: 1.4rem !important;
     }
 }
+
+/* Hall of Fame cards grid */
+.hof-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 700px) {
+    .hof-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.hof-cards-grid a.player-link:hover {
+    color: #FF6B6B !important;
+    text-decoration: underline !important;
+}
+
+/* Hall of Fame chart card */
+.hof-chart-card {
+    background: var(--secondary-background-color);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px 12px 0 0;
+    padding: 1rem 1rem 0 1rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    margin-top: 0.5rem;
+}
+
+.hof-chart-header {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(128,128,128,0.35);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Style the Plotly chart container that follows the card header */
+[data-testid="stElementContainer"]:has(.hof-chart-card) + [data-testid="stElementContainer"] {
+    background: var(--secondary-background-color);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 0.75rem 1rem 1rem 1rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    margin-top: -1rem !important;
+}
 </style>
 """
 
@@ -2963,6 +3262,12 @@ def main():
     # --- Tab 5: Top 10 History ---
     if active_tab == "🏆 Hall of Fame":
         if df_history is not None and 'active_rank' in df_history.columns:
+            # Hall of Fame leaderboard cards
+            hof_stats = compute_hall_of_fame_stats(df_history)
+            if hof_stats:
+                hof_cards_html = generate_hall_of_fame_cards(hof_stats)
+                st.html(hof_cards_html)
+
             # Use pre-computed active_rank from history data
             # Filter to players with an active_rank (only active players have ranks)
             df_history_active = df_history[df_history['active_rank'].notna()].copy()
@@ -2974,7 +3279,15 @@ def main():
             df_rank1 = df_top10[df_top10['active_rank'] == 1].copy()
             df_rank1 = df_rank1.sort_values('date')
 
-            st.html('<p class="tracker-chart-label">Elo Rank #1 History</p>')
+            # Card header for the chart
+            st.html('''
+                <div class="hof-chart-card">
+                    <div class="hof-chart-header">
+                        <span style="font-size: 1.2rem;">📈</span>
+                        <span>Elo #1 Timeline</span>
+                    </div>
+                </div>
+            ''')
 
             if not df_rank1.empty:
                 # Get all unique players who held #1
@@ -3003,7 +3316,6 @@ def main():
                         symbol='diamond',
                     ),
                 )
-                colors = get_theme_colors()
                 fig_rank1.update_layout(
                     height=max(200, len(all_rank1_players) * 25),  # Dynamic height based on player count
                     margin=dict(l=20, r=20, t=20, b=20),
