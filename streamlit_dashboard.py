@@ -87,12 +87,20 @@ def build_url_with_params(new_params):
         "hall-of-fame": [],
     }
 
+    # Global params that apply to all tabs
+    GLOBAL_PARAMS = ["dataset"]
+
     # Determine target tab from new_params
     target_tab = new_params.get("tab", "rankings")
     relevant_params = TAB_PARAMS.get(target_tab, [])
 
     # Start with tab param
     result_params = {"tab": target_tab}
+
+    # Include global params if present
+    for param in GLOBAL_PARAMS:
+        if param in new_params:
+            result_params[param] = new_params[param]
 
     # Only include params relevant to the target tab
     for param in relevant_params:
@@ -104,16 +112,36 @@ def build_url_with_params(new_params):
     return "?" + "&".join(query_parts) if query_parts else ""
 
 
+def _get_current_dataset_param():
+    """
+    Get the current dataset as a URL param if it's not the default.
+    Returns a dict with {"dataset": prefix} if Early Access is selected,
+    or an empty dict if using the default (full) dataset.
+    """
+    # Dataset label to URL prefix mapping (duplicated here for early access)
+    DATASET_PREFIXES = {
+        "Steam Demo+Early Access": "full",
+        "Early Access Only": "early_access"
+    }
+    if "sidebar_dataset" in st.session_state:
+        dataset_label = st.session_state["sidebar_dataset"]
+        dataset_prefix = DATASET_PREFIXES.get(dataset_label, "full")
+        if dataset_prefix != "full":
+            return {"dataset": dataset_prefix}
+    return {}
+
+
 def player_link(name, display_text=None):
     """
     Generate an anchor link to the Tracker tab for a player.
     The link uses query params: ?tab=tracker&player=PlayerName
-    Preserves other existing query params for navigation context.
+    Preserves dataset selection and other context params.
     target="_self" ensures navigation stays in the same browser tab.
     """
     if display_text is None:
         display_text = name
-    url = build_url_with_params({"tab": "tracker", "player": name})
+    params = {"tab": "tracker", "player": name, **_get_current_dataset_param()}
+    url = build_url_with_params(params)
     escaped_display = html.escape(display_text)
     return f'<a href="{url}" target="_self" class="player-link">{escaped_display}</a>'
 
@@ -122,12 +150,13 @@ def duel_link(player1, player2, display_text=None):
     """
     Generate an anchor link to the Duels tab with a specific matchup.
     The link uses query params: ?tab=duels&player1=Name1&player2=Name2
-    Preserves other existing query params for navigation context.
+    Preserves dataset selection and other context params.
     target="_self" ensures navigation stays in the same browser tab.
     """
     if display_text is None:
         display_text = f"{player1} vs {player2}"
-    url = build_url_with_params({"tab": "duels", "player1": player1, "player2": player2})
+    params = {"tab": "duels", "player1": player1, "player2": player2, **_get_current_dataset_param()}
+    url = build_url_with_params(params)
     escaped_display = html.escape(display_text)
     return f'<a href="{url}" target="_self" class="player-link">{escaped_display}</a>'
 
@@ -136,7 +165,7 @@ def daily_link(date_val, display_text=None):
     """
     Generate an anchor link to the Dailies tab with a specific date selected.
     The link uses query params: ?tab=dailies&date=YYYY-MM-DD
-    Preserves other existing query params for navigation context.
+    Preserves dataset selection and other context params.
     target="_self" ensures navigation stays in the same browser tab.
     """
     # Handle various date formats
@@ -148,7 +177,8 @@ def daily_link(date_val, display_text=None):
     if display_text is None:
         display_text = date_str
 
-    url = build_url_with_params({"tab": "dailies", "date": date_str})
+    params = {"tab": "dailies", "date": date_str, **_get_current_dataset_param()}
+    url = build_url_with_params(params)
     escaped_display = html.escape(str(display_text))
     return f'<a href="{url}" target="_self" class="date-link">{escaped_display}</a>'
 
@@ -173,6 +203,15 @@ def render_floating_share_button(current_tab_slug):
 
     # Build share params from current widget values
     share_params = {"tab": current_tab_slug}
+
+    # Add dataset if not default (full)
+    if "sidebar_dataset" in st.session_state:
+        dataset_label = st.session_state["sidebar_dataset"]
+        # Map label to prefix for URL
+        dataset_prefix = DATASET_OPTIONS.get(dataset_label, "full")
+        if dataset_prefix != "full":  # Only include if not default
+            share_params["dataset"] = dataset_prefix
+
     widget_map = WIDGET_MAPS.get(current_tab_slug, {})
     for widget_key, param in widget_map.items():
         if widget_key in st.session_state and st.session_state[widget_key] is not None:
@@ -2421,10 +2460,38 @@ def main():
 
     # Title with logo, gradient text, and glow effects
     logo_path = Path(__file__).parent / "images" / "dftl_logo.png"
+
+    # Determine current dataset for badge display and toggle behavior
+    # Check both URL param (for direct navigation) and session state (for widget selection)
+    is_early_access = False
+    if st.query_params.get("dataset") == "early_access":
+        is_early_access = True
+    elif "sidebar_dataset" in st.session_state:
+        if st.session_state["sidebar_dataset"] == "Early Access Only":
+            is_early_access = True
+
+    # Badge and toggle link: clicking banner switches to the OTHER dataset
+    # Always lands on Rankings tab (default) for simplicity
+    if is_early_access:
+        dataset_badge_html = '<span class="dataset-badge dataset-badge-ea">Early Access</span>'
+        toggle_params = {}  # Clean URL → full dataset, rankings tab
+        banner_link_title = "Switch to Steam Demo+Early Access dataset"
+    else:
+        dataset_badge_html = '<span class="dataset-badge dataset-badge-full">Full Dataset</span>'
+        toggle_params = {"dataset": "early_access"}
+        banner_link_title = "Switch to Early Access Only dataset"
+
+    # Build query string preserving other params
+    if toggle_params:
+        query_parts = [f"{quote(str(k))}={quote(str(v))}" for k, v in toggle_params.items()]
+        banner_link_href = "?" + "&".join(query_parts)
+    else:
+        banner_link_href = "?"
+
     if logo_path.exists():
         with open(logo_path, "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
-        st.markdown(f"""
+        st.html(f"""
         <style>
             /* Container query context */
             /* Banner header - compact, full-width, always horizontal, centered */
@@ -2469,6 +2536,30 @@ def main():
                 align-items: flex-start;
                 gap: 0;
             }}
+            .dashboard-title-row {{
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }}
+            .dataset-badge {{
+                font-family: system-ui, sans-serif !important;
+                font-size: 0.55rem !important;
+                font-weight: 600 !important;
+                padding: 0.15rem 0.4rem;
+                border-radius: 4px;
+                color-scheme: inherit;
+                white-space: nowrap;
+                letter-spacing: 0.02em;
+                cursor: pointer;
+            }}
+            .dataset-badge-ea {{
+                background: light-dark(#DBEAFE, #1E3A5F);
+                color: light-dark(#1E40AF, #93C5FD);
+            }}
+            .dataset-badge-full {{
+                background: light-dark(#D1FAE5, #064E3B);
+                color: light-dark(#065F46, #6EE7B7);
+            }}
             .dashboard-title {{
                 font-family: 'Source Sans', sans-serif !important;
                 font-size: 1.25rem !important;
@@ -2510,6 +2601,10 @@ def main():
                 .dashboard-subtitle {{
                     font-size: 0.7rem;
                 }}
+                .dataset-badge {{
+                    font-size: 0.65rem !important;
+                    padding: 0.2rem 0.5rem;
+                }}
             }}
             /* Hide the anchor link inside the title */
             .dashboard-title [data-testid="stHeaderActionElements"] {{
@@ -2523,15 +2618,18 @@ def main():
             }}
         </style>
         <div class="dashboard-banner">
-            <a href="?" class="dashboard-banner-link" target="_self" title="Clear filters and return to Rankings">
+            <a href="{banner_link_href}" class="dashboard-banner-link" target="_self" title="{banner_link_title}">
                 <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
                 <div class="dashboard-title-group">
-                    <h1 class="dashboard-title">DFTL Rankings</h1>
+                    <div class="dashboard-title-row">
+                        <h1 class="dashboard-title">DFTL Rankings</h1>
+                        {dataset_badge_html}
+                    </div>
                     <p class="dashboard-subtitle">Elo-based leaderboard</p>
                 </div>
             </a>
         </div>
-        """, unsafe_allow_html=True)
+        """)
     else:
         st.title("DFTL Rankings")
 
@@ -2548,14 +2646,36 @@ def main():
     with st.sidebar:
         st.header("📊 Dataset")
 
+        # Check for dataset in URL params
+        url_dataset = st.query_params.get("dataset", None)
+        dataset_index = 0
+        if url_dataset:
+            # Find the label for this prefix
+            for i, (label, prefix) in enumerate(available_datasets.items()):
+                if prefix == url_dataset:
+                    dataset_index = i
+                    break
+
         # Dataset selector (label hidden - redundant with header)
         dataset_label = st.selectbox(
             "Dataset",
             options=list(available_datasets.keys()),
-            index=0,
-            label_visibility="collapsed"
+            index=dataset_index,
+            label_visibility="collapsed",
+            key="sidebar_dataset"
         )
         dataset_prefix = available_datasets[dataset_label]
+
+        # Sync dataset selection to URL params (so refresh preserves selection)
+        current_url_dataset = st.query_params.get("dataset", None)
+        if dataset_prefix == "full":
+            # Default dataset - remove param from URL if present
+            if current_url_dataset is not None:
+                del st.query_params["dataset"]
+        else:
+            # Non-default dataset - ensure param is in URL
+            if current_url_dataset != dataset_prefix:
+                st.query_params["dataset"] = dataset_prefix
 
         # Load data
         df_leaderboard = load_leaderboard_data(dataset_prefix)
