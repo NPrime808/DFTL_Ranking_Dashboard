@@ -319,7 +319,7 @@ def generate_ranking_cards(df):
         # Build card with CSS-class-based responsive header
         # Rating class: 'active' (coral) for ranked, 'inactive' (muted) for unranked
         rating_class = "inactive" if is_inactive else "active"
-        card = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating {rating_class}"><span class="rating-label">Elo</span>{rating}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Games</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Wins</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Win%</span><span style="{value_style}">{win_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10</span><span style="{value_style}">{top10}</span></div><div style="{stat_layout}"><span style="{label_style}">Top10%</span><span style="{value_style}">{top10_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Avg Rank</span><span style="{value_style}">{avg_r}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last7}</span></div><div style="{stat_layout}"><span style="{label_style}">Stability</span><span style="{value_style}">{consist}</span></div></div></div>'
+        card = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating {rating_class}"><span class="rating-label">Elo</span>{rating}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Daily Runs</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1 (%)</span><span style="{value_style}">{win_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10</span><span style="{value_style}">{top10}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10 (%)</span><span style="{value_style}">{top10_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Avg</span><span style="{value_style}">{avg_r}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last7}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{consist}</span></div></div></div>'
         cards.append(card)
 
     return "".join(cards)
@@ -327,17 +327,13 @@ def generate_ranking_cards(df):
 
 def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
     """
-    Generate HTML cards for the daily leaderboard display (Tab 4).
-    Shows: Daily Rank, Player Name, Score, Rating (if available), Rating Change, Elo Rank.
+    Generate HTML rows for the daily leaderboard display (Tab 4).
+    Single-row format: Daily Rank | Score | Player | Rating (change)
     """
     if df.empty:
         return "<p>No data available</p>"
 
-    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
-
-    stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
-    label_style = "font-size:0.8rem;text-transform:uppercase;color:var(--text-color);font-weight:500;"
-    value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
+    row_style = "display:flex;align-items:center;gap:1rem;padding:0.75rem 1rem;margin-bottom:0.5rem;border-radius:8px;background:var(--secondary-background-color);border-left:4px solid;"
 
     def safe_str(val, fmt=None):
         if pd.isna(val):
@@ -346,52 +342,63 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
             return fmt.format(val)
         return str(int(val))
 
-    cards = []
+    rows = []
     for _, row in df.iterrows():
         rank = row.get('rank')
         rank_int = int(rank) if pd.notna(rank) else 0
 
+        # Border color based on rank
+        if rank_int == 1:
+            border_color = "#FFD700"
+        elif rank_int == 2:
+            border_color = "#C0C0C0"
+        elif rank_int == 3:
+            border_color = "#CD7F32"
+        elif rank_int <= 10:
+            border_color = "#FF6B6B"
+        else:
+            border_color = "rgba(255,255,255,0.2)"
+
         # Rank display with podium icons
         if rank_int in RANK_ICONS:
             info = RANK_ICONS[rank_int]
-            rank_html = f'<span style="color:{info["color"]};font-size:1.2rem;">{info["icon"]}</span>'
+            rank_html = f'<span style="color:{info["color"]};font-weight:700;min-width:2.5rem;text-align:center;">{info["icon"]}</span>'
         else:
-            rank_html = f'<span style="color:#FF6B6B;">#{rank_int}</span>'
+            rank_html = f'<span style="color:var(--text-color);font-weight:600;min-width:2.5rem;text-align:center;">#{rank_int}</span>'
 
+        # Score
+        score = safe_str(row.get('score'))
+        score_html = f'<span style="font-weight:600;min-width:4rem;text-align:right;color:var(--text-color);">{score}</span>'
+
+        # Player name (flex-grow to take remaining space)
         raw_name = str(row.get('player_name', 'Unknown'))
         name_link = player_link(raw_name)
-        score = safe_str(row.get('score'))
+        name_html = f'<span style="flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{name_link}</span>'
 
-        # Build stats grid based on available columns
-        stats_html = f'<div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{score}</span></div>'
-
+        # Rating with change
+        rating_html = ""
         if has_rating and 'rating' in row.index:
-            rating = safe_str(row.get('rating'), "{:.1f}")
-            stats_html += f'<div style="{stat_layout}"><span style="{label_style}">Rating</span><span style="{value_style}">{rating}</span></div>'
+            rating = row.get('rating')
+            rating_str = f"{rating:.1f}" if pd.notna(rating) else "—"
+            change = row.get('rating_change') if 'rating_change' in row.index else None
+            if pd.notna(change):
+                change_class = "change-positive" if change >= 0 else "change-negative"
+                change_str = f"+{change:.1f}" if change >= 0 else f"{change:.1f}"
+                rating_html = f'<span style="min-width:7rem;text-align:right;"><span style="font-weight:600;color:var(--text-color);">{rating_str}</span> <span class="{change_class}" style="font-size:0.85rem;">({change_str})</span></span>'
+            else:
+                rating_html = f'<span style="min-width:7rem;text-align:right;font-weight:600;color:var(--text-color);">{rating_str}</span>'
 
-            if 'rating_change' in row.index:
-                change = row.get('rating_change')
-                if pd.notna(change):
-                    change_color = "#10B981" if change >= 0 else "#EF4444"
-                    change_str = f"+{change:.1f}" if change >= 0 else f"{change:.1f}"
-                    stats_html += f'<div style="{stat_layout}"><span style="{label_style}">Change</span><span style="{value_style};color:{change_color};">{change_str}</span></div>'
+        row_html = f'<div style="{row_style}border-color:{border_color};">{rank_html}{score_html}{name_html}{rating_html}</div>'
+        rows.append(row_html)
 
-        if has_active_rank and 'active_rank' in row.index:
-            elo_rank = row.get('active_rank')
-            elo_rank_str = f"#{int(elo_rank)}" if pd.notna(elo_rank) else "N/R"
-            elo_color = "#FF6B6B" if pd.notna(elo_rank) else "#6B9AFF"
-            stats_html += f'<div style="{stat_layout}"><span style="{label_style}">Elo Rank</span><span style="{value_style};color:{elo_color};">{elo_rank_str}</span></div>'
-
-        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name"><span class="card-name-text">{name_link}</span></div><div class="card-rating active">{score}</div></div><div class="stats-grid" style="grid-template-columns:repeat(4, 1fr);">{stats_html}</div></div>'
-        cards.append(card)
-
-    return "".join(cards)
+    return "".join(rows)
 
 
 def generate_game_history_cards(df, has_active_rank=True):
     """
     Generate HTML cards for player game history display (Tab 3).
-    Shows: Date, Daily Rank, Score, Rating, Rating Change, cumulative stats.
+    Header: Score | Date + Player (Rating, Change) | Daily Rank
+    Stats: Daily Runs, Daily #1, Daily #1 (%), Daily Top 10, Daily Top 10 (%), Daily Avg, 7-Game Avg, Daily Variance
     """
     if df.empty:
         return "<p>No data available</p>"
@@ -411,45 +418,56 @@ def generate_game_history_cards(df, has_active_rank=True):
 
     cards = []
     for _, row in df.iterrows():
-        # Date as header (clickable link to Dailies tab)
+        # Score for header left
+        score = safe_str(row.get('score'))
+
+        # Date and player info for header middle
         date_val = row.get('date')
         date_link_html = daily_link(date_val)
+        player_name = row.get('player_name', 'Unknown')
+        rating = safe_str(row.get('rating'), "{:.1f}")
 
+        # Rating change with color for header
+        change = row.get('rating_change')
+        if pd.notna(change):
+            change_class = "change-positive" if change >= 0 else "change-negative"
+            change_str = f"+{change:.1f}" if change >= 0 else f"{change:.1f}"
+        else:
+            change_class = ""
+            change_str = "—"
+
+        # Daily rank for header right
         rank = row.get('rank')
         rank_int = int(rank) if pd.notna(rank) else 0
 
-        # Rank display
+        # Rank display with icons for podium, plain number for others
         if rank_int in RANK_ICONS:
             info = RANK_ICONS[rank_int]
-            rank_html = f'<span style="color:{info["color"]};font-size:1.1rem;">{info["icon"]} #{rank_int}</span>'
+            rank_html = f'<span style="color:{info["color"]};">{info["icon"]}</span>'
         else:
-            rank_html = f'<span style="color:#3B82F6;">#{rank_int}</span>'
+            rank_html = f'<span style="color:var(--text-color);">#{rank_int}</span>'
 
-        score = safe_str(row.get('score'))
-        rating = safe_str(row.get('rating'), "{:.1f}")
+        # Top 10 stats
+        top10 = safe_str(row.get('top_10s'))
+        top10_rate = safe_str(row.get('top_10s_rate'), "{:.1f}") + "%" if pd.notna(row.get('top_10s_rate')) else "—"
 
-        # Rating change with color
-        change = row.get('rating_change')
-        if pd.notna(change):
-            change_color = "#10B981" if change >= 0 else "#EF4444"
-            change_str = f"+{change:.1f}" if change >= 0 else f"{change:.1f}"
-        else:
-            change_color = "var(--text-color)"
-            change_str = "—"
-
-        # Build stats
+        # Build stats (8 items - Score moved to header)
         stats_html = f'''
-        <div style="{stat_layout}"><span style="{label_style}">Score</span><span style="{value_style}">{score}</span></div>
-        <div style="{stat_layout}"><span style="{label_style}">Rating</span><span style="{value_style}">{rating}</span></div>
-        <div style="{stat_layout}"><span style="{label_style}">Change</span><span style="{value_style};color:{change_color};">{change_str}</span></div>
-        <div style="{stat_layout}"><span style="{label_style}">Games</span><span style="{value_style}">{safe_str(row.get('games_played'))}</span></div>
-        <div style="{stat_layout}"><span style="{label_style}">Wins</span><span style="{value_style}">{safe_str(row.get('wins'))}</span></div>
-        <div style="{stat_layout}"><span style="{label_style}">Win%</span><span style="{value_style}">{safe_str(row.get('win_rate'), "{:.1f}")}%</span></div>
-        <div style="{stat_layout}"><span style="{label_style}">Avg Rank</span><span style="{value_style}">{safe_str(row.get('avg_daily_rank'), "{:.1f}")}</span></div>
-        <div style="{stat_layout}"><span style="{label_style}">Stability</span><span style="{value_style}">{safe_str(row.get('consistency'), "{:.1f}")}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Daily Runs</span><span style="{value_style}">{safe_str(row.get('games_played'))}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{safe_str(row.get('wins'))}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Daily #1 (%)</span><span style="{value_style}">{safe_str(row.get('win_rate'), "{:.1f}")}%</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Daily Top 10</span><span style="{value_style}">{top10}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Daily Top 10 (%)</span><span style="{value_style}">{top10_rate}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Daily Avg</span><span style="{value_style}">{safe_str(row.get('avg_daily_rank'), "{:.1f}")}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{safe_str(row.get('last_7'), "{:.1f}")}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{safe_str(row.get('consistency'), "{:.1f}")}</span></div>
         '''
 
-        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name"><span class="card-name-text">{date_link_html}</span></div><div class="card-rating active">{rating}</div></div><div class="stats-grid">{stats_html}</div></div>'
+        # Header: Score (left) | Date + Player (Rating, Change) (middle) | Daily Rank (right)
+        player_link_html = player_link(player_name)
+        header_middle = f'{date_link_html}<br>{player_link_html} <span style="font-weight:500;">({rating}, <span class="{change_class}">{change_str}</span>)</span>'
+
+        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank"><span class="rank-label">Score</span>{score}</div><div class="card-name"><span class="card-name-text">{header_middle}</span></div><div class="card-rating"><span class="rank-label">Daily Rank</span>{rank_html}</div></div><div class="stats-grid">{stats_html}</div></div>'
         cards.append(card)
 
     return "".join(cards)
@@ -1208,6 +1226,16 @@ CUSTOM_CSS = """
     --space-xl: 2rem;
 }
 
+/* ===== WCAG-Compliant Rating Change Colors ===== */
+.change-positive {
+    color-scheme: inherit;
+    color: light-dark(#047857, #10B981) !important;
+}
+.change-negative {
+    color-scheme: inherit;
+    color: light-dark(#DC2626, #EF4444) !important;
+}
+
 /* ===== Typography Hierarchy ===== */
 .main h1, .main h2, .main h3 {
     font-family: var(--font-display) !important;
@@ -1566,130 +1594,13 @@ CUSTOM_CSS = """
     }
 }
 
-/* ===== Player Tracker Summary Card ===== */
-.tracker-summary {
-    background: var(--secondary-background-color);
-    border-radius: 12px;
-    padding: 1rem;
-    border-left: 4px solid #FF6B6B;
-}
-.tracker-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.25rem;
-}
-.tracker-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--text-color);
-}
-.tracker-rank-badge {
-    font-size: 0.875rem;
-    font-weight: 700;
-    padding: 0.2rem 0.6rem;
-    border-radius: 6px;
-    color: white;
-}
-.tracker-rating {
-    font-size: 2.2rem;
-    font-weight: 700;
+/* ===== Player Tracker Chart Subtitle ===== */
+.tracker-chart-subtitle {
     color-scheme: inherit;
-    color: light-dark(#D93636, #FF6B6B);
-    line-height: 1.1;
-}
-.tracker-rating-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color-scheme: inherit;
-    color: light-dark(#666666, #999999);
-    margin-bottom: 0.75rem;
-}
-.tracker-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-.tracker-stat {
-    text-align: center;
-    padding: 0.4rem;
-    background: rgba(128, 128, 128, 0.1);
-    border-radius: 6px;
-}
-.tracker-stat-value {
-    display: block;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--text-color);
-}
-.tracker-stat-label {
-    display: block;
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color-scheme: inherit;
-    color: light-dark(#666666, #999999);
-}
-.tracker-timeline {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(128, 128, 128, 0.2);
-}
-.tracker-timeline-item {
-    flex: 1;
-    text-align: center;
-    padding: 0.4rem;
-    border-radius: 6px;
-}
-.tracker-timeline-item.tracker-first {
-    background: rgba(59, 130, 246, 0.15);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-}
-.tracker-timeline-item.tracker-last {
-    background: rgba(255, 107, 107, 0.15);
-    border: 1px solid rgba(255, 107, 107, 0.3);
-}
-.tracker-timeline-label {
-    font-size: 0.6rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color-scheme: inherit;
-    color: light-dark(#666666, #999999);
-}
-.tracker-timeline-date {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-color);
-}
-.tracker-timeline-detail {
-    font-size: 0.7rem;
-    color-scheme: inherit;
-    color: light-dark(#666666, #999999);
-}
-.tracker-timeline-arrow {
-    font-size: 1rem;
-    color-scheme: inherit;
-    color: light-dark(#999999, #666666);
-}
-.tracker-chart-label {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-color);
-    margin: 0.75rem 0 0.25rem 0;
-    padding: 0;
-}
-@media (max-width: 400px) {
-    .tracker-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .tracker-rating {
-        font-size: 1.8rem;
-    }
+    color: light-dark(#555555, #A0A0A0);
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin: -0.5rem 0 0.5rem 0;
 }
 
 /* ===== Dividers with Gradient ===== */
@@ -1867,6 +1778,15 @@ CUSTOM_CSS = """
     container-name: cards;
 }
 
+/* Dailies tab: constrained width for cleaner layout */
+.dailies-cards {
+    display: block;
+    container-type: inline-size;
+    container-name: cards;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
 /* Responsive stats grid: 8 columns on desktop, 4 on mobile */
 .stats-grid {
     display: grid;
@@ -1902,6 +1822,16 @@ CUSTOM_CSS = """
     font-weight: 700;
     font-size: 1rem;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.card-rank .rank-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #FF6B6B;
 }
 .card-name {
     grid-column: 2 / 8;
@@ -1929,12 +1859,12 @@ CUSTOM_CSS = """
     flex-direction: column;
     align-items: center;
 }
-.card-rating .rating-label {
+.card-rating .rating-label,
+.card-rating .rank-label {
     font-size: 0.65rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    /* No opacity - inherits color from parent for WCAG compliance */
 }
 .card-rating.active {
     color: #FF6B6B;
@@ -1979,12 +1909,13 @@ CUSTOM_CSS = """
 }
 
 /* Back to top button */
+/* bottom: 3rem to avoid overlap with Streamlit's "Manage app" button */
 .back-to-top {
     display: flex;
     align-items: center;
     justify-content: center;
     position: fixed;
-    bottom: 2rem;
+    bottom: 3rem;
     right: 1.5rem;
     width: 48px;
     height: 48px;
@@ -2009,9 +1940,10 @@ CUSTOM_CSS = """
 }
 
 /* Floating share button - position the popover container */
+/* bottom: 3rem to avoid overlap with Streamlit's "Manage app" button */
 [data-testid="stMain"] [data-testid="stPopover"] {
     position: fixed !important;
-    bottom: 2rem !important;
+    bottom: 3rem !important;
     left: 2rem !important;
     width: 48px !important;
     height: 48px !important;
@@ -2116,8 +2048,8 @@ CUSTOM_CSS = """
     font-size: 0.85rem !important;
 }
 
-/* Container-responsive: 4-column grid when container ≤600px */
-@container cards (max-width: 600px) {
+/* Container-responsive: 4-column grid when container ≤816px (prevents label wrapping) */
+@container cards (max-width: 816px) {
     /* Tab 1 ranking cards */
     .stats-grid {
         grid-template-columns: repeat(4, 1fr) !important;
@@ -2462,13 +2394,16 @@ def main():
     logo_path = Path(__file__).parent / "images" / "dftl_logo.png"
 
     # Determine current dataset for badge display and toggle behavior
-    # Check both URL param (for direct navigation) and session state (for widget selection)
+    # Check session_state FIRST (immediately reflects widget changes), then URL param (for direct navigation)
+    # This order is critical: URL param sync happens AFTER sidebar renders, so session_state is more current
     is_early_access = False
-    if st.query_params.get("dataset") == "early_access":
-        is_early_access = True
-    elif "sidebar_dataset" in st.session_state:
+    if "sidebar_dataset" in st.session_state:
+        # Widget exists - use its value (most current)
         if st.session_state["sidebar_dataset"] == "Early Access Only":
             is_early_access = True
+    elif st.query_params.get("dataset") == "early_access":
+        # First load via URL - widget hasn't rendered yet
+        is_early_access = True
 
     # Badge and toggle link: clicking banner switches to the OTHER dataset
     # Always lands on Rankings tab (default) for simplicity
@@ -2881,7 +2816,7 @@ def main():
                 has_rating = 'rating' in df_day.columns
                 has_active_rank = 'active_rank' in df_day.columns
                 cards_html = generate_leaderboard_cards(df_day_sorted, has_rating=has_rating, has_active_rank=has_active_rank)
-                st.markdown(f'<div class="ranking-cards">{cards_html}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="dailies-cards">{cards_html}</div>', unsafe_allow_html=True)
         else:
             st.warning("No data available for the selected date range.")
 
@@ -2907,14 +2842,14 @@ def main():
             # Sort options: display name -> (column, default_ascending)
             sort_options = {
                 "Elo": ("rating", False),
-                "Games": ("games_played", False),
-                "Wins": ("wins", False),
-                "Win %": ("win_rate", False),
-                "Top 10": ("top_10s", False),
-                "Top 10 %": ("top_10s_rate", False),
-                "Avg Rank": ("avg_daily_rank", True),
+                "Daily Runs": ("games_played", False),
+                "Daily #1": ("wins", False),
+                "Daily #1 (%)": ("win_rate", False),
+                "Daily Top10": ("top_10s", False),
+                "Daily Top10 (%)": ("top_10s_rate", False),
+                "Daily Avg": ("avg_daily_rank", True),
                 "7-Game Avg": ("last_7", True),
-                "Stability": ("consistency", True),
+                "Daily Variance": ("consistency", True),
             }
 
             col_date, col_sort = st.columns([2, 3])
@@ -3063,12 +2998,12 @@ def main():
                 "active_rank": st.column_config.NumberColumn("Elo Rank", format="%d"),
                 "player_name": st.column_config.TextColumn("Player"),
                 "rating": st.column_config.NumberColumn("Rating", format="%.1f"),
-                "games_played": st.column_config.NumberColumn("Games", format="%d", help="Top 30 Daily Runs"),
-                "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                "win_rate": st.column_config.NumberColumn("Win %", format="%.1f"),
-                "top_10s": st.column_config.NumberColumn("Top 10s", format="%d"),
-                "top_10s_rate": st.column_config.NumberColumn("Top 10 %", format="%.1f"),
-                "avg_daily_rank": st.column_config.NumberColumn("Avg Rank", format="%.1f", help="Average Daily Rank over all games"),
+                "games_played": st.column_config.NumberColumn("Daily Runs", format="%d", help="Top 30 finishes"),
+                "wins": st.column_config.NumberColumn("Daily #1", format="%d"),
+                "win_rate": st.column_config.NumberColumn("Daily #1 (%)", format="%.1f"),
+                "top_10s": st.column_config.NumberColumn("Daily Top10", format="%d"),
+                "top_10s_rate": st.column_config.NumberColumn("Daily Top10 (%)", format="%.1f"),
+                "avg_daily_rank": st.column_config.NumberColumn("Daily Avg", format="%.1f", help="Average Daily Rank over all games"),
                 "last_7": st.column_config.NumberColumn("7-Game Avg", format="%.1f", help="Average Daily Rank over last 7 games"),
                 "last_seen": st.column_config.DateColumn("Last Seen", format="YYYY-MM-DD")
             }
@@ -3155,185 +3090,149 @@ def main():
                         last_7_str = f"{last_7:.1f}" if pd.notna(last_7) else "N/A"
                         consistency_str = f"{consistency:.1f}" if pd.notna(consistency) else "N/A"
 
-                        # First/Last game data
-                        sorted_games = df_player_played.sort_values('date')
-                        first_game = sorted_games.iloc[0]
-                        last_game = sorted_games.iloc[-1]
+                        # --- Player Summary Card (exact match to Rankings tab) ---
+                        # Use the exact same styling as generate_ranking_cards()
+                        card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);"
+                        active_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
+                        card_style = active_bg + card_base
 
-                        first_date = first_game['date']
-                        first_date_link = daily_link(first_date)
-                        first_rank = int(first_game['rank'])
-                        first_rating = first_game['rating']
+                        stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
+                        label_style = "font-size:0.8rem;text-transform:uppercase;color:var(--text-color);font-weight:500;"
+                        value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
-                        last_date = last_game['date']
-                        last_date_link = daily_link(last_date)
-                        last_rank = int(last_game['rank'])
-                        last_rating = last_game['rating']
+                        # Elo rank display (with label on top)
+                        rank_html = f'<span class="rank-label">Elo Rank</span><span style="color:#FF6B6B;">{elo_rank_str}</span>'
 
-                        # --- Compact Player Summary Card ---
-                        summary_html = f"""
-                        <div class="tracker-summary">
-                            <div class="tracker-header">
-                                <div class="tracker-name">{selected_player}</div>
-                                <div class="tracker-rank-badge" style="background: {ACCENT_COLORS['primary']};">{elo_rank_str}</div>
-                            </div>
-                            <div class="tracker-rating">{current_rating:.0f}</div>
-                            <div class="tracker-rating-label">Elo Rating</div>
-                            <div class="tracker-stats-grid">
-                                <div class="tracker-stat">
-                                    <span class="tracker-stat-value">{games}</span>
-                                    <span class="tracker-stat-label">Games</span>
-                                </div>
-                                <div class="tracker-stat">
-                                    <span class="tracker-stat-value">{wins}</span>
-                                    <span class="tracker-stat-label">Wins ({win_rate:.0f}%)</span>
-                                </div>
-                                <div class="tracker-stat">
-                                    <span class="tracker-stat-value">{top_10s}</span>
-                                    <span class="tracker-stat-label">Top 10 ({top_10_rate:.0f}%)</span>
-                                </div>
-                                <div class="tracker-stat">
-                                    <span class="tracker-stat-value">{avg_rank_str}</span>
-                                    <span class="tracker-stat-label">Avg Rank</span>
-                                </div>
-                                <div class="tracker-stat">
-                                    <span class="tracker-stat-value">{last_7_str}</span>
-                                    <span class="tracker-stat-label">7-Game Avg</span>
-                                </div>
-                                <div class="tracker-stat">
-                                    <span class="tracker-stat-value">{consistency_str}</span>
-                                    <span class="tracker-stat-label">Stability</span>
-                                </div>
-                            </div>
-                            <div class="tracker-timeline">
-                                <div class="tracker-timeline-item tracker-first">
-                                    <div class="tracker-timeline-label">First</div>
-                                    <div class="tracker-timeline-date">{first_date_link}</div>
-                                    <div class="tracker-timeline-detail">#{first_rank} • {first_rating:.0f}</div>
-                                </div>
-                                <div class="tracker-timeline-arrow">→</div>
-                                <div class="tracker-timeline-item tracker-last">
-                                    <div class="tracker-timeline-label">Last</div>
-                                    <div class="tracker-timeline-date">{last_date_link}</div>
-                                    <div class="tracker-timeline-detail">#{last_rank} • {last_rating:.0f}</div>
-                                </div>
-                            </div>
-                        </div>
-                        """
-                        st.html(summary_html)
+                        # Player name (matches Rankings tab)
+                        name_html = f'<span class="card-name-text">{html.escape(selected_player)}</span>'
+
+                        # Rating display
+                        rating_str = f"{current_rating:.1f}"
+
+                        # Format stats to match Rankings tab exactly
+                        win_rate_str = f"{win_rate:.1f}%"
+                        top10_rate_str = f"{top_10_rate:.1f}%"
+
+                        summary_html = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating active"><span class="rating-label">Elo</span>{rating_str}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Daily Runs</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1 (%)</span><span style="{value_style}">{win_rate_str}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10</span><span style="{value_style}">{top_10s}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10 (%)</span><span style="{value_style}">{top10_rate_str}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Avg</span><span style="{value_style}">{avg_rank_str}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last_7_str}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{consistency_str}</span></div></div></div>'
+                        st.html(f'<div class="ranking-cards">{summary_html}</div>')
+
+                        # --- Charts Row (side by side if space allows) ---
+                        df_chart = df_player_played.sort_values('date')
+                        chart_col1, chart_col2 = st.columns(2)
 
                         # --- Rating Trajectory Chart ---
-                        st.html('<p class="tracker-chart-label">Elo Rating History</p>')
-                        df_chart = df_player_played.sort_values('date')
-
-                        fig_rating = px.line(
-                            df_chart,
-                            x='date',
-                            y='rating',
-                            markers=True,
-                            labels={'date': 'Date', 'rating': 'Elo Rating'},
-                            color_discrete_sequence=[ACCENT_COLORS["primary"]]
-                        )
-                        apply_plotly_style(fig_rating)
-                        fig_rating.update_traces(
-                            marker=dict(size=8, line=dict(width=2, color='rgba(255,255,255,0.3)')),
-                            line=dict(width=3),
-                            fill='tozeroy',
-                            fillcolor='rgba(255, 107, 107, 0.15)',
-                        )
-                        # Set Y-axis range to fit data with padding (don't show 0)
-                        rating_min = df_chart['rating'].min()
-                        rating_max = df_chart['rating'].max()
-                        rating_padding = (rating_max - rating_min) * 0.1
-                        y_min = max(rating_min - rating_padding, 1000)  # Don't go below 1000
-                        y_max = rating_max + rating_padding
-                        fig_rating.update_layout(
-                            height=300,
-                            margin=dict(l=20, r=20, t=30, b=20),
-                            showlegend=False,
-                            yaxis=dict(range=[y_min, y_max])
-                        )
-                        fig_rating.add_hline(
-                            y=1500,
-                            line_dash="dash",
-                            line_color="rgba(255, 107, 107, 0.4)",
-                            annotation_text="Baseline (1500)",
-                            annotation_font=dict(color="rgba(255, 107, 107, 0.7)", weight=600)
-                        )
-                        # Add peak rating marker
-                        peak_idx = df_chart['rating'].idxmax()
-                        peak_row = df_chart.loc[peak_idx]
-                        fig_rating.add_scatter(
-                            x=[peak_row['date']],
-                            y=[peak_row['rating']],
-                            mode='markers',
-                            marker=dict(
-                                size=16,
-                                color=ACCENT_COLORS["warning"],
-                                symbol='star',
-                                line=dict(width=2, color='#FFD700')
-                            ),
-                            name='Peak',
-                            hovertemplate=f"<b>Peak Rating</b><br>{peak_row['rating']:.0f}<extra></extra>"
-                        )
-                        st.plotly_chart(fig_rating, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                        with chart_col1:
+                            st.subheader("Elo Rating History")
+                            st.html('<p class="tracker-chart-subtitle">1500 = starting rating</p>')
+                            fig_rating = px.line(
+                                df_chart,
+                                x='date',
+                                y='rating',
+                                markers=True,
+                                labels={'date': 'Date', 'rating': 'Elo Rating'},
+                                color_discrete_sequence=[ACCENT_COLORS["primary"]]
+                            )
+                            apply_plotly_style(fig_rating)
+                            fig_rating.update_traces(
+                                marker=dict(size=8, line=dict(width=2, color='rgba(255,255,255,0.3)')),
+                                line=dict(width=3),
+                                fill='tozeroy',
+                                fillcolor='rgba(255, 107, 107, 0.15)',
+                            )
+                            # Set Y-axis range to fit data with padding (don't show 0)
+                            rating_min = df_chart['rating'].min()
+                            rating_max = df_chart['rating'].max()
+                            rating_padding = (rating_max - rating_min) * 0.1
+                            y_min = max(rating_min - rating_padding, 1000)  # Don't go below 1000
+                            y_max = rating_max + rating_padding
+                            fig_rating.update_layout(
+                                height=280,
+                                margin=dict(l=20, r=20, t=30, b=20),
+                                showlegend=False,
+                                yaxis=dict(range=[y_min, y_max])
+                            )
+                            fig_rating.add_hline(
+                                y=1500,
+                                line_dash="dash",
+                                line_color="rgba(255, 107, 107, 0.4)",
+                                annotation_text="Baseline (1500)",
+                                annotation_font=dict(color="rgba(255, 107, 107, 0.7)", weight=600)
+                            )
+                            # Add peak rating marker
+                            peak_idx = df_chart['rating'].idxmax()
+                            peak_row = df_chart.loc[peak_idx]
+                            fig_rating.add_scatter(
+                                x=[peak_row['date']],
+                                y=[peak_row['rating']],
+                                mode='markers',
+                                marker=dict(
+                                    size=16,
+                                    color=ACCENT_COLORS["warning"],
+                                    symbol='star',
+                                    line=dict(width=2, color='#FFD700')
+                                ),
+                                name='Peak',
+                                hovertemplate=f"<b>Peak Rating</b><br>{peak_row['rating']:.0f}<extra></extra>"
+                            )
+                            st.plotly_chart(fig_rating, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # --- Daily Rank History Chart (Bar Chart) ---
-                        st.html('<p class="tracker-chart-label">Daily Rank History</p>')
+                        with chart_col2:
+                            st.subheader("Daily Rank History")
+                            st.html('<p class="tracker-chart-subtitle">Green = best rank achieved</p>')
+                            # Bars grow from bottom (rank 31) UPWARD toward rank 1
+                            # Better ranks (closer to 1) = taller bars
+                            base_rank = 31  # Base of all bars (bottom of chart)
+                            fig_rank = go.Figure()
 
-                        # Bars grow from bottom (rank 31) UPWARD toward rank 1
-                        # Better ranks (closer to 1) = taller bars
-                        base_rank = 31  # Base of all bars (bottom of chart)
-                        fig_rank = go.Figure()
+                            # Calculate bar heights: negative values so bars grow upward on reversed y-axis
+                            # height = rank - base_rank (e.g., rank 1 -> height -30, rank 30 -> height -1)
+                            ranks = df_chart['rank'].tolist()
+                            bar_heights = [r - base_rank for r in ranks]  # All negative
 
-                        # Calculate bar heights: negative values so bars grow upward on reversed y-axis
-                        # height = rank - base_rank (e.g., rank 1 -> height -30, rank 30 -> height -1)
-                        ranks = df_chart['rank'].tolist()
-                        bar_heights = [r - base_rank for r in ranks]  # All negative
+                            # Determine colors: green for best rank (rank 1), blue for others
+                            best_rank = df_chart['rank'].min()
+                            bar_colors = [ACCENT_COLORS["success"] if r == best_rank else ACCENT_COLORS["info"] for r in ranks]
 
-                        # Determine colors: green for best rank (rank 1), blue for others
-                        best_rank = df_chart['rank'].min()
-                        bar_colors = [ACCENT_COLORS["success"] if r == best_rank else ACCENT_COLORS["info"] for r in ranks]
+                            fig_rank.add_trace(go.Bar(
+                                x=df_chart['date'],
+                                y=bar_heights,  # Negative heights = bars grow upward
+                                base=[base_rank] * len(df_chart),  # All bars start from rank 31
+                                marker=dict(
+                                    color=bar_colors,
+                                    line=dict(width=1, color='rgba(255,255,255,0.3)')
+                                ),
+                                customdata=ranks,  # Store actual ranks for hover
+                                hovertemplate='%{x|%b %d, %Y}<br>Rank #%{customdata}<extra></extra>',
+                            ))
 
-                        fig_rank.add_trace(go.Bar(
-                            x=df_chart['date'],
-                            y=bar_heights,  # Negative heights = bars grow upward
-                            base=[base_rank] * len(df_chart),  # All bars start from rank 31
-                            marker=dict(
-                                color=bar_colors,
-                                line=dict(width=1, color='rgba(255,255,255,0.3)')
-                            ),
-                            customdata=ranks,  # Store actual ranks for hover
-                            hovertemplate='%{x|%b %d, %Y}<br>Rank #%{customdata}<extra></extra>',
-                        ))
-
-                        apply_plotly_style(fig_rank)
-                        fig_rank.update_layout(
-                            height=280,
-                            margin=dict(l=20, r=70, t=30, b=20),  # Extra right margin for annotation
-                            showlegend=False,
-                            yaxis=dict(
-                                autorange="reversed",  # Rank 1 at top, rank 31 at bottom
-                                range=[1, base_rank],  # With reversed: 1 at top, 31 at bottom
-                                title="Daily Rank",
-                                tickmode='array',
-                                tickvals=[1, 5, 10, 15, 20, 25, 30],
-                            ),
-                            xaxis=dict(title="Date"),
-                            bargap=0.15,
-                        )
-                        # Add average rank line with annotation at right edge
-                        avg_rank_val = df_chart['rank'].mean()
-                        fig_rank.add_hline(
-                            y=avg_rank_val,
-                            line_dash="dash",
-                            line_color="rgba(59, 130, 246, 0.8)",
-                            annotation_text=f"Avg: {avg_rank_val:.1f}",
-                            annotation_position="right",
-                            annotation_font=dict(color="rgba(59, 130, 246, 1)", weight=600),
-                            annotation_xshift=5,  # Small shift to ensure text is in margin area
-                        )
-                        st.plotly_chart(fig_rank, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                            apply_plotly_style(fig_rank)
+                            fig_rank.update_layout(
+                                height=280,
+                                margin=dict(l=20, r=70, t=30, b=20),  # Extra right margin for annotation
+                                showlegend=False,
+                                yaxis=dict(
+                                    autorange="reversed",  # Rank 1 at top, rank 31 at bottom
+                                    range=[1, base_rank],  # With reversed: 1 at top, 31 at bottom
+                                    title="Daily Rank",
+                                    tickmode='array',
+                                    tickvals=[1, 5, 10, 15, 20, 25, 30],
+                                ),
+                                xaxis=dict(title="Date"),
+                                bargap=0.15,
+                            )
+                            # Add average rank line with annotation at right edge
+                            avg_rank_val = df_chart['rank'].mean()
+                            fig_rank.add_hline(
+                                y=avg_rank_val,
+                                line_dash="dash",
+                                line_color="rgba(59, 130, 246, 0.8)",
+                                annotation_text=f"Avg: {avg_rank_val:.1f}",
+                                annotation_position="right",
+                                annotation_font=dict(color="rgba(59, 130, 246, 1)", weight=600),
+                                annotation_xshift=5,  # Small shift to ensure text is in margin area
+                            )
+                            st.plotly_chart(fig_rank, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # --- Game History Cards ---
                         # Sort controls - column and direction combined
@@ -3346,7 +3245,7 @@ def main():
 
                         col_label, col_sort = st.columns([1, 2])
                         with col_label:
-                            st.html('<p class="tracker-chart-label" style="margin-top: 0.5rem;">Game History</p>')
+                            st.subheader("Game History")
                         with col_sort:
                             selected_sort = st.selectbox(
                                 "Sort",
