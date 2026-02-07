@@ -273,11 +273,14 @@ While mostly aesthetics (compared to the raw ratings), it prevents runaway ratin
 | **Elo Rank** | Your position among ranked players by Elo rating |
 | **Rating** | Your compressed Elo score (higher = better) |
 | **Raw Rating** | Your uncompressed Elo score (used internally) |
-| **Games** | Top 30 Daily Runs |
-| **Confidence** | How reliable your rating is (based on games played) |
-| **Avg Rank** | Average Daily Rank over all games |
-| **7-Game Avg** | Average Daily Rank over last 7 games |
-| **Stability** | Rank variation over last 14 games (lower = more stable) |
+| **Daily Runs** | Number of top 30 finishes (appearances on the daily leaderboard) |
+| **Daily #1** | Number of times you finished 1st on the daily leaderboard |
+| **Daily #1 (%)** | Win rate: Daily #1 ÷ Daily Runs × 100 |
+| **Daily Top10** | Number of times you finished in the top 10 |
+| **Daily Top10 (%)** | Top 10 rate: Daily Top10 ÷ Daily Runs × 100 |
+| **Daily Avg** | Average daily rank across all your runs |
+| **7-Game Avg** | Average daily rank over your last 7 runs |
+| **Daily Variance** | Standard deviation of your daily ranks (lower = more consistent) |
 | **Daily Rank** | Your position on a specific day's leaderboard |
 | **Rating Change** | How much your Elo changed that day |
 | **Baseline** | The starting/median rating of 1500 |

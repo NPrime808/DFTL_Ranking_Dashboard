@@ -201,23 +201,33 @@ def render_floating_share_button(current_tab_slug):
         "hall-of-fame": {},
     }
 
-    # Build share params from current widget values
+    # Build share params from URL params (more reliable than session_state timing)
     share_params = {"tab": current_tab_slug}
 
-    # Add dataset if not default (full)
-    if "sidebar_dataset" in st.session_state:
-        dataset_label = st.session_state["sidebar_dataset"]
-        # Map label to prefix for URL
-        dataset_prefix = DATASET_OPTIONS.get(dataset_label, "full")
-        if dataset_prefix != "full":  # Only include if not default
-            share_params["dataset"] = dataset_prefix
+    # Add dataset if present in URL
+    url_dataset = st.query_params.get("dataset", None)
+    if url_dataset and url_dataset != "full":
+        share_params["dataset"] = url_dataset
 
-    widget_map = WIDGET_MAPS.get(current_tab_slug, {})
-    for widget_key, param in widget_map.items():
-        if widget_key in st.session_state and st.session_state[widget_key] is not None:
+    # Add tab-specific params from URL, with session_state fallback for defaults
+    PARAM_CONFIG = {
+        "rankings": [("date", "elo_ranking_date")],
+        "dailies": [("date", "dailies_date")],
+        "tracker": [("player", "tab4_player_select")],
+        "duels": [("player1", "duel_player1"), ("player2", "duel_player2")],
+        "hall-of-fame": [],
+    }
+
+    param_config = PARAM_CONFIG.get(current_tab_slug, [])
+    for param, widget_key in param_config:
+        # Try URL param first
+        value = st.query_params.get(param, None)
+        # Fall back to session_state (for default selections not yet in URL)
+        if not value and widget_key in st.session_state:
             value = st.session_state[widget_key]
             if hasattr(value, 'strftime'):
                 value = value.strftime('%Y-%m-%d')
+        if value:
             share_params[param] = value
 
     share_path = build_url_with_params(share_params)
@@ -238,6 +248,7 @@ def generate_ranking_cards(df):
     Responsive: 4 columns on mobile, 8 columns on desktop.
     Uses Streamlit CSS variables for automatic theme support.
     """
+    import urllib.parse  # For URL-safe anchor IDs
     if df.empty:
         return "<p>No data available</p>"
 
@@ -319,7 +330,9 @@ def generate_ranking_cards(df):
         # Build card with CSS-class-based responsive header
         # Rating class: 'active' (coral) for ranked, 'inactive' (muted) for unranked
         rating_class = "inactive" if is_inactive else "active"
-        card = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating {rating_class}"><span class="rating-label">Elo</span>{rating}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Daily Runs</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1 (%)</span><span style="{value_style}">{win_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10</span><span style="{value_style}">{top10}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10 (%)</span><span style="{value_style}">{top10_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Avg</span><span style="{value_style}">{avg_r}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last7}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{consist}</span></div></div></div>'
+        # Create URL-safe anchor ID from player name for navigation
+        player_anchor_id = urllib.parse.quote(raw_name, safe='')
+        card = f'<div id="player-{player_anchor_id}" class="player-card" style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating {rating_class}"><span class="rating-label">Elo</span>{rating}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Daily Runs</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1 (%)</span><span style="{value_style}">{win_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10</span><span style="{value_style}">{top10}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10 (%)</span><span style="{value_style}">{top10_rate}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Avg</span><span style="{value_style}">{avg_r}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last7}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{consist}</span></div></div></div>'
         cards.append(card)
 
     return "".join(cards)
@@ -1288,6 +1301,25 @@ CUSTOM_CSS = """
     text-decoration: underline !important;
 }
 
+/* Focus styles for keyboard navigation (WCAG 2.1 compliance) */
+.player-link:focus,
+.date-link:focus,
+.dashboard-banner-link:focus,
+.back-to-top:focus,
+.stPopover button:focus {
+    color-scheme: inherit;
+    outline: 2px solid light-dark(#D93636, #FF6B6B) !important;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Focus styles for tab navigation radio buttons (radio is 0x0, style the label) */
+[data-testid="stRadio"] label:focus-within {
+    outline: 2px solid light-dark(#D93636, #FF6B6B) !important;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
 /* ===== Section Containers ===== */
 .stTabs [data-baseweb="tab-panel"] {
     padding-top: 1.5rem;
@@ -1865,11 +1897,15 @@ CUSTOM_CSS = """
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    color: #FF6B6B;
 }
 .card-rating.active {
     color: #FF6B6B;
 }
 .card-rating.inactive {
+    color: #6B9AFF;
+}
+.card-rating.inactive .rating-label {
     color: #6B9AFF;
 }
 
@@ -2240,6 +2276,100 @@ CUSTOM_CSS = """
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     margin-top: -1rem !important;
 }
+
+/* Pagination nav row - constrain width and center, prevent wrapping */
+[data-testid="stHorizontalBlock"]:has(button[data-testid="stBaseButton-secondary"]) {
+    max-width: 420px !important;
+    margin: 0 auto !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    flex-wrap: nowrap !important;
+}
+[data-testid="stHorizontalBlock"]:has(button[data-testid="stBaseButton-secondary"]) [data-testid="stColumn"] {
+    width: auto !important;
+    min-width: auto !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+}
+/* Pagination label styling - WCAG compliant colors, no opacity */
+.pagination-label {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 0.85rem !important;
+    white-space: nowrap !important;
+    color-scheme: inherit;
+    color: light-dark(#666666, #999999) !important;
+    line-height: 1.75rem !important;
+}
+/* Fix: Streamlit's stMarkdownContainer has -16px margin that collapses layout height */
+[data-testid="stMarkdownContainer"]:has(.pagination-label) {
+    margin-bottom: 0 !important;
+}
+
+/* Page size selectbox in pagination row - scale down to match label */
+[data-testid="stHorizontalBlock"]:has(button[data-testid="stBaseButton-secondary"]) [data-testid="stSelectbox"] {
+    transform: scale(0.75) !important;
+    transform-origin: left center !important;
+    margin-right: -15px !important;
+}
+
+/* Pagination buttons - no button chrome, WCAG compliant colors */
+button[data-testid="stBaseButton-secondary"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.15rem 0.35rem !important;
+    min-height: 1.75rem !important;
+    min-width: auto !important;
+    font-size: 0.95rem !important;
+    color-scheme: inherit;
+    color: light-dark(#666666, #999999) !important;
+    transition: color 0.15s ease !important;
+    line-height: 1 !important;
+}
+button[data-testid="stBaseButton-secondary"]:hover:not(:disabled) {
+    background: transparent !important;
+    color: light-dark(#333333, #FFFFFF) !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+/* Disabled nav arrows - muted but still visible (decorative, not essential) */
+button[data-testid="stBaseButton-secondary"]:disabled {
+    background: transparent !important;
+    color: light-dark(#BBBBBB, #555555) !important;
+    cursor: default !important;
+    border: none !important;
+}
+/* Range indicator (col 4) - essential text, needs full WCAG contrast */
+[data-testid="stHorizontalBlock"]:has(button[data-testid="stBaseButton-secondary"]) [data-testid="stColumn"]:nth-child(4) button[data-testid="stBaseButton-secondary"]:disabled {
+    color: light-dark(#666666, #999999) !important;
+    font-size: 0.9rem !important;
+    white-space: nowrap !important;
+}
+button[data-testid="stBaseButton-secondary"]:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Player card scroll positioning - center on screen when navigated via anchor link */
+.player-card {
+    scroll-margin-top: 35vh;
+}
+
+/* Player card target highlighting - when navigating via anchor link */
+.player-card:target {
+    animation: highlight-pulse 2s ease-out;
+    outline: 2px solid #FF6B6B;
+    outline-offset: 2px;
+}
+@keyframes highlight-pulse {
+    0% { outline-color: #FF6B6B; box-shadow: 0 0 20px rgba(255, 107, 107, 0.6); }
+    50% { outline-color: #FF6B6B; box-shadow: 0 0 10px rgba(255, 107, 107, 0.3); }
+    100% { outline-color: transparent; box-shadow: none; }
+}
 </style>
 """
 
@@ -2553,8 +2683,8 @@ def main():
             }}
         </style>
         <div class="dashboard-banner">
-            <a href="{banner_link_href}" class="dashboard-banner-link" target="_self" title="{banner_link_title}">
-                <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo">
+            <a href="{banner_link_href}" class="dashboard-banner-link" target="_self" title="{banner_link_title}" aria-label="{banner_link_title}">
+                <img src="data:image/png;base64,{logo_b64}" class="dashboard-logo" alt="DFTL Rankings Logo">
                 <div class="dashboard-title-group">
                     <div class="dashboard-title-row">
                         <h1 class="dashboard-title">DFTL Rankings</h1>
@@ -2569,7 +2699,7 @@ def main():
         st.title("DFTL Rankings")
 
     # Back-to-top anchor and button (always rendered)
-    st.markdown('<a id="top"></a><a href="#top" class="back-to-top" title="Back to top">↑</a>', unsafe_allow_html=True)
+    st.markdown('<a id="top"></a><a href="#top" class="back-to-top" title="Back to top" aria-label="Back to top">↑</a>', unsafe_allow_html=True)
 
     # Check for available datasets
     available_datasets = get_available_datasets()
@@ -2876,7 +3006,7 @@ def main():
             if df_date_history.empty:
                 st.info(f"No ranking data for {selected_ranking_date}. Try another date.")
             else:
-                # Toggle to show unranked players
+                # Toggle for showing unranked players
                 show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
 
                 # Use "Best" sort direction (defined in sort_options)
@@ -2894,12 +3024,105 @@ def main():
                     df_filtered = df_date_history[df_date_history['active_rank'].notna()][display_cols].copy()
 
                 # Sort cards by selected option
-                df_cards_display = df_filtered.sort_values(sort_column, ascending=sort_ascending, na_position='last')
+                df_sorted = df_filtered.sort_values(sort_column, ascending=sort_ascending, na_position='last')
 
-                # Card layout (responsive: 8 stats on desktop, 4x2 on mobile)
-                # Uses Streamlit CSS variables for automatic theme adaptation
-                cards_html = generate_ranking_cards(df_cards_display)
-                st.markdown(f'<div class="ranking-cards">{cards_html}</div>', unsafe_allow_html=True)
+                # No search filtering - show all players in sorted order
+                df_to_paginate = df_sorted
+
+                # Page size options
+                PAGE_SIZE_OPTIONS = {10: "10", 20: "20", 50: "50", 100: "100", 1000: "1000"}
+
+                # Initialize page size in session state
+                if "ranking_page_size" not in st.session_state:
+                    st.session_state.ranking_page_size = 20
+
+                page_size = st.session_state.ranking_page_size
+                total_players = len(df_to_paginate)
+
+                if total_players == 0:
+                    st.info("No players to display.")
+                else:
+                    # Calculate pagination
+                    total_pages = max(1, (total_players + page_size - 1) // page_size)
+
+                    # Initialize page state if not exists
+                    if "ranking_page" not in st.session_state:
+                        st.session_state.ranking_page = 1
+
+                    # Clamp page to valid range
+                    current_page = max(1, min(st.session_state.ranking_page, total_pages))
+                    if current_page != st.session_state.ranking_page:
+                        st.session_state.ranking_page = current_page
+
+                    # Calculate slice indices
+                    start_idx = (current_page - 1) * page_size
+                    end_idx = min(start_idx + page_size, total_players)
+
+                    # Pagination controls function (renders compact centered nav with page size selector)
+                    def render_pagination(position: str):
+                        """Render pagination controls. position='top' or 'bottom' for unique keys."""
+                        # Navigation: [label] [size] prev | range | next (label+size only on top)
+                        if position == "top":
+                            col_label, col_size, col_prev, col_range, col_next = st.columns([1.5, 1, 0.5, 2, 0.5])
+                            with col_label:
+                                st.markdown('<p class="pagination-label">Rows per page:</p>', unsafe_allow_html=True)
+                            with col_size:
+                                new_size = st.selectbox(
+                                    "Per page",
+                                    options=list(PAGE_SIZE_OPTIONS.keys()),
+                                    format_func=lambda x: str(x),
+                                    index=list(PAGE_SIZE_OPTIONS.keys()).index(page_size),
+                                    key="page_size_select",
+                                    label_visibility="collapsed"
+                                )
+                                if new_size != page_size:
+                                    st.session_state.ranking_page_size = new_size
+                                    st.session_state.ranking_page = 1
+                                    st.rerun()
+                            with col_prev:
+                                if st.button("◁", disabled=(current_page <= 1), key=f"prev_{position}"):
+                                    st.session_state.ranking_page = current_page - 1
+                                    st.rerun()
+                            with col_range:
+                                range_text = f"{start_idx + 1}-{end_idx} of {total_players}"
+                                st.button(range_text, disabled=True, key=f"range_{position}")
+                            with col_next:
+                                if st.button("▷", disabled=(current_page >= total_pages), key=f"next_{position}"):
+                                    st.session_state.ranking_page = current_page + 1
+                                    st.rerun()
+                        else:
+                            # Bottom: just navigation, no size selector
+                            col_prev, col_range, col_next = st.columns(3)
+                            with col_prev:
+                                if st.button("◁", disabled=(current_page <= 1), key=f"prev_{position}"):
+                                    st.session_state.ranking_page = current_page - 1
+                                    st.rerun()
+                            with col_range:
+                                range_text = f"{start_idx + 1}-{end_idx} of {total_players}"
+                                st.button(range_text, disabled=True, key=f"range_{position}")
+                            with col_next:
+                                if st.button("▷", disabled=(current_page >= total_pages), key=f"next_{position}"):
+                                    st.session_state.ranking_page = current_page + 1
+                                    st.rerun()
+
+                    # Top pagination (only show if more than 1 page)
+                    if total_pages > 1:
+                        render_pagination("top")
+                    elif total_players > 20:
+                        # Show page size selector even if only 1 page (user might want smaller pages)
+                        render_pagination("top")
+
+                    # Slice to current page
+                    df_page = df_to_paginate.iloc[start_idx:end_idx]
+
+                    # Card layout (responsive: 8 stats on desktop, 4x2 on mobile)
+                    # Uses Streamlit CSS variables for automatic theme adaptation
+                    cards_html = generate_ranking_cards(df_page)
+                    st.html(f'<div class="ranking-cards">{cards_html}</div>')
+
+                    # Bottom pagination (only show if more than 1 page)
+                    if total_pages > 1:
+                        render_pagination("bottom")
         elif df_ratings is not None:
             # Fallback if no history data with active_rank
             st.warning("Historical rankings not available. Showing current rankings only.")
@@ -3049,7 +3272,10 @@ def main():
                 placeholder="Choose a player...",
                 key="tab4_player_select"
             )
-            # Note: Player saved to session state on tab switch, not synced to URL on every change
+
+            # Sync selected player to URL params (for share button and bookmarking)
+            if selected_player and st.query_params.get("player") != selected_player:
+                st.query_params["player"] = selected_player
 
             if selected_player:
                 # Filter history for selected player
@@ -3346,7 +3572,8 @@ def main():
                         tickvals=all_rank1_players,
                         ticktext=all_rank1_players,
                         tickfont=dict(weight=600)
-                    )
+                    ),
+                    dragmode=False,  # Prevent scroll hijacking on mobile
                 )
                 st.plotly_chart(fig_rank1, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
         else:
@@ -3721,7 +3948,7 @@ def main():
         else:
             st.warning("History data not available.")
 
-    # Floating share button (rendered last so CSS :last-of-type targets it)
+    # Floating share button (rendered after tab content for correct URL state)
     render_floating_share_button(new_slug)
 
 if __name__ == "__main__":
