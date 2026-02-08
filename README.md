@@ -11,7 +11,7 @@ A competitive Elo rating system and analytics dashboard for **Die For The Lich**
 - **Activity Gating** - Only players active in the last 7 days with 7+ games appear in rankings
 - **Hybrid Compression** - Prevents rating inflation while allowing top players to reach high ratings
 - **Interactive Dashboard** - Responsive web UI with player search, rankings, and detailed stats
-- **Theme Support** - Automatic light/dark mode detection
+- **Dark Mode Design** - Optimized dark theme for reduced eye strain
 - **Mobile-First Design** - Card-based layout optimized for all screen sizes
 - **Multiple Data Views** - Track Steam Demo era, Early Access, or combined datasets
 
@@ -110,7 +110,8 @@ DFTL_Ranking_Dashboard/
 │   ├── utils.py             # Shared utilities
 │   ├── elo/
 │   │   ├── compression.py   # Rating compression functions
-│   │   └── engine.py        # Elo computation engine
+│   │   ├── engine.py        # Elo computation engine
+│   │   └── rivalries.py     # Head-to-head rivalry statistics
 │   └── ingestion/
 │       ├── discord_parser.py    # JSON export parser
 │       └── paste_mode.py        # Daily paste ingestion

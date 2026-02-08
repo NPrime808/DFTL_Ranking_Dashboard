@@ -60,18 +60,6 @@ RANK_ICONS = {
     3: {"icon": "🥉", "color": "#CD7F32", "label": "Third Place"},
 }
 
-def get_rank_badge_html(rank):
-    """Generate HTML for a rank badge with icon and styling."""
-    if pd.isna(rank):
-        return ""
-    rank = int(rank)
-    if rank not in RANK_ICONS:
-        return f'<span style="font-weight:600;">#{rank}</span>'
-
-    info = RANK_ICONS[rank]
-    badge_style = f'display:inline-flex;align-items:center;gap:0.3rem;font-weight:700;color:{info["color"]};text-shadow:0 0 10px {info["color"]}40;'
-    return f'<span style="{badge_style}"><span style="font-size:1.2rem;">{info["icon"]}</span>#{rank}</span>'
-
 
 def build_url_with_params(new_params):
     """
@@ -141,21 +129,6 @@ def player_link(name, display_text=None):
     if display_text is None:
         display_text = name
     params = {"tab": "tracker", "player": name, **_get_current_dataset_param()}
-    url = build_url_with_params(params)
-    escaped_display = html.escape(display_text)
-    return f'<a href="{url}" target="_self" class="player-link">{escaped_display}</a>'
-
-
-def duel_link(player1, player2, display_text=None):
-    """
-    Generate an anchor link to the Duels tab with a specific matchup.
-    The link uses query params: ?tab=duels&player1=Name1&player2=Name2
-    Preserves dataset selection and other context params.
-    target="_self" ensures navigation stays in the same browser tab.
-    """
-    if display_text is None:
-        display_text = f"{player1} vs {player2}"
-    params = {"tab": "duels", "player1": player1, "player2": player2, **_get_current_dataset_param()}
     url = build_url_with_params(params)
     escaped_display = html.escape(display_text)
     return f'<a href="{url}" target="_self" class="player-link">{escaped_display}</a>'
@@ -255,7 +228,7 @@ def generate_ranking_cards(df):
     # Theme-adaptive styles using Streamlit CSS variables
     # Base card styling (border, radius, shadow) - background varies by active status
     # Uses spacing token: --space-md (1rem) for padding
-    # Uses --glass-* CSS vars for theme-adaptive borders/shadows (light-dark aware)
+    # Uses --glass-* CSS vars for borders/shadows (dark mode)
     card_base = "color-scheme:inherit;border:1px solid var(--glass-border-subtle);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px var(--glass-ring), inset 0 1px 0 var(--glass-inset), 0 4px 20px var(--glass-drop);"
     # Active player: coral accent gradient (use bg-color + bg-image so gradient blends with element, not parent)
     active_bg = "background-color:var(--secondary-background-color);background-image:linear-gradient(135deg, transparent 0%, rgba(255,107,107,0.15) 100%);"
@@ -525,9 +498,8 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
     label_style = "font-size:0.8rem;text-transform:uppercase;color:var(--text-color);font-weight:500;"
     value_style = "font-size:1.4rem;font-weight:700;color:var(--text-color);"
 
-    # Theme-adaptive player colors (Cyan + Amber)
-    # Dark mode: bright cyan #22D3EE, golden amber #FBBF24
-    # Light mode: muted cyan #0E7490, burnt amber #B45309
+    # Player colors (Cyan + Amber)
+    # Bright cyan #22D3EE, golden amber #FBBF24
     if colors:
         p1_color = colors.get("player1", "#0E7490")
         p2_color = colors.get("player2", "#B45309")
@@ -837,7 +809,7 @@ def generate_hall_of_fame_cards(stats):
         font-size: 0.9rem;
         min-width: 1.5rem;
         color-scheme: inherit;
-        color: light-dark(#666666, #999999);
+        color: #999999;
     """
 
     name_style = """
@@ -853,7 +825,7 @@ def generate_hall_of_fame_cards(stats):
         font-weight: 700;
         font-size: 1rem;
         color-scheme: inherit;
-        color: light-dark(#D93636, #FF6B6B);
+        color: #FF6B6B;
     """
 
     def build_card(title, icon, items, value_formatter=format_number):
@@ -1054,14 +1026,14 @@ def generate_rivals_html(player_name, rivals):
     record_style = """
         font-size: 0.9rem;
         color-scheme: inherit;
-        color: light-dark(#D93636, #FF6B6B);
+        color: #FF6B6B;
         font-weight: 700;
     """
 
     meta_style = """
         font-size: 0.8rem;
         color-scheme: inherit;
-        color: light-dark(#666666, #999999);
+        color: #999999;
         margin-top: 0.25rem;
     """
 
@@ -1109,14 +1081,14 @@ def generate_rivals_html(player_name, rivals):
     '''
 
 
-# Theme-specific colors (WCAG AA compliant contrast ratios)
-DARK_THEME = {
+# Theme colors - dark mode only (WCAG AA compliant contrast ratios)
+THEME_COLORS = {
     "bg_primary": "#0E1117",
     "bg_secondary": "#262730",
     "bg_hover": "#3D3D4D",
     "text_primary": "#FAFAFA",
-    "text_secondary": "#E0E0E0",  # Improved: ~11:1 contrast vs bg_primary
-    "text_muted": "#A0A0A0",       # Improved: ~7:1 contrast vs bg_primary
+    "text_secondary": "#E0E0E0",  # ~11:1 contrast vs bg_primary
+    "text_muted": "#A0A0A0",       # ~7:1 contrast vs bg_primary
     # Player colors - Cyan + Amber (vibrant for dark backgrounds)
     "player1": "#22D3EE",         # Cyan 400 - 11.4:1 contrast
     "player2": "#FBBF24",         # Amber 400 - 12.4:1 contrast
@@ -1124,64 +1096,17 @@ DARK_THEME = {
     "player2_rgb": "251, 191, 36",
 }
 
-LIGHT_THEME = {
-    "bg_primary": "#FFFFFF",
-    "bg_secondary": "#F0F2F6",
-    "bg_hover": "#E0E2E6",
-    "text_primary": "#262730",
-    "text_secondary": "#404040",  # Improved: ~10:1 contrast vs bg_primary
-    "text_muted": "#666666",       # Improved: ~5.7:1 contrast vs bg_primary
-    # Player colors - Cyan + Amber (darker for WCAG AA on light backgrounds)
-    "player1": "#0E7490",         # Cyan 700 - 5.36:1 contrast on white
-    "player2": "#B45309",         # Amber 700 - 5.02:1 contrast on white
-    "player1_rgb": "14, 116, 144",  # For rgba() backgrounds
-    "player2_rgb": "180, 83, 9",
-}
-
 
 def get_theme_colors():
-    """Get the current theme colors based on user's theme preference."""
-    is_dark = True  # Default to dark
-
-    try:
-        # Method 1: st.context (Streamlit 1.37+) - most reliable for runtime detection
-        if hasattr(st, 'context') and hasattr(st.context, 'theme'):
-            theme_info = st.context.theme
-            if theme_info:
-                # Check backgroundColor - light themes have high RGB values
-                bg_color = getattr(theme_info, 'backgroundColor', None)
-                if bg_color:
-                    # Parse hex color to check luminance
-                    bg_hex = bg_color.lstrip('#')
-                    if len(bg_hex) == 6:
-                        r, g, b = int(bg_hex[0:2], 16), int(bg_hex[2:4], 16), int(bg_hex[4:6], 16)
-                        luminance = (0.299 * r + 0.587 * g + 0.114 * b)
-                        is_dark = luminance < 128
-    except Exception:
-        pass
-
-    # Method 2: Fallback to theme.base option
-    if is_dark:
-        try:
-            theme_base = st.get_option("theme.base")
-            if theme_base == "light":
-                is_dark = False
-        except Exception:
-            pass
-
-    theme = DARK_THEME if is_dark else LIGHT_THEME
-    return {**ACCENT_COLORS, **theme}
+    """Get theme colors for charts and dynamic styling."""
+    return {**ACCENT_COLORS, **THEME_COLORS}
 
 
 def get_theme_css():
-    """Generate theme-specific CSS for elements that need dynamic colors."""
-    colors = get_theme_colors()
-    is_dark = colors["bg_primary"] == "#0E1117"
-
-    if is_dark:
-        return """
+    """Generate theme-specific CSS for dark mode elements."""
+    return """
         <style>
-        /* Dark theme overrides */
+        /* Dark mode styles */
         [data-testid="stExpander"] {
             background: rgba(38, 39, 48, 0.8) !important;
         }
@@ -1223,9 +1148,6 @@ def get_theme_css():
             fill: #FAFAFA !important;
             stroke: #FAFAFA !important;
             opacity: 1 !important;
-        }
-        .dashboard-header {
-            background: linear-gradient(135deg, rgba(38, 39, 48, 0.9) 0%, rgba(14, 17, 23, 0.95) 100%) !important;
         }
 
         /* Sidebar - Dark mode: high contrast white text */
@@ -1282,113 +1204,6 @@ def get_theme_css():
         [data-testid="stSidebar"] [data-testid="stElementContainer"]:has([data-testid="stSelectbox"]) {
             margin-bottom: var(--space-sm) !important;
         }
-        </style>
-        """
-    else:
-        return """
-        <style>
-        /* Light theme overrides */
-        [data-testid="stExpander"] {
-            background: rgba(240, 242, 246, 0.95) !important;
-        }
-        /* Expander content text - ensure dark text in light mode */
-        [data-testid="stExpander"] p,
-        [data-testid="stExpander"] li,
-        [data-testid="stExpander"] td,
-        [data-testid="stExpander"] th {
-            color: #262730 !important;
-        }
-        [data-testid="stExpander"] strong {
-            color: #1a1c23 !important;
-        }
-        /* Expander header - force dark text in light mode with multiple methods */
-        [data-testid="stExpander"] summary,
-        [data-testid="stExpander"] summary *,
-        [data-testid="stExpander"] details > summary,
-        [data-testid="stExpander"] details > summary *,
-        [data-testid="stExpander"] details[open] > summary,
-        [data-testid="stExpander"] details[open] > summary *,
-        .streamlit-expanderHeader,
-        .streamlit-expanderHeader *,
-        details[open] > summary,
-        details[open] > summary * {
-            color: #262730 !important;
-            -webkit-text-fill-color: #262730 !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-            background-clip: unset !important;
-            -webkit-background-clip: unset !important;
-        }
-        /* Ensure expanded header has visible background */
-        [data-testid="stExpander"] details[open] > summary {
-            background-color: rgba(240, 242, 246, 0.95) !important;
-        }
-        [data-testid="stExpander"] summary svg,
-        [data-testid="stExpander"] details > summary svg,
-        [data-testid="stExpander"] details[open] > summary svg {
-            fill: #262730 !important;
-            stroke: #262730 !important;
-            opacity: 1 !important;
-        }
-        .dashboard-header {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 242, 246, 0.98) 100%) !important;
-            border-color: rgba(0, 0, 0, 0.1) !important;
-        }
-
-        /* Sidebar - Light mode: high contrast dark text */
-        [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #FFFFFF 0%, #F0F2F6 100%) !important;
-        }
-        [data-testid="stSidebar"] h1,
-        [data-testid="stSidebar"] h2,
-        [data-testid="stSidebar"] h3,
-        [data-testid="stSidebar"] .stMarkdown h1,
-        [data-testid="stSidebar"] .stMarkdown h2 {
-            color: #1a1c23 !important;
-        }
-        /* Text elements - exclude Material icons by not targeting bare spans */
-        [data-testid="stSidebar"] p,
-        [data-testid="stSidebar"] label,
-        [data-testid="stSidebar"] .stMarkdown span,
-        [data-testid="stSidebar"] .stSelectbox span {
-            color: #333333 !important;
-        }
-        [data-testid="stSidebar"] .stCaption p {
-            color: #555555 !important;
-        }
-        [data-testid="stSidebar"] hr {
-            border-color: rgba(0, 0, 0, 0.1) !important;
-        }
-        /* Sidebar spacing */
-        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-            gap: 0.5rem !important;
-        }
-        [data-testid="stSidebar"] h2 {
-            margin-top: 0 !important;
-            margin-bottom: 0.25rem !important;
-        }
-        /* Captions stack tightly together */
-        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-            margin-top: 0 !important;
-            margin-bottom: 0 !important;
-        }
-        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
-            margin-bottom: 0 !important;
-        }
-        /* Caption containers stack tightly */
-        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has([data-testid="stCaptionContainer"]) {
-            margin-bottom: 0 !important;
-        }
-        /* Dividers: symmetrical spacing to center content between them */
-        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(hr) {
-            margin-top: var(--space-md) !important;
-            margin-bottom: var(--space-md) !important;
-        }
-        /* Selectbox container - reduce default margin for tighter layout */
-        [data-testid="stSidebar"] [data-testid="stElementContainer"]:has([data-testid="stSelectbox"]) {
-            margin-bottom: var(--space-sm) !important;
-        }
-
         </style>
         """
 
@@ -1449,10 +1264,10 @@ CUSTOM_CSS = """
 
 /* Theme-adaptive glass effect variables (set on Streamlit's themed container) */
 [data-testid="stAppViewContainer"] {
-    --glass-border-subtle: light-dark(rgba(0,0,0,0.12), rgba(255,255,255,0.2));
-    --glass-ring: light-dark(rgba(0,0,0,0.06), rgba(255,255,255,0.08));
-    --glass-inset: light-dark(rgba(0,0,0,0.03), rgba(255,255,255,0.1));
-    --glass-drop: light-dark(rgba(0,0,0,0.1), rgba(0,0,0,0.15));
+    --glass-border-subtle: rgba(255,255,255,0.2);
+    --glass-ring: rgba(255,255,255,0.08);
+    --glass-inset: rgba(255,255,255,0.1);
+    --glass-drop: rgba(0,0,0,0.15);
 }
 
 /* Hide Streamlit toolbar and status indicators */
@@ -1473,11 +1288,11 @@ CUSTOM_CSS = """
 /* ===== WCAG-Compliant Rating Change Colors ===== */
 .change-positive {
     color-scheme: inherit;
-    color: light-dark(#047857, #10B981) !important;
+    color: #10B981 !important;
 }
 .change-negative {
     color-scheme: inherit;
-    color: light-dark(#DC2626, #EF4444) !important;
+    color: #EF4444 !important;
 }
 
 /* ===== Typography Hierarchy ===== */
@@ -1539,14 +1354,14 @@ CUSTOM_CSS = """
 .back-to-top:focus,
 .stPopover button:focus {
     color-scheme: inherit;
-    outline: 2px solid light-dark(#D93636, #FF6B6B) !important;
+    outline: 2px solid #FF6B6B !important;
     outline-offset: 2px;
     border-radius: 4px;
 }
 
 /* Focus styles for tab navigation radio buttons (radio is 0x0, style the label) */
 [data-testid="stRadio"] label:focus-within {
-    outline: 2px solid light-dark(#D93636, #FF6B6B) !important;
+    outline: 2px solid #FF6B6B !important;
     outline-offset: 2px;
     border-radius: 4px;
 }
@@ -1579,7 +1394,7 @@ CUSTOM_CSS = """
     text-transform: uppercase !important;
     letter-spacing: 0.1em !important;
     color-scheme: inherit;
-    color: light-dark(#6B7280, #9CA3AF) !important;
+    color: #9CA3AF !important;
 }
 
 [data-testid="stMetric"] [data-testid="stMetricValue"] {
@@ -1781,7 +1596,7 @@ CUSTOM_CSS = """
 }
 [data-testid="stHorizontalBlock"]:has(.stPlotlyChart) > [data-testid="stColumn"]:first-child {
     color-scheme: inherit;
-    border-right: 1px solid light-dark(#C0C0C0, #404040);
+    border-right: 1px solid #404040;
     padding-right: 1rem;
 }
 /* Mobile/Tablet: prevent chart scroll hijacking */
@@ -1873,7 +1688,7 @@ CUSTOM_CSS = """
 /* ===== Player Tracker Chart Subtitle ===== */
 .tracker-chart-subtitle {
     color-scheme: inherit;
-    color: light-dark(#555555, #A0A0A0);
+    color: #A0A0A0;
     font-size: 0.75rem;
     font-weight: 500;
     margin: -0.5rem 0 0.5rem 0;
@@ -2011,8 +1826,7 @@ CUSTOM_CSS = """
 }
 
 /* Sidebar download button - Label scale with card styling */
-[data-testid="stSidebar"] .stDownloadButton button,
-[data-testid="stSidebar"] a.download-link {
+[data-testid="stSidebar"] .stDownloadButton button {
     font-family: var(--font-body) !important;
     font-weight: 600 !important;
     font-size: 0.8rem !important;  /* Label lg size */
@@ -2040,8 +1854,7 @@ CUSTOM_CSS = """
     [data-testid="stSidebar"] .stCaption {
         font-size: 0.7rem !important;  /* Label xs size */
     }
-    [data-testid="stSidebar"] .stDownloadButton button,
-    [data-testid="stSidebar"] a.download-link {
+    [data-testid="stSidebar"] .stDownloadButton button {
         font-size: 0.75rem !important;  /* Label sm size */
         padding: var(--space-xs) var(--space-sm) !important;
     }
@@ -2133,24 +1946,6 @@ CUSTOM_CSS = """
     margin-top: auto;
 }
 
-/* Card date row (Game History cards) */
-.card-date {
-    text-align: center;
-    font-weight: 600;
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.375rem;
-    border-bottom: 1px solid rgba(128,128,128,0.2);
-}
-.card-date a {
-    color: var(--text-color);
-    text-decoration: none;
-}
-.card-date a:hover {
-    color: #FF6B6B;
-    text-decoration: underline;
-}
-
 /* Responsive card header: matches stats grid columns */
 .card-header {
     display: grid;
@@ -2228,12 +2023,6 @@ CUSTOM_CSS = """
     color: #6B9AFF;
 }
 
-/* Sort controls */
-.sort-controls {
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
 /* Tab 1 controls compression - related controls use --space-sm */
 [data-testid="stDateInput"] {
     margin-bottom: 0.5rem !important;
@@ -2241,12 +2030,6 @@ CUSTOM_CSS = """
 [data-testid="stDateInput"] + div [data-testid="stHorizontalBlock"] {
     margin-top: 0 !important;
 }
-.sort-controls + div [data-testid="stToggle"] {
-    margin-top: 0.25rem !important;
-    margin-bottom: 0.5rem !important;
-}
-
-/* Removed: Hidden table CSS - tables now fully removed from code */
 
 /* Back to top anchor - hide container spacing */
 #top {
@@ -2704,7 +2487,7 @@ a.rival-card:hover {
     font-size: 0.85rem !important;
     white-space: nowrap !important;
     color-scheme: inherit;
-    color: light-dark(#666666, #999999) !important;
+    color: #999999 !important;
     line-height: 1.75rem !important;
 }
 /* Fix: Streamlit's stMarkdownContainer has -16px margin that collapses layout height */
@@ -2729,26 +2512,26 @@ button[data-testid="stBaseButton-secondary"] {
     min-width: auto !important;
     font-size: 0.95rem !important;
     color-scheme: inherit;
-    color: light-dark(#666666, #999999) !important;
+    color: #999999 !important;
     transition: color 0.15s ease !important;
     line-height: 1 !important;
 }
 button[data-testid="stBaseButton-secondary"]:hover:not(:disabled) {
     background: transparent !important;
-    color: light-dark(#333333, #FFFFFF) !important;
+    color: #FFFFFF !important;
     border: none !important;
     box-shadow: none !important;
 }
 /* Disabled nav arrows - muted but still visible (decorative, not essential) */
 button[data-testid="stBaseButton-secondary"]:disabled {
     background: transparent !important;
-    color: light-dark(#BBBBBB, #555555) !important;
+    color: #555555 !important;
     cursor: default !important;
     border: none !important;
 }
 /* Range indicator (col 4) - essential text, needs full WCAG contrast */
 [data-testid="stHorizontalBlock"]:has(button[data-testid="stBaseButton-secondary"]) [data-testid="stColumn"]:nth-child(4) button[data-testid="stBaseButton-secondary"]:disabled {
-    color: light-dark(#666666, #999999) !important;
+    color: #999999 !important;
     font-size: 0.9rem !important;
     white-space: nowrap !important;
 }
@@ -3033,12 +2816,12 @@ def main():
                 cursor: pointer;
             }}
             .dataset-badge-ea {{
-                background: light-dark(#DBEAFE, #1E3A5F);
-                color: light-dark(#1E40AF, #93C5FD);
+                background: #1E3A5F;
+                color: #93C5FD;
             }}
             .dataset-badge-full {{
-                background: light-dark(#D1FAE5, #064E3B);
-                color: light-dark(#065F46, #6EE7B7);
+                background: #064E3B;
+                color: #6EE7B7;
             }}
             .dashboard-title {{
                 font-family: 'Source Sans', sans-serif !important;
@@ -3047,10 +2830,9 @@ def main():
                 line-height: 1.1 !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                color-scheme: inherit;
-                --gradient-start: light-dark(#8B2942, #FAFAFA);
-                --gradient-mid: light-dark(#C53030, #FF6B6B);
-                --gradient-end: light-dark(#92400E, #FFD700);
+                --gradient-start: #FAFAFA;
+                --gradient-mid: #FF6B6B;
+                --gradient-end: #FFD700;
                 background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%) !important;
                 -webkit-background-clip: text !important;
                 -webkit-text-fill-color: transparent !important;
@@ -3061,8 +2843,7 @@ def main():
                 font-size: 0.55rem;
                 font-weight: 400;
                 line-height: 1.2;
-                color-scheme: inherit;
-                color: light-dark(#6B7280, #9CA3AF);
+                color: #9CA3AF;
                 margin: 0 !important;
                 padding: 0 !important;
                 letter-spacing: 0.04em;
@@ -4343,11 +4124,11 @@ def main():
                         col_elo, col_score = st.columns(2)
                         with col_elo:
                             st.subheader("Elo Rating Comparison")
-                            st.html('<p style="color-scheme: inherit; color: light-dark(#555555, #A0A0A0); font-size: 0.75rem; font-weight: 500; margin: -0.5rem 0 0.5rem 0;">1500 = starting rating</p>')
+                            st.html('<p style="color: #A0A0A0; font-size: 0.75rem; font-weight: 500; margin: -0.5rem 0 0.5rem 0;">1500 = starting rating</p>')
                             st.plotly_chart(fig_elo, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
                         with col_score:
                             st.subheader("Score Comparison")
-                            st.html('<p style="color-scheme: inherit; color: light-dark(#555555, #A0A0A0); font-size: 0.75rem; font-weight: 500; margin: -0.5rem 0 0.5rem 0;">Color = duel winner</p>')
+                            st.html('<p style="color: #A0A0A0; font-size: 0.75rem; font-weight: 500; margin: -0.5rem 0 0.5rem 0;">Color = duel winner</p>')
                             st.plotly_chart(fig_score, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
 
                         # Display the duel cards
