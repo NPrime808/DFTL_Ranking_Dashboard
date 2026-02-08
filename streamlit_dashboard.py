@@ -1472,10 +1472,11 @@ CUSTOM_CSS = """
     --glass-drop: light-dark(rgba(0,0,0,0.1), rgba(0,0,0,0.15));
 }
 
-/* Hide Streamlit toolbar (Deploy button, main menu, etc.) */
+/* Hide Streamlit toolbar and status indicators */
 [data-testid="stMainMenu"],
 [data-testid="stAppDeployButton"],
-[data-testid="stToolbarActions"] {
+[data-testid="stToolbarActions"],
+[data-testid="stStatusWidget"] {
     display: none !important;
 }
 
