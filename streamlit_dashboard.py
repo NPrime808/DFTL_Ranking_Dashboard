@@ -1472,8 +1472,10 @@ CUSTOM_CSS = """
     --glass-drop: light-dark(rgba(0,0,0,0.1), rgba(0,0,0,0.15));
 }
 
-/* Hide Streamlit main menu (hamburger button) */
-[data-testid="stMainMenu"] {
+/* Hide Streamlit toolbar (Deploy button, main menu, etc.) */
+[data-testid="stMainMenu"],
+[data-testid="stAppDeployButton"],
+[data-testid="stToolbarActions"] {
     display: none !important;
 }
 
