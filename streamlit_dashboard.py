@@ -881,8 +881,8 @@ def generate_hall_of_fame_cards(stats):
             else:
                 rank_display = f"{current_rank}."
 
-            # Create player link
-            player_url = build_url_with_params({"tab": "tracker", "player": player})
+            # Create player link (preserve dataset selection)
+            player_url = build_url_with_params({"tab": "tracker", "player": player, **_get_current_dataset_param()})
             player_link_html = f'<a href="{player_url}" target="_self" class="player-link" style="color: inherit; text-decoration: none;">{html.escape(player)}</a>'
 
             rows_html += f'''
@@ -1077,8 +1077,8 @@ def generate_rivals_html(player_name, rivals):
         else:
             medal = f"#{i + 1}"
 
-        # Duel link
-        duel_url = build_url_with_params({"tab": "duels", "player1": player_name, "player2": rival['name']})
+        # Duel link (preserve dataset selection)
+        duel_url = build_url_with_params({"tab": "duels", "player1": player_name, "player2": rival['name'], **_get_current_dataset_param()})
 
         # Win/loss indicator
         if rival['player_wins'] > rival['rival_wins']:
