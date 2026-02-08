@@ -84,7 +84,6 @@ def build_url_with_params(new_params):
         "duels": ["player1", "player2"],
         "tracker": ["player"],
         "dailies": ["date"],
-        "rivalries": [],
         "hall-of-fame": [],
     }
 
@@ -925,173 +924,6 @@ def generate_hall_of_fame_cards(stats):
     # Days at Elo #1 card (shows ALL players who have held #1, not just top 5)
     if stats.get('days_at_elo_1'):
         cards_html += build_card("Days at Elo #1", "👑", stats['days_at_elo_1'])
-
-    cards_html += '</div>'
-
-    return cards_html
-
-
-def generate_rivalry_cards(df_rivalries):
-    """
-    Generate HTML cards for Greatest Rivalries.
-    Shows three categories: Most Battles, Closest Rivals, Elite Showdowns.
-    """
-    if df_rivalries is None or df_rivalries.empty:
-        return ""
-
-    # Card styling (matches Hall of Fame cards)
-    card_style = """
-        color-scheme: inherit;
-        background: var(--secondary-background-color);
-        border: 1px solid var(--glass-border-subtle);
-        border-radius: 12px;
-        padding: 1rem;
-        box-shadow: 0 4px 20px var(--glass-drop);
-    """
-
-    title_style = """
-        font-size: 1rem;
-        font-weight: 700;
-        margin: 0 0 0.75rem 0;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid rgba(128,128,128,0.35);
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    """
-
-    row_style = """
-        display: block;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid rgba(128,128,128,0.15);
-        text-decoration: none;
-        color: inherit;
-        transition: background 0.15s ease;
-    """
-
-    rank_style = """
-        font-weight: 700;
-        font-size: 0.9rem;
-        min-width: 1.5rem;
-        color-scheme: inherit;
-        color: light-dark(#666666, #999999);
-    """
-
-    vs_row_style = """
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.25rem;
-    """
-
-    player_style = """
-        font-weight: 600;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    """
-
-    vs_style = """
-        color-scheme: inherit;
-        color: light-dark(#666666, #999999);
-        font-size: 0.8rem;
-        flex-shrink: 0;
-    """
-
-    stats_style = """
-        display: flex;
-        gap: 0.75rem;
-        font-size: 0.85rem;
-        color-scheme: inherit;
-        color: light-dark(#666666, #999999);
-    """
-
-    value_style = """
-        font-weight: 700;
-        color-scheme: inherit;
-        color: light-dark(#D93636, #FF6B6B);
-    """
-
-    def build_rivalry_card(title, icon, df_category, metric_formatter):
-        """Build a single rivalry card with top 5 rivalries."""
-        rows_html = ""
-
-        for i, (_, row) in enumerate(df_category.head(5).iterrows()):
-            rank_num = i + 1
-            p1 = row['player1']
-            p2 = row['player2']
-            p1_wins = int(row['p1_wins'])
-            p2_wins = int(row['p2_wins'])
-            total = int(row['total_encounters'])
-
-            # Medal for top 3
-            if rank_num == 1:
-                rank_display = "🥇"
-            elif rank_num == 2:
-                rank_display = "🥈"
-            elif rank_num == 3:
-                rank_display = "🥉"
-            else:
-                rank_display = f"{rank_num}."
-
-            # Link to Duels tab with both players pre-selected
-            duel_url = build_url_with_params({"tab": "duels", "player1": p1, "player2": p2})
-
-            # Metric display (varies by category)
-            metric_html = metric_formatter(row)
-
-            rows_html += f'''
-                <a href="{duel_url}" target="_self" style="{row_style}" class="rivalry-row">
-                    <div style="{vs_row_style}">
-                        <span style="{rank_style}">{rank_display}</span>
-                        <span style="{player_style}">{html.escape(p1)}</span>
-                        <span style="{vs_style}">vs</span>
-                        <span style="{player_style}">{html.escape(p2)}</span>
-                    </div>
-                    <div style="{stats_style}">
-                        <span><span style="{value_style}">{p1_wins}-{p2_wins}</span> record</span>
-                        <span>•</span>
-                        <span>{metric_html}</span>
-                    </div>
-                </a>
-            '''
-
-        return f'''
-            <div style="{card_style}">
-                <div style="{title_style}">
-                    <span style="font-size: 1.2rem;">{icon}</span>
-                    <span>{title}</span>
-                </div>
-                {rows_html}
-            </div>
-        '''
-
-    # Metric formatters for each category
-    def most_battles_metric(row):
-        return f'<span style="{value_style}">{int(row["total_encounters"])}</span> battles'
-
-    def closest_metric(row):
-        closeness_pct = row['closeness'] * 100
-        return f'<span style="{value_style}">{closeness_pct:.0f}%</span> close'
-
-    def elite_metric(row):
-        return f'avg rank <span style="{value_style}">{row["avg_combined_rank"]:.1f}</span>'
-
-    # Sort for each category
-    df_most_battles = df_rivalries.nlargest(5, 'total_encounters')
-    df_closest = df_rivalries.nlargest(5, 'closeness')
-    df_elite = df_rivalries.nlargest(5, 'elite_score')
-
-    cards_html = '<div class="rivalry-cards-grid">'
-
-    # Most Battles card
-    cards_html += build_rivalry_card("Most Battles", "⚔️", df_most_battles, most_battles_metric)
-
-    # Closest Rivals card
-    cards_html += build_rivalry_card("Closest Rivals", "⚖️", df_closest, closest_metric)
-
-    # Elite Showdowns card
-    cards_html += build_rivalry_card("Elite Showdowns", "👑", df_elite, elite_metric)
 
     cards_html += '</div>'
 
@@ -2806,41 +2638,6 @@ CUSTOM_CSS = """
     text-decoration: underline !important;
 }
 
-/* Rivalry cards grid */
-.rivalry-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-@media (max-width: 900px) {
-    .rivalry-cards-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 600px) {
-    .rivalry-cards-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-.rivalry-cards-grid a.rivalry-row {
-    display: block;
-    border-radius: 6px;
-    margin: 0 -0.5rem;
-    padding: 0.5rem;
-}
-
-.rivalry-cards-grid a.rivalry-row:hover {
-    background: rgba(128, 128, 128, 0.1);
-}
-
-.rivalry-cards-grid a.rivalry-row:last-child {
-    border-bottom: none;
-}
-
 /* Rival cards in Tracker tab */
 a.rival-card:hover {
     background: rgba(128, 128, 128, 0.2) !important;
@@ -3426,7 +3223,6 @@ def main():
         "⚔️ Duels",
         "👤 Tracker",
         "📊 Dailies",
-        "🔥 Rivalries",
         "🏆 Hall of Fame"
     ]
 
@@ -3436,7 +3232,6 @@ def main():
         "⚔️ Duels": "duels",
         "👤 Tracker": "tracker",
         "📊 Dailies": "dailies",
-        "🔥 Rivalries": "rivalries",
         "🏆 Hall of Fame": "hall-of-fame"
     }
     SLUG_TO_TAB = {v: k for k, v in TAB_SLUGS.items()}
@@ -3447,7 +3242,6 @@ def main():
         "duels": ["player1", "player2"],
         "tracker": ["player"],
         "dailies": ["date"],
-        "rivalries": [],
         "hall-of-fame": [],
     }
     ALL_TAB_PARAMS = set(p for params in TAB_PARAMS.values() for p in params)
@@ -4130,22 +3924,7 @@ def main():
         else:
             st.warning("History data not available.")
 
-    # --- Tab 5: Rivalries ---
-    if active_tab == "🔥 Rivalries":
-        # Load rivalries data for current dataset
-        df_rivalries = load_rivalries_data(dataset_prefix)
-
-        if df_rivalries is not None and not df_rivalries.empty:
-            # Generate and display rivalry cards
-            rivalry_cards_html = generate_rivalry_cards(df_rivalries)
-            st.html(rivalry_cards_html)
-
-            # Show total rivalries count
-            st.caption(f"Showing top rivalries from {len(df_rivalries):,} qualifying matchups (≥7 encounters)")
-        else:
-            st.warning("Rivalry data not available. Run `python -m src.elo.rivalries` to generate it.")
-
-    # --- Tab 6: Top 10 History ---
+    # --- Tab 5: Hall of Fame ---
     if active_tab == "🏆 Hall of Fame":
         if df_history is not None and 'active_rank' in df_history.columns:
             # Hall of Fame leaderboard cards
