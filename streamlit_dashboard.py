@@ -1098,14 +1098,18 @@ def generate_rivalry_cards(df_rivalries):
     return cards_html
 
 
-def get_player_rivals(player_name, df_rivalries, n=3):
+def get_player_rivals(player_name, df_rivalries, n=3, min_closeness=0.7):
     """
-    Get a player's top rivals using hybrid scoring (encounters × closeness).
+    Get a player's top rivals - competitive matchups ranked by encounter count.
+
+    A true rivalry requires competition (closeness >= 0.7), then ranks by
+    how many times they've faced each other.
 
     Args:
         player_name: The player to find rivals for
         df_rivalries: DataFrame with rivalry data
         n: Number of top rivals to return (default 3)
+        min_closeness: Minimum closeness threshold (default 0.7 = within 30% win margin)
 
     Returns:
         List of dicts with rival info, or empty list if no rivals found
@@ -1120,14 +1124,15 @@ def get_player_rivals(player_name, df_rivalries, n=3):
     if player_rivalries.empty:
         return []
 
-    # Calculate hybrid score: encounters × closeness
-    # This prioritizes rivalries that are both frequent AND competitive
-    player_rivalries['rival_score'] = (
-        player_rivalries['total_encounters'] * player_rivalries['closeness']
-    )
+    # Filter to competitive rivalries only (closeness >= threshold)
+    # One-sided matchups aren't true rivalries
+    player_rivalries = player_rivalries[player_rivalries['closeness'] >= min_closeness]
 
-    # Sort by hybrid score descending
-    player_rivalries = player_rivalries.nlargest(n, 'rival_score')
+    if player_rivalries.empty:
+        return []
+
+    # Rank by encounter count (more history = more meaningful rivalry)
+    player_rivalries = player_rivalries.nlargest(n, 'total_encounters')
 
     # Build result list with normalized data
     rivals = []
@@ -1148,7 +1153,6 @@ def get_player_rivals(player_name, df_rivalries, n=3):
             'rival_wins': rival_wins,
             'total_encounters': int(row['total_encounters']),
             'closeness': row['closeness'],
-            'rival_score': row['rival_score'],
         })
 
     return rivals

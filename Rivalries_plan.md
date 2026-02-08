@@ -139,12 +139,16 @@ from src.elo.rivalries import compute_rivalries, process_rivalries
 
 ### Top Rivals Feature (Nemesis) ✅ COMPLETE
 
-Shows top 3 rivals on each player's Tracker page using hybrid scoring.
+Shows top 3 rivals on each player's Tracker page.
 
-**Scoring:** `encounters × closeness` - prioritizes rivalries that are both frequent AND competitive
+**Scoring:** Filter-then-rank approach
+1. **Filter:** `closeness >= 0.7` (excludes one-sided matchups where win margin exceeds 30%)
+2. **Rank:** By `total_encounters` (most history = most meaningful rivalry)
+
+This ensures "rivalries" are genuinely competitive - one-sided farming relationships like 51-24 records are excluded regardless of encounter count.
 
 **Functions:**
-- `get_player_rivals(player_name, df_rivalries, n=3)` - Gets top N rivals with hybrid scoring
+- `get_player_rivals(player_name, df_rivalries, n=3, min_closeness=0.7)` - Gets top N competitive rivals
 - `generate_rivals_html(player_name, rivals)` - Generates the rivals card HTML
 
 **UI features:**
