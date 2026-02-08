@@ -1098,6 +1098,181 @@ def generate_rivalry_cards(df_rivalries):
     return cards_html
 
 
+def get_player_rivals(player_name, df_rivalries, n=3):
+    """
+    Get a player's top rivals using hybrid scoring (encounters × closeness).
+
+    Args:
+        player_name: The player to find rivals for
+        df_rivalries: DataFrame with rivalry data
+        n: Number of top rivals to return (default 3)
+
+    Returns:
+        List of dicts with rival info, or empty list if no rivals found
+    """
+    if df_rivalries is None or df_rivalries.empty:
+        return []
+
+    # Find all rivalries involving this player
+    mask = (df_rivalries['player1'] == player_name) | (df_rivalries['player2'] == player_name)
+    player_rivalries = df_rivalries[mask].copy()
+
+    if player_rivalries.empty:
+        return []
+
+    # Calculate hybrid score: encounters × closeness
+    # This prioritizes rivalries that are both frequent AND competitive
+    player_rivalries['rival_score'] = (
+        player_rivalries['total_encounters'] * player_rivalries['closeness']
+    )
+
+    # Sort by hybrid score descending
+    player_rivalries = player_rivalries.nlargest(n, 'rival_score')
+
+    # Build result list with normalized data
+    rivals = []
+    for _, row in player_rivalries.iterrows():
+        # Determine which player is the rival
+        if row['player1'] == player_name:
+            rival_name = row['player2']
+            player_wins = int(row['p1_wins'])
+            rival_wins = int(row['p2_wins'])
+        else:
+            rival_name = row['player1']
+            player_wins = int(row['p2_wins'])
+            rival_wins = int(row['p1_wins'])
+
+        rivals.append({
+            'name': rival_name,
+            'player_wins': player_wins,
+            'rival_wins': rival_wins,
+            'total_encounters': int(row['total_encounters']),
+            'closeness': row['closeness'],
+            'rival_score': row['rival_score'],
+        })
+
+    return rivals
+
+
+def generate_rivals_html(player_name, rivals):
+    """
+    Generate HTML for the rivals section in Tracker tab.
+
+    Args:
+        player_name: The current player's name
+        rivals: List of rival dicts from get_player_rivals()
+
+    Returns:
+        HTML string for the rivals section
+    """
+    if not rivals:
+        return ""
+
+    # Card styling (matches existing card styles)
+    card_style = """
+        color-scheme: inherit;
+        background: var(--secondary-background-color);
+        border: 1px solid var(--glass-border-subtle);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 20px var(--glass-drop);
+    """
+
+    title_style = """
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 0 0 0.75rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(128,128,128,0.35);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    """
+
+    rivals_grid_style = """
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.75rem;
+    """
+
+    rival_card_style = """
+        display: block;
+        background: rgba(128, 128, 128, 0.1);
+        border-radius: 8px;
+        padding: 0.75rem;
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.15s ease;
+    """
+
+    name_style = """
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    """
+
+    record_style = """
+        font-size: 0.9rem;
+        color-scheme: inherit;
+        color: light-dark(#D93636, #FF6B6B);
+        font-weight: 700;
+    """
+
+    meta_style = """
+        font-size: 0.8rem;
+        color-scheme: inherit;
+        color: light-dark(#666666, #999999);
+        margin-top: 0.25rem;
+    """
+
+    rivals_html = ""
+    for i, rival in enumerate(rivals):
+        # Medal for top 3
+        if i == 0:
+            medal = "🥇"
+        elif i == 1:
+            medal = "🥈"
+        elif i == 2:
+            medal = "🥉"
+        else:
+            medal = ""
+
+        # Duel link
+        duel_url = build_url_with_params({"tab": "duels", "player1": player_name, "player2": rival['name']})
+
+        # Win/loss indicator
+        if rival['player_wins'] > rival['rival_wins']:
+            record_prefix = "▲"  # Winning
+        elif rival['player_wins'] < rival['rival_wins']:
+            record_prefix = "▼"  # Losing
+        else:
+            record_prefix = "="  # Tied
+
+        rivals_html += f'''
+            <a href="{duel_url}" target="_self" style="{rival_card_style}" class="rival-card">
+                <div style="{name_style}">{medal} {html.escape(rival['name'])}</div>
+                <div style="{record_style}">{record_prefix} {rival['player_wins']}-{rival['rival_wins']}</div>
+                <div style="{meta_style}">{rival['total_encounters']} battles</div>
+            </a>
+        '''
+
+    return f'''
+        <div style="{card_style}">
+            <div style="{title_style}">
+                <span style="font-size: 1.2rem;">⚔️</span>
+                <span>Top Rivals</span>
+            </div>
+            <div style="{rivals_grid_style}">
+                {rivals_html}
+            </div>
+        </div>
+    '''
+
+
 # Theme-specific colors (WCAG AA compliant contrast ratios)
 DARK_THEME = {
     "bg_primary": "#0E1117",
@@ -2662,6 +2837,11 @@ CUSTOM_CSS = """
     border-bottom: none;
 }
 
+/* Rival cards in Tracker tab */
+a.rival-card:hover {
+    background: rgba(128, 128, 128, 0.2) !important;
+}
+
 /* Hall of Fame chart card */
 .hof-chart-card {
     color-scheme: inherit;
@@ -3775,6 +3955,14 @@ def main():
 
                         summary_html = f'<div style="{card_style}"><div class="card-header"><div class="card-rank">{rank_html}</div><div class="card-name">{name_html}</div><div class="card-rating active"><span class="rating-label">Elo</span>{rating_str}</div></div><div class="stats-grid"><div style="{stat_layout}"><span style="{label_style}">Daily Runs</span><span style="{value_style}">{games}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{wins}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily #1 (%)</span><span style="{value_style}">{win_rate_str}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10</span><span style="{value_style}">{top_10s}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Top10 (%)</span><span style="{value_style}">{top10_rate_str}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Avg</span><span style="{value_style}">{avg_rank_str}</span></div><div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{last_7_str}</span></div><div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{consistency_str}</span></div></div></div>'
                         st.html(f'<div class="ranking-cards">{summary_html}</div>')
+
+                        # --- Top Rivals Section ---
+                        df_rivalries = load_rivalries_data(dataset_prefix)
+                        if df_rivalries is not None and not df_rivalries.empty:
+                            rivals = get_player_rivals(selected_player, df_rivalries, n=3)
+                            if rivals:
+                                rivals_html = generate_rivals_html(selected_player, rivals)
+                                st.html(rivals_html)
 
                         # --- Charts Row (side by side if space allows) ---
                         df_chart = df_player_played.sort_values('date')

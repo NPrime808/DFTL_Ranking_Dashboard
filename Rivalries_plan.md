@@ -134,5 +134,21 @@ from src.elo.rivalries import compute_rivalries, process_rivalries
 
 - "Rivalry of the Month" - most active recent rivalry
 - Head-to-head trend chart (win rate over time)
-- "Nemesis" feature - show each player's top rival on their Tracker page
+- ~~"Nemesis" feature - show each player's top rival on their Tracker page~~ ✅ Implemented as "Top Rivals"
 - Lead change tracking ("Most Dramatic" category)
+
+### Top Rivals Feature (Nemesis) ✅ COMPLETE
+
+Shows top 3 rivals on each player's Tracker page using hybrid scoring.
+
+**Scoring:** `encounters × closeness` - prioritizes rivalries that are both frequent AND competitive
+
+**Functions:**
+- `get_player_rivals(player_name, df_rivalries, n=3)` - Gets top N rivals with hybrid scoring
+- `generate_rivals_html(player_name, rivals)` - Generates the rivals card HTML
+
+**UI features:**
+- Medal icons (🥇🥈🥉) for top 3
+- Win/loss indicator (▲ winning, ▼ losing, = tied)
+- Battle count display
+- Click → navigates to Duels tab with both players
