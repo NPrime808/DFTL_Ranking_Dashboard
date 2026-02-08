@@ -401,7 +401,7 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
             else:
                 rating_html = f'<span style="min-width:7rem;text-align:right;font-weight:600;color:var(--text-color);">{rating_str}</span>'
 
-        row_html = f'<div style="{row_style}border-color:{border_color};">{rank_html}{score_html}{name_html}{rating_html}</div>'
+        row_html = f'<div class="daily-row" style="{row_style}border-color:{border_color};">{rank_html}{score_html}{name_html}{rating_html}</div>'
         rows.append(row_html)
 
     return "".join(rows)
@@ -410,7 +410,7 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
 def generate_game_history_cards(df, has_active_rank=True):
     """
     Generate HTML cards for player game history display (Tab 3).
-    Header: Score | Date + Player (Rating, Change) | Daily Rank
+    Date row spans full width, then: Daily Rank | Elo (with change) | Score
     Stats: Daily Runs, Daily #1, Daily #1 (%), Daily Top 10, Daily Top 10 (%), Daily Avg, 7-Game Avg, Daily Variance
     """
     if df.empty:
@@ -434,20 +434,19 @@ def generate_game_history_cards(df, has_active_rank=True):
         # Score for header left
         score = safe_str(row.get('score'))
 
-        # Date and player info for header middle
+        # Date (now its own row)
         date_val = row.get('date')
         date_link_html = daily_link(date_val)
-        player_name = row.get('player_name', 'Unknown')
-        rating = safe_str(row.get('rating'), "{:.1f}")
 
-        # Rating change with color for header
+        # Rating with change for header middle
+        rating = safe_str(row.get('rating'), "{:.1f}")
         change = row.get('rating_change')
         if pd.notna(change):
             change_class = "change-positive" if change >= 0 else "change-negative"
             change_str = f"+{change:.1f}" if change >= 0 else f"{change:.1f}"
+            rating_display = f'{rating} <span class="{change_class}" style="font-size:0.85em;">({change_str})</span>'
         else:
-            change_class = ""
-            change_str = "—"
+            rating_display = rating
 
         # Daily rank for header right
         rank = row.get('rank')
@@ -464,7 +463,7 @@ def generate_game_history_cards(df, has_active_rank=True):
         top10 = safe_str(row.get('top_10s'))
         top10_rate = safe_str(row.get('top_10s_rate'), "{:.1f}") + "%" if pd.notna(row.get('top_10s_rate')) else "—"
 
-        # Build stats (8 items - Score moved to header)
+        # Build stats (8 items)
         stats_html = f'''
         <div style="{stat_layout}"><span style="{label_style}">Daily Runs</span><span style="{value_style}">{safe_str(row.get('games_played'))}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{safe_str(row.get('wins'))}</span></div>
@@ -476,11 +475,16 @@ def generate_game_history_cards(df, has_active_rank=True):
         <div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{safe_str(row.get('consistency'), "{:.1f}")}</span></div>
         '''
 
-        # Header: Score (left) | Date + Player (Rating, Change) (middle) | Daily Rank (right)
-        player_link_html = player_link(player_name)
-        header_middle = f'{date_link_html}<br>{player_link_html} <span style="font-weight:500;">({rating}, <span class="{change_class}">{change_str}</span>)</span>'
-
-        card = f'<div style="{card_base}"><div class="card-header"><div class="card-rank"><span class="rank-label">Score</span>{score}</div><div class="card-name"><span class="card-name-text">{header_middle}</span></div><div class="card-rating"><span class="rank-label">Daily Rank</span>{rank_html}</div></div><div class="stats-grid">{stats_html}</div></div>'
+        # Card layout: Date row, then Daily Rank | Elo | Score
+        card = f'''<div style="{card_base}">
+            <div class="card-date">{date_link_html}</div>
+            <div class="card-header">
+                <div class="card-rank"><span class="rank-label">Daily Rank</span>{rank_html}</div>
+                <div class="card-name"><span class="rank-label">Elo</span><span class="card-name-text">{rating_display}</span></div>
+                <div class="card-rating"><span class="rank-label">Score</span>{score}</div>
+            </div>
+            <div class="stats-grid">{stats_html}</div>
+        </div>'''
         cards.append(card)
 
     return "".join(cards)
@@ -1532,6 +1536,13 @@ CUSTOM_CSS = """
 [data-testid="stHorizontalBlock"]:has([data-testid="stSelectbox"]) [data-testid="stElementContainer"]:has([data-testid="stHtml"]) {
     margin-bottom: 0 !important;
 }
+/* Vertically center heading + control rows (e.g., Game History + sort dropdown) */
+[data-testid="stHorizontalBlock"]:has(h3):has([data-testid="stSelectbox"]) {
+    align-items: center !important;
+}
+[data-testid="stHorizontalBlock"]:has(h3):has([data-testid="stSelectbox"]) [data-testid="stVerticalBlock"] {
+    justify-content: center !important;
+}
 /* Reduce vertical spacing in Tab 2 (duel pickers, cards, charts) */
 [data-testid="stVerticalBlock"]:has([data-testid="stSelectbox"]) > [data-testid="stElementContainer"] {
     margin-bottom: 0.5rem !important;
@@ -1819,6 +1830,56 @@ CUSTOM_CSS = """
     margin: 0 auto;
 }
 
+/* Daily row responsive adjustments for narrow viewports - two-row grid layout */
+@container cards (max-width: 400px) {
+    .daily-row {
+        display: grid !important;
+        grid-template-columns: auto 1fr auto !important;
+        grid-template-rows: auto auto !important;
+        gap: 0.125rem 0.5rem !important;
+        padding: 0.5rem 0.75rem !important;
+        align-items: center !important;
+    }
+    /* Row 1: Rank (col 1) */
+    .daily-row > span:nth-child(1) {
+        grid-row: 1 !important;
+        grid-column: 1 !important;
+        min-width: 1.75rem !important;
+        text-align: center !important;
+    }
+    /* Row 1: Score (col 2-3, spans to end) */
+    .daily-row > span:nth-child(2) {
+        grid-row: 1 !important;
+        grid-column: 2 / -1 !important;
+        text-align: left !important;
+        min-width: auto !important;
+    }
+    /* Row 2: Name (col 1-2) - smaller font */
+    .daily-row > span:nth-child(3) {
+        grid-row: 2 !important;
+        grid-column: 1 / 3 !important;
+        font-size: 0.85rem !important;
+        min-width: 0 !important;
+        padding-top: 0.25rem !important;
+        border-top: 1px solid rgba(128,128,128,0.2) !important;
+    }
+    /* Row 2: Rating (col 3) - smaller font */
+    .daily-row > span:nth-child(4) {
+        grid-row: 2 !important;
+        grid-column: 3 !important;
+        font-size: 0.85rem !important;
+        min-width: auto !important;
+        text-align: right !important;
+        padding-top: 0.25rem !important;
+        border-top: 1px solid rgba(128,128,128,0.2) !important;
+    }
+    /* Smaller rating change text */
+    .daily-row > span:nth-child(4) .change-positive,
+    .daily-row > span:nth-child(4) .change-negative {
+        font-size: 0.75rem !important;
+    }
+}
+
 /* Responsive stats grid: 8 columns on desktop, 4 on mobile */
 .stats-grid {
     display: grid;
@@ -1837,6 +1898,24 @@ CUSTOM_CSS = """
 }
 .stats-grid > div span:last-child {
     margin-top: auto;
+}
+
+/* Card date row (Game History cards) */
+.card-date {
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid rgba(128,128,128,0.2);
+}
+.card-date a {
+    color: var(--text-color);
+    text-decoration: none;
+}
+.card-date a:hover {
+    color: #FF6B6B;
+    text-decoration: underline;
 }
 
 /* Responsive card header: matches stats grid columns */
@@ -1881,6 +1960,13 @@ CUSTOM_CSS = """
     word-break: break-word;
     overflow-wrap: break-word;
     line-height: 1.2;
+}
+.card-name .rank-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #FF6B6B;
 }
 .card-rating {
     grid-column: 8;
