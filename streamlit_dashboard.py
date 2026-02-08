@@ -1389,23 +1389,6 @@ def get_theme_css():
             margin-bottom: var(--space-sm) !important;
         }
 
-        /* Sidebar expand button (when collapsed) - make visible in light mode */
-        /* Use filter to darken the icon since color overrides don't work */
-        [data-testid="collapsedControl"],
-        [data-testid="stSidebarCollapsedControl"],
-        [data-testid="stSidebarNavCollapseButton"] {
-            filter: brightness(0.2) !important;
-        }
-        [data-testid="collapsedControl"]:hover,
-        [data-testid="stSidebarCollapsedControl"]:hover,
-        [data-testid="stSidebarNavCollapseButton"]:hover {
-            filter: brightness(0) !important;
-        }
-        /* Also try targeting via position - the expand control is fixed position */
-        .stApp > div:first-child > [data-testid="collapsedControl"],
-        section[data-testid="stSidebar"] ~ [data-testid="collapsedControl"] {
-            filter: brightness(0.2) !important;
-        }
         </style>
         """
 
@@ -1478,6 +1461,13 @@ CUSTOM_CSS = """
 [data-testid="stToolbarActions"],
 [data-testid="stStatusWidget"] {
     display: none !important;
+}
+
+/* Sidebar collapse button - ensure always visible (not just on hover) */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapseButton"] button {
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 /* ===== WCAG-Compliant Rating Change Colors ===== */
