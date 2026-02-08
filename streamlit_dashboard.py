@@ -1786,8 +1786,14 @@ CUSTOM_CSS = """
     border-right: 1px solid light-dark(#C0C0C0, #404040);
     padding-right: 1rem;
 }
-/* Mobile (sm): fully disable chart interaction to prevent scroll hijacking */
-@media (max-width: 600px) {
+/* Mobile/Tablet: prevent chart scroll hijacking */
+/* touch-action: pan-y allows vertical scrolling through charts */
+.stPlotlyChart,
+.stPlotlyChart * {
+    touch-action: pan-y !important;
+}
+/* On narrower screens, fully disable chart interaction */
+@media (max-width: 768px) {
     .stPlotlyChart {
         pointer-events: none !important;
     }
