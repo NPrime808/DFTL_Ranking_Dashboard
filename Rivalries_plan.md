@@ -63,7 +63,7 @@ player1,player2,total_encounters,p1_wins,p2_wins,p1_avg_rank,p2_avg_rank,avg_com
 | `p1_avg_rank` | float | Player1's average rank when they met |
 | `p2_avg_rank` | float | Player2's average rank when they met |
 | `avg_combined_rank` | float | Average of both players' ranks |
-| `closeness` | float | 1 - abs(p1_wins - p2_wins) / total (0-1) |
+| `closeness` | float | ratio_closeness × gap_penalty (penalizes large absolute gaps) |
 | `elite_score` | float | total_encounters / avg_combined_rank |
 
 #### Usage
@@ -141,14 +141,17 @@ from src.elo.rivalries import compute_rivalries, process_rivalries
 
 Shows top 3 rivals on each player's Tracker page.
 
-**Scoring:** Filter-then-rank approach
-1. **Filter:** `closeness >= 0.7` (excludes one-sided matchups where win margin exceeds 30%)
-2. **Rank:** By `total_encounters` (most history = most meaningful rivalry)
+**Scoring:** Filter-then-rank approach with gap penalty
+1. **Closeness formula:** `ratio_closeness × gap_penalty` where:
+   - `ratio_closeness = 1 - abs(wins_diff) / total`
+   - `gap_penalty = 1 / (1 + wins_diff / 20)`
+2. **Filter:** `closeness >= 0.65`
+3. **Rank:** By `total_encounters` (most history = most meaningful rivalry)
 
-This ensures "rivalries" are genuinely competitive - one-sided farming relationships like 51-24 records are excluded regardless of encounter count.
+The gap penalty means that even at the same win ratio (e.g., 60%-40%), a larger absolute gap (72-48) scores lower than a smaller gap (36-24). This captures the intuition that big leads are harder to overcome.
 
 **Functions:**
-- `get_player_rivals(player_name, df_rivalries, n=3, min_closeness=0.7)` - Gets top N competitive rivals
+- `get_player_rivals(player_name, df_rivalries, n=3, min_closeness=0.65)` - Gets top N competitive rivals
 - `generate_rivals_html(player_name, rivals)` - Generates the rivals card HTML
 
 **UI features:**

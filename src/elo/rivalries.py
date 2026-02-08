@@ -36,6 +36,7 @@ logger = setup_logging(__name__)
 # --- Configuration ---
 MIN_ENCOUNTERS = 7  # Minimum games to qualify as a rivalry
 TOP_N_RIVALRIES = 10  # Number of rivalries to include per category
+GAP_PENALTY_K = 20  # Controls how much absolute win gap affects closeness
 
 
 def compute_rivalries(df_history: pd.DataFrame) -> pd.DataFrame:
@@ -52,7 +53,7 @@ def compute_rivalries(df_history: pd.DataFrame) -> pd.DataFrame:
         - total_encounters: Days both players participated
         - p1_wins, p2_wins: Number of wins for each player
         - p1_avg_rank, p2_avg_rank: Average rank when they met
-        - closeness: 1 - abs(p1_wins - p2_wins) / total (closer to 1 = more even)
+        - closeness: ratio_closeness × gap_penalty (penalizes large absolute gaps)
         - elite_score: total_encounters / avg_combined_rank (higher = more elite)
     """
     logger.info("Computing rivalry statistics...")
@@ -129,7 +130,14 @@ def compute_rivalries(df_history: pd.DataFrame) -> pd.DataFrame:
 
         total = stats['encounters']
         win_diff = abs(stats['p1_wins'] - stats['p2_wins'])
-        closeness = 1 - (win_diff / total) if total > 0 else 0
+
+        # Closeness with gap penalty:
+        # - Ratio component: 1 - (diff/total) - how close the win% is to 50-50
+        # - Gap penalty: 1 / (1 + diff/k) - penalizes large absolute gaps
+        # This means 36-24 (gap=12) feels closer than 72-48 (gap=24) even at same ratio
+        ratio_closeness = 1 - (win_diff / total) if total > 0 else 0
+        gap_penalty = 1 / (1 + win_diff / GAP_PENALTY_K)
+        closeness = ratio_closeness * gap_penalty
 
         # Elite score: more encounters at higher ranks = higher score
         elite_score = total / avg_combined_rank if avg_combined_rank > 0 else 0

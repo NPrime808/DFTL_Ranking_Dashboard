@@ -1098,18 +1098,18 @@ def generate_rivalry_cards(df_rivalries):
     return cards_html
 
 
-def get_player_rivals(player_name, df_rivalries, n=3, min_closeness=0.7):
+def get_player_rivals(player_name, df_rivalries, n=3, min_closeness=0.65):
     """
     Get a player's top rivals - competitive matchups ranked by encounter count.
 
-    A true rivalry requires competition (closeness >= 0.7), then ranks by
-    how many times they've faced each other.
+    A true rivalry requires competition (gap-penalized closeness >= 0.65),
+    then ranks by how many times they've faced each other.
 
     Args:
         player_name: The player to find rivals for
         df_rivalries: DataFrame with rivalry data
         n: Number of top rivals to return (default 3)
-        min_closeness: Minimum closeness threshold (default 0.7 = within 30% win margin)
+        min_closeness: Minimum closeness threshold (default 0.65)
 
     Returns:
         List of dicts with rival info, or empty list if no rivals found
