@@ -139,23 +139,23 @@ from src.elo.rivalries import compute_rivalries, process_rivalries
 
 ### Top Rivals Feature (Nemesis) ✅ COMPLETE
 
-Shows top 3 rivals on each player's Tracker page.
+Shows top 6 rivals on each player's Tracker page.
 
 **Scoring:** Filter-then-rank approach with gap penalty
 1. **Closeness formula:** `ratio_closeness × gap_penalty` where:
    - `ratio_closeness = 1 - abs(wins_diff) / total`
    - `gap_penalty = 1 / (1 + wins_diff / 20)`
-2. **Filter:** `closeness >= 0.65`
+2. **Filter:** `closeness >= 0.5` (allows ~60% win rate matchups)
 3. **Rank:** By `total_encounters` (most history = most meaningful rivalry)
 
 The gap penalty means that even at the same win ratio (e.g., 60%-40%), a larger absolute gap (72-48) scores lower than a smaller gap (36-24). This captures the intuition that big leads are harder to overcome.
 
 **Functions:**
-- `get_player_rivals(player_name, df_rivalries, n=3, min_closeness=0.65)` - Gets top N competitive rivals
+- `get_player_rivals(player_name, df_rivalries, n=6, min_closeness=0.5)` - Gets top N competitive rivals
 - `generate_rivals_html(player_name, rivals)` - Generates the rivals card HTML
 
 **UI features:**
-- Medal icons (🥇🥈🥉) for top 3
+- Medal icons (🥇🥈🥉) for top 3, numbers (#4, #5, #6) for rest
 - Win/loss indicator (▲ winning, ▼ losing, = tied)
 - Battle count display
 - Click → navigates to Duels tab with both players

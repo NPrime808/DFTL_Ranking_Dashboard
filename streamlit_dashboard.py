@@ -1098,18 +1098,18 @@ def generate_rivalry_cards(df_rivalries):
     return cards_html
 
 
-def get_player_rivals(player_name, df_rivalries, n=3, min_closeness=0.65):
+def get_player_rivals(player_name, df_rivalries, n=6, min_closeness=0.5):
     """
     Get a player's top rivals - competitive matchups ranked by encounter count.
 
-    A true rivalry requires competition (gap-penalized closeness >= 0.65),
+    A true rivalry requires competition (gap-penalized closeness >= 0.5),
     then ranks by how many times they've faced each other.
 
     Args:
         player_name: The player to find rivals for
         df_rivalries: DataFrame with rivalry data
-        n: Number of top rivals to return (default 3)
-        min_closeness: Minimum closeness threshold (default 0.65)
+        n: Number of top rivals to return (default 6)
+        min_closeness: Minimum closeness threshold (default 0.5)
 
     Returns:
         List of dicts with rival info, or empty list if no rivals found
@@ -1235,7 +1235,7 @@ def generate_rivals_html(player_name, rivals):
 
     rivals_html = ""
     for i, rival in enumerate(rivals):
-        # Medal for top 3
+        # Medal for top 3, numbers for 4-6
         if i == 0:
             medal = "🥇"
         elif i == 1:
@@ -1243,7 +1243,7 @@ def generate_rivals_html(player_name, rivals):
         elif i == 2:
             medal = "🥉"
         else:
-            medal = ""
+            medal = f"#{i + 1}"
 
         # Duel link
         duel_url = build_url_with_params({"tab": "duels", "player1": player_name, "player2": rival['name']})
@@ -3963,7 +3963,7 @@ def main():
                         # --- Top Rivals Section ---
                         df_rivalries = load_rivalries_data(dataset_prefix)
                         if df_rivalries is not None and not df_rivalries.empty:
-                            rivals = get_player_rivals(selected_player, df_rivalries, n=3)
+                            rivals = get_player_rivals(selected_player, df_rivalries, n=6)
                             if rivals:
                                 rivals_html = generate_rivals_html(selected_player, rivals)
                                 st.html(rivals_html)
