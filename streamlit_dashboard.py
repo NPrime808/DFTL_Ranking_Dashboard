@@ -1472,6 +1472,11 @@ CUSTOM_CSS = """
     --glass-drop: light-dark(rgba(0,0,0,0.1), rgba(0,0,0,0.15));
 }
 
+/* Hide Streamlit main menu (hamburger button) */
+[data-testid="stMainMenu"] {
+    display: none !important;
+}
+
 /* ===== WCAG-Compliant Rating Change Colors ===== */
 .change-positive {
     color-scheme: inherit;
