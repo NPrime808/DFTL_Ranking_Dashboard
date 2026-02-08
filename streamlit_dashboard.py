@@ -255,11 +255,12 @@ def generate_ranking_cards(df):
     # Theme-adaptive styles using Streamlit CSS variables
     # Base card styling (border, radius, shadow) - background varies by active status
     # Uses spacing token: --space-md (1rem) for padding
-    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);"
-    # Active player: coral accent gradient
-    active_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
+    # Uses --glass-* CSS vars for theme-adaptive borders/shadows (light-dark aware)
+    card_base = "color-scheme:inherit;border:1px solid var(--glass-border-subtle);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px var(--glass-ring), inset 0 1px 0 var(--glass-inset), 0 4px 20px var(--glass-drop);"
+    # Active player: coral accent gradient (use bg-color + bg-image so gradient blends with element, not parent)
+    active_bg = "background-color:var(--secondary-background-color);background-image:linear-gradient(135deg, transparent 0%, rgba(255,107,107,0.15) 100%);"
     # Inactive player (N/R): muted gray gradient to visually distinguish
-    inactive_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(128,128,128,0.12) 100%);"
+    inactive_bg = "background-color:var(--secondary-background-color);background-image:linear-gradient(135deg, transparent 0%, rgba(128,128,128,0.12) 100%);"
 
     # Header now uses CSS classes for responsive layout (see CSS: .card-header, .card-rank, etc.)
     # Status label style for inactive players (blue to match N/R and rating)
@@ -346,7 +347,7 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
     if df.empty:
         return "<p>No data available</p>"
 
-    row_style = "display:flex;align-items:center;gap:1rem;padding:0.75rem 1rem;margin-bottom:0.5rem;border-radius:8px;background:var(--secondary-background-color);border-left:4px solid;"
+    row_style = "color-scheme:inherit;display:flex;align-items:center;gap:1rem;padding:0.75rem 1rem;margin-bottom:0.5rem;border-radius:8px;background:var(--secondary-background-color);border-left:4px solid;"
 
     def safe_str(val, fmt=None):
         if pd.isna(val):
@@ -370,7 +371,8 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
         elif rank_int <= 10:
             border_color = "#FF6B6B"
         else:
-            border_color = "rgba(255,255,255,0.2)"
+            # Theme-adaptive via CSS variable (subtle border for rank >10)
+            border_color = "var(--glass-border-subtle)"
 
         # Rank display with podium icons
         if rank_int in RANK_ICONS:
@@ -407,16 +409,18 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
     return "".join(rows)
 
 
-def generate_game_history_cards(df, has_active_rank=True):
+def generate_game_history_cards(df, player_name="Player", has_active_rank=True):
     """
     Generate HTML cards for player game history display (Tab 3).
-    Date row spans full width, then: Daily Rank | Elo (with change) | Score
-    Stats: Daily Runs, Daily #1, Daily #1 (%), Daily Top 10, Daily Top 10 (%), Daily Avg, 7-Game Avg, Daily Variance
+    Unified layout matching duel cards:
+    Row 1: Date (Run n°XXX) | Player (Elo, change)
+    Row 2: Daily Rank label | #rank · score
+    Row 3: Stats grid (6 items, excludes Daily Runs and Daily Avg)
     """
     if df.empty:
         return "<p>No data available</p>"
 
-    card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(59,130,246,0.12) 100%);"
+    card_base = "color-scheme:inherit;border:1px solid var(--glass-border-subtle);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px var(--glass-ring), inset 0 1px 0 var(--glass-inset), 0 4px 20px var(--glass-drop);background-color:var(--secondary-background-color);background-image:linear-gradient(135deg, transparent 0%, rgba(59,130,246,0.12) 100%);"
 
     stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
     label_style = "font-size:0.8rem;text-transform:uppercase;color:var(--text-color);font-weight:500;"
@@ -429,14 +433,23 @@ def generate_game_history_cards(df, has_active_rank=True):
             return fmt.format(val)
         return str(int(val))
 
+    # Calculate run numbers based on chronological order (oldest = 1, newest = N)
+    # This ensures run numbers are correct regardless of sort order
+    df_with_run = df.copy()
+    df_with_run['_run_number'] = df_with_run['date'].rank(method='dense').astype(int)
+
     cards = []
-    for _, row in df.iterrows():
-        # Score for header left
+    for _, row in df_with_run.iterrows():
+        run_number = row['_run_number']
+
+        # Score
         score = safe_str(row.get('score'))
 
-        # Date (now its own row)
+        # Date with run number
         date_val = row.get('date')
-        date_link_html = daily_link(date_val)
+        date_str = date_val.strftime('%Y-%m-%d') if hasattr(date_val, 'strftime') else str(date_val)[:10]
+        date_display = f"{date_str} (Run n°{run_number})"
+        date_link_html = daily_link(date_val, date_display)
 
         # Rating with change for header middle
         rating = safe_str(row.get('rating'), "{:.1f}")
@@ -452,38 +465,41 @@ def generate_game_history_cards(df, has_active_rank=True):
         rank = row.get('rank')
         rank_int = int(rank) if pd.notna(rank) else 0
 
-        # Rank display with icons for podium, plain number for others
+        # Rank display with icons for podium
         if rank_int in RANK_ICONS:
             info = RANK_ICONS[rank_int]
-            rank_html = f'<span style="color:{info["color"]};">{info["icon"]}</span>'
+            rank_display = f'<span style="color:{info["color"]};">{info["icon"]}</span>'
         else:
-            rank_html = f'<span style="color:var(--text-color);">#{rank_int}</span>'
+            rank_display = f'#{rank_int}'
+
+        # Combined rank · score (like duel cards)
+        rank_score_combined = f"{rank_display} · {score}"
 
         # Top 10 stats
         top10 = safe_str(row.get('top_10s'))
         top10_rate = safe_str(row.get('top_10s_rate'), "{:.1f}") + "%" if pd.notna(row.get('top_10s_rate')) else "—"
 
-        # Build stats (8 items)
+        # Build stats (6 items - excludes Daily Runs and Daily Avg)
         stats_html = f'''
-        <div style="{stat_layout}"><span style="{label_style}">Daily Runs</span><span style="{value_style}">{safe_str(row.get('games_played'))}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{safe_str(row.get('wins'))}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">Daily #1 (%)</span><span style="{value_style}">{safe_str(row.get('win_rate'), "{:.1f}")}%</span></div>
         <div style="{stat_layout}"><span style="{label_style}">Daily Top 10</span><span style="{value_style}">{top10}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">Daily Top 10 (%)</span><span style="{value_style}">{top10_rate}</span></div>
-        <div style="{stat_layout}"><span style="{label_style}">Daily Avg</span><span style="{value_style}">{safe_str(row.get('avg_daily_rank'), "{:.1f}")}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{safe_str(row.get('last_7'), "{:.1f}")}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{safe_str(row.get('consistency'), "{:.1f}")}</span></div>
         '''
 
-        # Card layout: Date row, then Daily Rank | Elo | Score
-        card = f'''<div style="{card_base}">
-            <div class="card-date">{date_link_html}</div>
-            <div class="card-header">
-                <div class="card-rank"><span class="rank-label">Daily Rank</span>{rank_html}</div>
-                <div class="card-name"><span class="rank-label">Elo</span><span class="card-name-text">{rating_display}</span></div>
-                <div class="card-rating"><span class="rank-label">Score</span>{score}</div>
+        # Card layout matching duel card structure
+        card = f'''<div class="history-card" style="{card_base}">
+            <div class="history-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
+                <span class="history-date" style="font-weight:600;color:var(--text-color);">{date_link_html}</span>
+                <span class="history-player" style="font-weight:600;color:var(--text-color);">{html.escape(player_name)} <span style="font-weight:500;">({rating_display})</span></span>
             </div>
-            <div class="stats-grid">{stats_html}</div>
+            <div class="history-rank" style="display:flex;flex-direction:column;align-items:center;margin-bottom:0.5rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.2);">
+                <span style="{label_style}">Daily Rank</span>
+                <span style="{value_style}">{rank_score_combined}</span>
+            </div>
+            <div class="history-stats" style="display:grid;grid-template-columns:repeat(6, 1fr);gap:0.5rem;">{stats_html}</div>
         </div>'''
         cards.append(card)
 
@@ -511,14 +527,14 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
 
     # Theme-adaptive player colors (Cyan + Amber)
     # Dark mode: bright cyan #22D3EE, golden amber #FBBF24
-    # Light mode: muted cyan #0891B2, burnt amber #B45309
+    # Light mode: muted cyan #0E7490, burnt amber #B45309
     if colors:
-        p1_color = colors.get("player1", "#0891B2")
+        p1_color = colors.get("player1", "#0E7490")
         p2_color = colors.get("player2", "#B45309")
         p1_rgb = colors.get("player1_rgb", "8, 145, 178")
         p2_rgb = colors.get("player2_rgb", "180, 83, 9")
     else:
-        p1_color = "#0891B2"
+        p1_color = "#0E7490"
         p2_color = "#B45309"
         p1_rgb = "8, 145, 178"
         p2_rgb = "180, 83, 9"
@@ -547,6 +563,7 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
         date_val = row.get('Date')
         cumulative_wins[date_val] = (p1_wins, p2_wins)
 
+    total_duels = len(df)
     cards = []
     for idx, (_, row) in enumerate(df.iterrows()):
         # Respect limit parameter if set
@@ -558,8 +575,13 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
             date_str = date_val.strftime('%Y-%m-%d')
         else:
             date_str = str(date_val)[:10]
-        # Add "(most recent)" label to first card if requested
-        display_date = date_str + " (most recent)" if last_encounter_label and idx == 0 else date_str
+        # Calculate duel number (most recent = highest number)
+        duel_number = total_duels - idx
+        # Add "Last Encounter" label to first card, duel number to all
+        if last_encounter_label and idx == 0:
+            display_date = f"{date_str} (Duel n°{duel_number} · Last Encounter)"
+        else:
+            display_date = f"{date_str} (Duel n°{duel_number})"
         # Create clickable date link
         date_link_html = daily_link(date_val, display_date)
 
@@ -568,19 +590,21 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
         # Get cumulative wins as of this date
         p1_cumulative, p2_cumulative = cumulative_wins.get(date_val, (0, 0))
 
-        # Determine card style based on winner (match Tab 1 gradient style)
+        # Determine card style based on winner
+        # Use background-color + background-image so gradient blends with element's own bg, not parent
         if winner == player1:
-            card_bg = f"background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba({p1_rgb},0.15) 100%);"
+            card_bg = f"background-color:var(--secondary-background-color);background-image:linear-gradient(135deg, transparent 0%, rgba({p1_rgb},0.15) 100%);"
             winner_color = p1_color
         elif winner == player2:
-            card_bg = f"background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba({p2_rgb},0.15) 100%);"
+            card_bg = f"background-color:var(--secondary-background-color);background-image:linear-gradient(135deg, transparent 0%, rgba({p2_rgb},0.15) 100%);"
             winner_color = p2_color
         else:
-            card_bg = f"background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba({tie_rgb},0.1) 100%);"
+            card_bg = f"background-color:var(--secondary-background-color);background-image:linear-gradient(135deg, transparent 0%, rgba({tie_rgb},0.1) 100%);"
             winner_color = tie_color
 
         # Match Tab 1 card base styling (compact padding for mobile)
-        card_base = f"border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:0.75rem;margin-bottom:0.5rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);{card_bg}"
+        # Uses --glass-* CSS vars for theme-adaptive borders/shadows
+        card_base = f"color-scheme:inherit;border:1px solid var(--glass-border-subtle);border-radius:12px;padding:0.75rem;margin-bottom:0.5rem;box-shadow:0 0 0 1px var(--glass-ring), inset 0 1px 0 var(--glass-inset), 0 4px 20px var(--glass-drop);{card_bg}"
 
         p1_rank = safe_str(row.get(f'{player1} Daily Rank'))
         p2_rank = safe_str(row.get(f'{player2} Daily Rank'))
@@ -595,17 +619,17 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
         winner_display = player_link(winner) if winner in (player1, player2) else html.escape(winner)
         header_html = f'''
         <div class="duel-header" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;margin-bottom:0.75rem;padding:0 0.5rem 0.5rem 0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
-            <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
+            <div class="duel-header-wins" style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
                 <span class="duel-win-count" style="font-weight:700;font-size:1.4rem;color:{p1_color};">{p1_cumulative}</span>
-                <span class="duel-win-label" style="font-size:0.7rem;text-transform:uppercase;font-weight:600;color:{p1_color};">Duel Wins</span>
+                <span class="duel-win-label" style="font-size:0.7rem;text-transform:uppercase;font-weight:600;color:{p1_color};">Duels won</span>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;gap:0.25rem;">
                 <span class="duel-date" style="font-weight:600;font-size:1rem;color:var(--text-color);">{date_link_html}</span>
                 <span class="duel-winner" style="font-weight:700;color:{winner_color};">🏆 {winner_display}</span>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
+            <div class="duel-header-wins" style="display:flex;flex-direction:column;align-items:center;min-width:2.5rem;">
                 <span class="duel-win-count" style="font-weight:700;font-size:1.4rem;color:{p2_color};">{p2_cumulative}</span>
-                <span class="duel-win-label" style="font-size:0.7rem;text-transform:uppercase;font-weight:600;color:{p2_color};">Duel Wins</span>
+                <span class="duel-win-label" style="font-size:0.7rem;text-transform:uppercase;font-weight:600;color:{p2_color};">Duels won</span>
             </div>
         </div>
         '''
@@ -617,18 +641,34 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
         stats_html = f'''
         <div class="duel-stats" style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.5rem;align-items:start;max-width:700px;margin:0 auto;">
             <div style="text-align:center;">
-                <div class="duel-player-name" style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;">{p1_link} <span style="font-weight:500;">({p1_elo})</span></div>
+                <div class="duel-player-name" style="font-weight:600;color:{p1_color};margin-bottom:0.5rem;font-size:1.1rem;"><span class="duel-name-text">{p1_link}</span> <span class="duel-elo" style="font-weight:500;">({p1_elo})</span></div>
                 <div class="duel-player-stats" style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Daily Rank</span><span class="duel-stat-value" style="{value_style}">#{p1_rank}</span></div>
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Score</span><span class="duel-stat-value" style="{value_style}">{p1_score}</span></div>
                 </div>
+                <div class="duel-stat-combined" style="display:none;flex-direction:column;align-items:center;">
+                    <span class="duel-stat-label" style="{label_style}">Daily Rank</span>
+                    <span class="duel-stat-value" style="{value_style}">#{p1_rank} · {p1_score}</span>
+                </div>
+                <div class="duel-footer-wins" style="display:none;flex-direction:column;align-items:center;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(128,128,128,0.2);">
+                    <span class="duel-win-count" style="font-weight:700;font-size:1.2rem;color:{p1_color};">{p1_cumulative}</span>
+                    <span class="duel-win-label" style="font-size:0.65rem;text-transform:uppercase;font-weight:600;color:{p1_color};">Duels won</span>
+                </div>
             </div>
             <div class="duel-vs" style="display:flex;align-items:center;justify-content:center;font-size:2rem;padding-top:0.25rem;">⚔️</div>
             <div style="text-align:center;">
-                <div class="duel-player-name" style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;">{p2_link} <span style="font-weight:500;">({p2_elo})</span></div>
+                <div class="duel-player-name" style="font-weight:600;color:{p2_color};margin-bottom:0.5rem;font-size:1.1rem;"><span class="duel-name-text">{p2_link}</span> <span class="duel-elo" style="font-weight:500;">({p2_elo})</span></div>
                 <div class="duel-player-stats" style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;">
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Daily Rank</span><span class="duel-stat-value" style="{value_style}">#{p2_rank}</span></div>
                     <div style="{stat_layout}"><span class="duel-stat-label" style="{label_style}">Score</span><span class="duel-stat-value" style="{value_style}">{p2_score}</span></div>
+                </div>
+                <div class="duel-stat-combined" style="display:none;flex-direction:column;align-items:center;">
+                    <span class="duel-stat-label" style="{label_style}">Daily Rank</span>
+                    <span class="duel-stat-value" style="{value_style}">#{p2_rank} · {p2_score}</span>
+                </div>
+                <div class="duel-footer-wins" style="display:none;flex-direction:column;align-items:center;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(128,128,128,0.2);">
+                    <span class="duel-win-count" style="font-weight:700;font-size:1.2rem;color:{p2_color};">{p2_cumulative}</span>
+                    <span class="duel-win-label" style="font-size:0.65rem;text-transform:uppercase;font-weight:600;color:{p2_color};">Duels won</span>
                 </div>
             </div>
         </div>
@@ -763,12 +803,14 @@ def generate_hall_of_fame_cards(stats):
             return str(val)
 
     # Card styling (matches existing card styles)
+    # Uses --glass-* CSS vars for theme-adaptive borders/shadows
     card_style = """
+        color-scheme: inherit;
         background: var(--secondary-background-color);
-        border: 1px solid rgba(255,255,255,0.15);
+        border: 1px solid var(--glass-border-subtle);
         border-radius: 12px;
         padding: 1rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 20px var(--glass-drop);
     """
 
     title_style = """
@@ -910,10 +952,10 @@ LIGHT_THEME = {
     "text_primary": "#262730",
     "text_secondary": "#404040",  # Improved: ~10:1 contrast vs bg_primary
     "text_muted": "#666666",       # Improved: ~5.7:1 contrast vs bg_primary
-    # Player colors - Cyan + Amber (muted for light backgrounds)
-    "player1": "#0891B2",         # Cyan 600 - 4.5:1 contrast
-    "player2": "#B45309",         # Amber 700 - 4.8:1 contrast
-    "player1_rgb": "8, 145, 178",   # For rgba() backgrounds
+    # Player colors - Cyan + Amber (darker for WCAG AA on light backgrounds)
+    "player1": "#0E7490",         # Cyan 700 - 5.36:1 contrast on white
+    "player2": "#B45309",         # Amber 700 - 5.02:1 contrast on white
+    "player1_rgb": "14, 116, 144",  # For rgba() backgrounds
     "player2_rgb": "180, 83, 9",
 }
 
@@ -1241,6 +1283,14 @@ CUSTOM_CSS = """
     --space-md: 1rem;
     --space-lg: 1.5rem;
     --space-xl: 2rem;
+}
+
+/* Theme-adaptive glass effect variables (set on Streamlit's themed container) */
+[data-testid="stAppViewContainer"] {
+    --glass-border-subtle: light-dark(rgba(0,0,0,0.12), rgba(255,255,255,0.2));
+    --glass-ring: light-dark(rgba(0,0,0,0.06), rgba(255,255,255,0.08));
+    --glass-inset: light-dark(rgba(0,0,0,0.03), rgba(255,255,255,0.1));
+    --glass-drop: light-dark(rgba(0,0,0,0.1), rgba(0,0,0,0.15));
 }
 
 /* ===== WCAG-Compliant Rating Change Colors ===== */
@@ -2170,6 +2220,80 @@ CUSTOM_CSS = """
     font-size: 0.85rem !important;
 }
 
+/* ===== Duel Card Layout (all sizes) ===== */
+/* 2-column layout: Player 1 | Player 2 */
+.duel-stats {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+}
+.duel-vs {
+    display: none !important;
+}
+/* Vertical divider between player columns */
+.duel-stats > div:first-child {
+    border-right: 1px solid rgba(128,128,128,0.3) !important;
+    padding-right: 0.75rem !important;
+}
+/* Header: date/winner only, duel wins in footer */
+.duel-header {
+    grid-template-columns: 1fr !important;
+    justify-items: center !important;
+}
+.duel-header-wins {
+    display: none !important;
+}
+.duel-footer-wins {
+    display: flex !important;
+}
+/* Stack player name and Elo vertically */
+.duel-player-name {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0.125rem !important;
+    margin-bottom: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    border-bottom: 1px solid rgba(128,128,128,0.2) !important;
+}
+.duel-name-text {
+    display: block !important;
+}
+.duel-elo {
+    display: block !important;
+}
+/* Hide separate stats, show combined "#rank · score" */
+.duel-player-stats {
+    display: none !important;
+}
+.duel-stat-combined {
+    display: flex !important;
+    margin-bottom: 0.25rem !important;
+}
+
+/* ===== History Card Layout (Tab 3) ===== */
+/* 6-column stats grid for desktop */
+.history-stats {
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 0.5rem !important;
+}
+/* Responsive: 3 columns on medium, 2 on narrow */
+@media (max-width: 700px) {
+    .history-stats {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+    .history-header {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 0.25rem !important;
+    }
+}
+@media (max-width: 450px) {
+    .history-stats {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
 /* Container-responsive: 4-column grid when container ≤816px (prevents label wrapping) */
 @container cards (max-width: 816px) {
     /* Tab 1 ranking cards */
@@ -2210,7 +2334,7 @@ CUSTOM_CSS = """
     .ranking-cards > div {
         padding: 0.75rem !important;
     }
-    /* Tab 2 duel cards - sm breakpoint */
+    /* Tab 2 duel cards - sm breakpoint (font sizes only) */
     .duel-player-name {
         font-size: 0.95rem !important;
     }
@@ -2229,11 +2353,8 @@ CUSTOM_CSS = """
     .duel-date {
         font-size: 0.9rem !important;
     }
-    .duel-vs {
-        font-size: 1.5rem !important;
-    }
-    .duel-player-stats {
-        gap: 0.5rem !important;
+    .duel-elo {
+        font-size: 0.9rem !important;
     }
 }
 
@@ -2260,7 +2381,7 @@ CUSTOM_CSS = """
     .stats-grid {
         gap: 0.25rem !important;
     }
-    /* Tab 2 duel cards - xs breakpoint */
+    /* Tab 2 duel cards - xs breakpoint (font sizes only, layout is base) */
     .duel-player-name {
         font-size: 0.9rem !important;
     }
@@ -2279,11 +2400,18 @@ CUSTOM_CSS = """
     .duel-date {
         font-size: 0.85rem !important;
     }
-    .duel-vs {
-        font-size: 1.25rem !important;
+    .duel-winner {
+        font-size: 0.9rem !important;
     }
-    .duel-player-stats {
-        gap: 0.35rem !important;
+    .duel-elo {
+        font-size: 0.85rem !important;
+    }
+    /* Tighter gaps at xs */
+    .duel-stats {
+        gap: 0.25rem 0.5rem !important;
+    }
+    .duel-stats > div:first-child {
+        padding-right: 0.5rem !important;
     }
 }
 
@@ -2333,11 +2461,12 @@ CUSTOM_CSS = """
 
 /* Hall of Fame chart card */
 .hof-chart-card {
+    color-scheme: inherit;
     background: var(--secondary-background-color);
-    border: 1px solid rgba(255,255,255,0.15);
+    border: 1px solid var(--glass-border-subtle);
     border-radius: 12px 12px 0 0;
     padding: 1rem 1rem 0 1rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 20px var(--glass-drop);
     margin-top: 0.5rem;
 }
 
@@ -2354,12 +2483,13 @@ CUSTOM_CSS = """
 
 /* Style the Plotly chart container that follows the card header */
 [data-testid="stElementContainer"]:has(.hof-chart-card) + [data-testid="stElementContainer"] {
+    color-scheme: inherit;
     background: var(--secondary-background-color);
-    border: 1px solid rgba(255,255,255,0.15);
+    border: 1px solid var(--glass-border-subtle);
     border-top: none;
     border-radius: 0 0 12px 12px;
     padding: 0.75rem 1rem 1rem 1rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 20px var(--glass-drop);
     margin-top: -1rem !important;
 }
 
@@ -3404,8 +3534,9 @@ def main():
 
                         # --- Player Summary Card (exact match to Rankings tab) ---
                         # Use the exact same styling as generate_ranking_cards()
-                        card_base = "border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.15);"
-                        active_bg = "background:linear-gradient(135deg, var(--secondary-background-color) 0%, rgba(255,107,107,0.15) 100%);"
+                        # Uses --glass-* CSS vars for theme-adaptive borders/shadows
+                        card_base = "color-scheme:inherit;border:1px solid var(--glass-border-subtle);border-radius:12px;padding:1rem;margin-bottom:0.75rem;box-shadow:0 0 0 1px var(--glass-ring), inset 0 1px 0 var(--glass-inset), 0 4px 20px var(--glass-drop);"
+                        active_bg = "background-color:var(--secondary-background-color);background-image:linear-gradient(135deg, transparent 0%, rgba(255,107,107,0.15) 100%);"
                         card_style = active_bg + card_base
 
                         stat_layout = "display:flex;flex-direction:column;align-items:center;text-align:center;"
@@ -3579,8 +3710,8 @@ def main():
                             df_table = df_player_played.sort_values(sort_column, ascending=sort_ascending, na_position='last')
 
                         # Display as cards
-                        cards_html = generate_game_history_cards(df_table, has_active_rank=has_active_rank)
-                        st.markdown(f'<div class="ranking-cards">{cards_html}</div>', unsafe_allow_html=True)
+                        cards_html = generate_game_history_cards(df_table, player_name=selected_player, has_active_rank=has_active_rank)
+                        st.html(f'<div class="ranking-cards">{cards_html}</div>')
                     else:
                         st.info(f"No game history found for {selected_player}.")
                 else:
@@ -3700,7 +3831,7 @@ def main():
 
             # Get theme colors (same source as duel cards for consistency)
             duel_colors = get_theme_colors()
-            p1_label_color = duel_colors.get("player1", "#0891B2")
+            p1_label_color = duel_colors.get("player1", "#0E7490")
             p2_label_color = duel_colors.get("player2", "#B45309")
 
             col_p1, col_p2 = st.columns([1, 1])
