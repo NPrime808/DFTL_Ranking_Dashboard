@@ -2951,9 +2951,9 @@ def main():
     if is_early_access:
         dataset_badge_html = '<span class="dataset-badge dataset-badge-ea">Early Access</span>'
         toggle_params = {}  # Clean URL → full dataset, rankings tab
-        banner_link_title = "Switch to Steam Demo+Early Access dataset"
+        banner_link_title = "Switch to Early Access+Steam Demo dataset"
     else:
-        dataset_badge_html = '<span class="dataset-badge dataset-badge-full">Full Dataset</span>'
+        dataset_badge_html = '<span class="dataset-badge dataset-badge-full">Early Access+Steam Demo</span>'
         toggle_params = {"dataset": "early_access"}
         banner_link_title = "Switch to Early Access Only dataset"
 
