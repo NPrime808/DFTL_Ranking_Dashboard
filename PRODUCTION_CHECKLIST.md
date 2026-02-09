@@ -289,21 +289,9 @@ Pre-production audit checklist for the DFTL Ranking Dashboard.
 - [x] Direct URL to each tab works
 - [x] Share URL works when sent to another device
 - [ ] All features work on mobile device
-- [ ] No console errors in browser DevTools
-- [ ] No Python errors in Streamlit logs
+- [x] No console errors in browser DevTools
+- [x] No Python errors in Streamlit logs
 
----
-
-## Sign-Off
-
-| Area | Reviewer | Date | Status |
-|------|----------|------|--------|
-| Functional | | | |
-| Responsive | | | |
-| Accessibility | | | |
-| Performance | | | |
-| Security | | | |
-| Code Quality | | | |
 
 ---
 
