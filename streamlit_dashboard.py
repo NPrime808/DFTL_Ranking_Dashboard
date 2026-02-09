@@ -1351,16 +1351,9 @@ CUSTOM_CSS = """
 .player-link:focus,
 .date-link:focus,
 .dashboard-banner-link:focus,
-.back-to-top:focus,
+.tab-link:focus,
 .stPopover button:focus {
     color-scheme: inherit;
-    outline: 2px solid #FF6B6B !important;
-    outline-offset: 2px;
-    border-radius: 4px;
-}
-
-/* Focus styles for tab navigation radio buttons (radio is 0x0, style the label) */
-[data-testid="stRadio"] label:focus-within {
     outline: 2px solid #FF6B6B !important;
     outline-offset: 2px;
     border-radius: 4px;
@@ -1612,76 +1605,58 @@ CUSTOM_CSS = """
     }
 }
 
-/* ===== Radio-as-Tabs Styling ===== */
-/* Style horizontal radio buttons to look like native Streamlit tabs */
-/* Center the tab bar by making container full-width and centering content */
-[data-testid="stElementContainer"]:has([data-testid="stRadio"]) {
-    width: 100% !important;
-    display: flex !important;
-    justify-content: center !important;
-    position: relative !important;
+/* ===== Tab Navigation Styling ===== */
+/* Anchor links styled as tabs for scroll-to-top navigation */
+.tab-nav {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0;
+    justify-content: center;
+    width: 100%;
+    position: relative;
+    padding-bottom: 1px;
 }
-/* Full-width divider line below tabs */
-[data-testid="stElementContainer"]:has([data-testid="stRadio"])::after {
-    content: "" !important;
-    position: absolute !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    height: 1px !important;
-    background: rgba(128, 128, 128, 0.3) !important;
+/* Note: Full-width divider line is handled by box-shadow on sticky container */
+.tab-link {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.6rem;
+    margin: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: var(--text-color);
+    opacity: 0.6;
+    border-bottom: 2px solid transparent;
+    transition: opacity 0.2s, border-color 0.2s;
+    white-space: nowrap;
+    text-decoration: none;
 }
-[data-testid="stRadio"] [role="radiogroup"] {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
-    gap: 0 !important;
-    justify-content: center !important;
+.tab-link:hover {
+    opacity: 1;
+    text-decoration: none;
+    color: var(--text-color);
 }
-[data-testid="stRadio"] [role="radiogroup"] > label {
-    display: flex !important;
-    align-items: center !important;
-    padding: 0.5rem 0.6rem !important;
-    margin: 0 !important;
-    border: none !important;
-    background: transparent !important;
-    cursor: pointer !important;
-    font-weight: 500 !important;
-    font-size: 0.75rem !important;
-    color: var(--text-color) !important;
-    opacity: 0.6 !important;
-    border-bottom: 2px solid transparent !important;
-    transition: opacity 0.2s, border-color 0.2s !important;
-    white-space: nowrap !important;
-}
-[data-testid="stRadio"] [role="radiogroup"] > label:hover {
-    opacity: 1 !important;
-}
-/* Selected tab styling - use :has(input:checked) */
-[data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
-    opacity: 1 !important;
-    border-bottom-color: #FF6B6B !important;
-    font-weight: 600 !important;
-}
-/* Hide the actual radio circle */
-[data-testid="stRadio"] [role="radiogroup"] > label > div:first-child {
-    display: none !important;
+.tab-link.active {
+    opacity: 1;
+    border-bottom-color: #FF6B6B;
+    font-weight: 600;
 }
 /* Mobile sm (≤600px): compact tabs to fit on one row */
 @media (max-width: 600px) {
-    [data-testid="stRadio"] [role="radiogroup"] > label {
-        padding: 0.3rem 0 !important;
-        font-size: 0.6rem !important;
-        transform: scale(0.85) !important;
-        transform-origin: center !important;
-        margin: 0 -6px !important;
+    .tab-link {
+        padding: 0.4rem 0.3rem;
+        font-size: 0.7rem;
     }
 }
-/* Mobile xs (≤450px): extra compact tabs for narrow screens */
-@media (max-width: 450px) {
-    [data-testid="stRadio"] [role="radiogroup"] > label {
-        transform: scale(0.78) !important;
-        margin: 0 -10px !important;
+/* Mobile xs (≤400px): tighter spacing for narrow screens */
+@media (max-width: 400px) {
+    .tab-link {
+        padding: 0.35rem 0.2rem;
+        font-size: 0.65rem;
     }
 }
 
@@ -2041,58 +2016,14 @@ CUSTOM_CSS = """
 }
 
 /* Sticky tab bar - sticks below Streamlit's header (60px tall) */
-[data-testid="stElementContainer"].st-key-tab_selector {
+[data-testid="stElementContainer"]:has(.tab-nav) {
     position: sticky !important;
     top: 60px !important;  /* Below Streamlit's header */
     z-index: 999 !important;
-    background: var(--secondary-background-color) !important;
     padding: 0.5rem 0 !important;
-    margin-left: -1rem !important;
-    margin-right: -1rem !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.2) !important;
-}
-[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.back-to-top) {
-    margin: 0 !important;
-    padding: 0 !important;
-    height: 0 !important;
-    overflow: visible;
-}
-[data-testid="stMarkdownContainer"]:has(.back-to-top) p {
-    margin: 0 !important;
-    line-height: 0 !important;
-}
-
-/* Back to top button */
-/* bottom: 3rem to avoid overlap with Streamlit's "Manage app" button */
-.back-to-top {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: fixed;
-    bottom: 3rem;
-    right: 1.5rem;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #FF6B6B 0%, #ee5a5a 100%);
-    border: none;
-    color: white !important;
-    font-size: 1.5rem;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(255,107,107,0.4);
-    z-index: 1000;
-    transition: transform 0.2s, box-shadow 0.2s;
-    text-decoration: none !important;
-}
-.back-to-top:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 16px rgba(255,107,107,0.5);
-}
-.back-to-top:active {
-    transform: scale(0.95);
+    background: #0E1117 !important;
+    /* Use box-shadow to extend background full-width (not clipped by overflow:hidden) */
+    box-shadow: -9999px 0 0 0 #0E1117, 9999px 0 0 0 #0E1117, 0 1px 0 0 rgba(128, 128, 128, 0.2) !important;
 }
 
 /* Floating share button - position the popover container */
@@ -2917,9 +2848,6 @@ def main():
         st.html('<div id="top"></div>')
         st.title("DFTL Rankings")
 
-    # Back-to-top button (anchor #top is in the header above)
-    st.markdown('<a href="#top" class="back-to-top" title="Back to top" aria-label="Back to top">↑</a>', unsafe_allow_html=True)
-
     # Check for available datasets
     available_datasets = get_available_datasets()
     if not available_datasets:
@@ -3044,65 +2972,27 @@ def main():
     }
     SLUG_TO_TAB = {v: k for k, v in TAB_SLUGS.items()}
 
-    # Define which query params are relevant to each tab
-    TAB_PARAMS = {
-        "rankings": ["date"],
-        "duels": ["player1", "player2"],
-        "tracker": ["player"],
-        "dailies": ["date"],
-        "hall-of-fame": [],
-    }
-    ALL_TAB_PARAMS = set(p for params in TAB_PARAMS.values() for p in params)
-
     # Read tab from URL query params (persists across reloads)
     url_tab = st.query_params.get("tab", "rankings")
     default_tab = SLUG_TO_TAB.get(url_tab, TAB_OPTIONS[0])
+    active_tab = default_tab  # Tab is determined purely by URL
 
-    # Radio buttons styled as tabs (CSS makes them look like native tabs)
-    active_tab = st.radio(
-        "Navigation",
-        TAB_OPTIONS,
-        index=TAB_OPTIONS.index(default_tab),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="tab_selector"
-    )
+    # Generate HTML tab navigation links (with #top for scroll-to-top)
+    dataset_params = _get_current_dataset_param()
+    tab_links = []
+    for tab_name in TAB_OPTIONS:
+        slug = TAB_SLUGS[tab_name]
+        params = {"tab": slug, **dataset_params}
+        url = build_url_with_params(params) + "#top"
+        is_active = "active" if tab_name == active_tab else ""
+        escaped_name = html.escape(tab_name)
+        tab_links.append(f'<a href="{url}" class="tab-link {is_active}" target="_self">{escaped_name}</a>')
 
-    # Map widget session state keys to their corresponding URL param names
-    # This allows saving widget values when switching tabs (without URL auto-sync)
-    WIDGET_TO_PARAM = {
-        "rankings": {"elo_ranking_date": "date"},
-        "dailies": {"dailies_date": "date"},
-        "tracker": {"tab4_player_select": "player"},
-        "duels": {"duel_player1": "player1", "duel_player2": "player2"},
-    }
-
-    # Smart tab switching: save/restore params per tab, keep URLs clean
-    new_slug = TAB_SLUGS.get(active_tab, "rankings")
-    if url_tab != new_slug:
-        # Save current tab's widget values to session state before switching
-        widget_map = WIDGET_TO_PARAM.get(url_tab, {})
-        for widget_key, param in widget_map.items():
-            if widget_key in st.session_state and st.session_state[widget_key] is not None:
-                value = st.session_state[widget_key]
-                # Format dates as strings
-                if hasattr(value, 'strftime'):
-                    value = value.strftime('%Y-%m-%d')
-                st.session_state[f"saved_param_{url_tab}_{param}"] = value
-
-        # Clear all tab-specific params from URL
-        for param in ALL_TAB_PARAMS:
-            if param in st.query_params:
-                del st.query_params[param]
-
-        # Restore saved params for the new tab (to URL for deep linking)
-        for param in TAB_PARAMS.get(new_slug, []):
-            saved_key = f"saved_param_{new_slug}_{param}"
-            if saved_key in st.session_state:
-                st.query_params[param] = st.session_state[saved_key]
-
-        # Update tab param
-        st.query_params["tab"] = new_slug
+    st.html(f'''
+        <nav class="tab-nav" aria-label="Main navigation">
+            {"".join(tab_links)}
+        </nav>
+    ''')
 
     # --- Tab 4: Steam Leaderboards ---
     if active_tab == "📊 Dailies":
@@ -4177,7 +4067,7 @@ def main():
             st.warning("History data not available.")
 
     # Floating share button (rendered after tab content for correct URL state)
-    render_floating_share_button(new_slug)
+    render_floating_share_button(url_tab)
 
 if __name__ == "__main__":
     main()
