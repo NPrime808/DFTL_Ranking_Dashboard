@@ -385,10 +385,10 @@ def generate_leaderboard_cards(df, has_rating=True, has_active_rank=True):
 def generate_game_history_cards(df, player_name="Player", has_active_rank=True):
     """
     Generate HTML cards for player game history display (Tab 3).
-    Unified layout matching duel cards:
-    Row 1: Date (Run n°XXX) | Player (Elo, change)
+    Layout:
+    Row 1: "{player}'s run n°XXX · YYYY-MM-DD" centered header
     Row 2: Daily Rank label | #rank · score
-    Row 3: Stats grid (6 items, excludes Daily Runs and Daily Avg)
+    Row 3: Stats grid (8 items including Elo and Change)
     """
     if df.empty:
         return "<p>No data available</p>"
@@ -418,11 +418,10 @@ def generate_game_history_cards(df, player_name="Player", has_active_rank=True):
         # Score
         score = safe_str(row.get('score'))
 
-        # Date with run number
+        # Date (run number shown in header separately)
         date_val = row.get('date')
         date_str = date_val.strftime('%Y-%m-%d') if hasattr(date_val, 'strftime') else str(date_val)[:10]
-        date_display = f"{date_str} (Run n°{run_number})"
-        date_link_html = daily_link(date_val, date_display)
+        date_link_html = daily_link(date_val, date_str)
 
         # Rating with change for header middle
         rating = safe_str(row.get('rating'), "{:.1f}")
@@ -452,7 +451,14 @@ def generate_game_history_cards(df, player_name="Player", has_active_rank=True):
         top10 = safe_str(row.get('top_10s'))
         top10_rate = safe_str(row.get('top_10s_rate'), "{:.1f}") + "%" if pd.notna(row.get('top_10s_rate')) else "—"
 
-        # Build stats (6 items - excludes Daily Runs and Daily Avg)
+        # Elo change display for stats grid
+        change_display = "—"
+        if pd.notna(change):
+            change_class = "change-positive" if change >= 0 else "change-negative"
+            change_prefix = "+" if change >= 0 else ""
+            change_display = f'<span class="{change_class}">{change_prefix}{change:.1f}</span>'
+
+        # Build stats (8 items including Elo and Change)
         stats_html = f'''
         <div style="{stat_layout}"><span style="{label_style}">Daily #1</span><span style="{value_style}">{safe_str(row.get('wins'))}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">Daily #1 (%)</span><span style="{value_style}">{safe_str(row.get('win_rate'), "{:.1f}")}%</span></div>
@@ -460,19 +466,20 @@ def generate_game_history_cards(df, player_name="Player", has_active_rank=True):
         <div style="{stat_layout}"><span style="{label_style}">Daily Top 10 (%)</span><span style="{value_style}">{top10_rate}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">7-Game Avg</span><span style="{value_style}">{safe_str(row.get('last_7'), "{:.1f}")}</span></div>
         <div style="{stat_layout}"><span style="{label_style}">Daily Variance</span><span style="{value_style}">{safe_str(row.get('consistency'), "{:.1f}")}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Elo</span><span style="{value_style}">{rating}</span></div>
+        <div style="{stat_layout}"><span style="{label_style}">Change</span><span style="{value_style}">{change_display}</span></div>
         '''
 
-        # Card layout matching duel card structure
+        # Card layout with centered header
         card = f'''<div class="history-card" style="{card_base}">
-            <div class="history-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
-                <span class="history-date" style="font-weight:600;color:var(--text-color);">{date_link_html}</span>
-                <span class="history-player" style="font-weight:600;color:var(--text-color);">{html.escape(player_name)} <span style="font-weight:500;">({rating_display})</span></span>
+            <div class="history-header" style="text-align:center;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.35);">
+                <span style="font-weight:600;color:var(--text-color);">{html.escape(player_name)}'s run n°{run_number} · {date_link_html}</span>
             </div>
             <div class="history-rank" style="display:flex;flex-direction:column;align-items:center;margin-bottom:0.5rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(128,128,128,0.2);">
                 <span style="{label_style}">Daily Rank</span>
                 <span style="{value_style}">{rank_score_combined}</span>
             </div>
-            <div class="history-stats" style="display:grid;grid-template-columns:repeat(6, 1fr);gap:0.5rem;">{stats_html}</div>
+            <div class="history-stats" style="display:grid;grid-template-columns:repeat(4, 1fr);gap:0.5rem;">{stats_html}</div>
         </div>'''
         cards.append(card)
 
@@ -1000,7 +1007,7 @@ def generate_rivals_html(player_name, rivals):
 
     rivals_grid_style = """
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        grid-template-columns: repeat(3, 1fr);
         gap: 0.75rem;
     """
 
@@ -1039,15 +1046,8 @@ def generate_rivals_html(player_name, rivals):
 
     rivals_html = ""
     for i, rival in enumerate(rivals):
-        # Medal for top 3, numbers for 4-6
-        if i == 0:
-            medal = "🥇"
-        elif i == 1:
-            medal = "🥈"
-        elif i == 2:
-            medal = "🥉"
-        else:
-            medal = f"#{i + 1}"
+        # Target icon for all rivals
+        icon = "🎯"
 
         # Duel link (preserve dataset selection)
         duel_url = build_url_with_params({"tab": "duels", "player1": player_name, "player2": rival['name'], **_get_current_dataset_param()})
@@ -1062,7 +1062,7 @@ def generate_rivals_html(player_name, rivals):
 
         rivals_html += f'''
             <a href="{duel_url}" target="_self" style="{rival_card_style}" class="rival-card">
-                <div style="{name_style}">{medal} {html.escape(rival['name'])}</div>
+                <div style="{name_style}">{icon} {html.escape(rival['name'])}</div>
                 <div style="{record_style}">{record_prefix} {rival['player_wins']}-{rival['rival_wins']}</div>
                 <div style="{meta_style}">{rival['total_encounters']} battles</div>
             </a>
@@ -1074,7 +1074,7 @@ def generate_rivals_html(player_name, rivals):
                 <span style="font-size: 1.2rem;">⚔️</span>
                 <span>Top Rivals</span>
             </div>
-            <div style="{rivals_grid_style}">
+            <div class="rivals-grid" style="{rivals_grid_style}">
                 {rivals_html}
             </div>
         </div>
@@ -2031,9 +2031,13 @@ CUSTOM_CSS = """
     margin-top: 0 !important;
 }
 
-/* Back to top anchor - hide container spacing */
+/* Back to top anchor - invisible target at page top */
 #top {
-    scroll-margin-top: 100vh;
+    display: block;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    scroll-margin-top: 2000px;  /* Large fixed value (Safari Mobile handles px better than vh) */
 }
 [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.back-to-top) {
     margin: 0 !important;
@@ -2237,16 +2241,16 @@ CUSTOM_CSS = """
 }
 
 /* ===== History Card Layout (Tab 3) ===== */
-/* 6-column stats grid for desktop */
+/* 4-column stats grid for desktop (8 items = 2 symmetric rows) */
 .history-stats {
     display: grid !important;
-    grid-template-columns: repeat(6, 1fr) !important;
+    grid-template-columns: repeat(4, 1fr) !important;
     gap: 0.5rem !important;
 }
-/* Responsive: 3 columns on medium, 2 on narrow */
-@media (max-width: 700px) {
+/* Responsive: 2 columns on narrow (8 items = 4 symmetric rows) */
+@media (max-width: 500px) {
     .history-stats {
-        grid-template-columns: repeat(3, 1fr) !important;
+        grid-template-columns: repeat(2, 1fr) !important;
     }
     .history-header {
         flex-direction: column !important;
@@ -2254,8 +2258,11 @@ CUSTOM_CSS = """
         gap: 0.25rem !important;
     }
 }
-@media (max-width: 450px) {
-    .history-stats {
+
+/* ===== Rivals Grid (Tab 3) ===== */
+/* Responsive: 2 columns on narrow screens */
+@media (max-width: 500px) {
+    .rivals-grid {
         grid-template-columns: repeat(2, 1fr) !important;
     }
 }
@@ -2755,6 +2762,7 @@ def main():
         with open(logo_path, "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
         st.html(f"""
+        <div id="top"></div>
         <style>
             /* Container query context */
             /* Banner header - compact, full-width, always horizontal, centered */
@@ -2892,10 +2900,11 @@ def main():
         </div>
         """)
     else:
+        st.html('<div id="top"></div>')
         st.title("DFTL Rankings")
 
-    # Back-to-top anchor and button (always rendered)
-    st.markdown('<a id="top"></a><a href="#top" class="back-to-top" title="Back to top" aria-label="Back to top">↑</a>', unsafe_allow_html=True)
+    # Back-to-top button (anchor #top is in the header above)
+    st.markdown('<a href="#top" class="back-to-top" title="Back to top" aria-label="Back to top">↑</a>', unsafe_allow_html=True)
 
     # Check for available datasets
     available_datasets = get_available_datasets()

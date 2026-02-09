@@ -193,9 +193,9 @@ Pre-production audit checklist for the DFTL Ranking Dashboard.
 
 ### Desktop Browsers
 - [x] Chrome (latest)
-- [ ] Firefox (latest)
-- [ ] Safari (latest)
-- [ ] Edge (latest)
+- [x] Firefox (latest)
+- [x] Safari (latest)
+- [x] Edge (latest)
 
 ### Mobile Browsers
 - [x] Chrome Mobile (Android)
@@ -285,9 +285,9 @@ Pre-production audit checklist for the DFTL Ranking Dashboard.
 
 ## 14. Final Smoke Test
 
-- [ ] Fresh browser (incognito) loads correctly
-- [ ] Direct URL to each tab works
-- [ ] Share URL works when sent to another device
+- [x] Fresh browser (incognito) loads correctly
+- [x] Direct URL to each tab works
+- [x] Share URL works when sent to another device
 - [ ] All features work on mobile device
 - [ ] No console errors in browser DevTools
 - [ ] No Python errors in Streamlit logs
