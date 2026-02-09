@@ -2039,6 +2039,20 @@ CUSTOM_CSS = """
     padding: 0;
     scroll-margin-top: 2000px;  /* Large fixed value (Safari Mobile handles px better than vh) */
 }
+
+/* Sticky tab bar - sticks below Streamlit's header (60px tall) */
+[data-testid="stElementContainer"].st-key-tab_selector {
+    position: sticky !important;
+    top: 60px !important;  /* Below Streamlit's header */
+    z-index: 999 !important;
+    background: var(--secondary-background-color) !important;
+    padding: 0.5rem 0 !important;
+    margin-left: -1rem !important;
+    margin-right: -1rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2) !important;
+}
 [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.back-to-top) {
     margin: 0 !important;
     padding: 0 !important;
