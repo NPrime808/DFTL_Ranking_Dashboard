@@ -317,5 +317,4 @@ Game data and leaderboard content belong to their respective owners.
 
 ---
 
-*Built with 🫶 by N Prime, for the Die For The Lich community*
-- **🎮 Official game page**: https://store.steampowered.com/app/3415570/Die_For_The_Lich/
+*Built with 🫶 by N Prime, for the [Die For The Lich](https://store.steampowered.com/app/3415570/Die_For_The_Lich/) community*

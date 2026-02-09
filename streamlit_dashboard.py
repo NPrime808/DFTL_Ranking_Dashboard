@@ -3024,7 +3024,7 @@ def main():
         st.caption("Made with 🫶 by N Prime")
         st.markdown(
             '<a href="https://store.steampowered.com/app/3415570/Die_For_The_Lich/" target="_blank" '
-            'style="font-size:0.85rem;color:var(--text-color);opacity:0.7;">🎮 Official game page</a>',
+            'style="font-size:0.85rem;color:var(--text-color);opacity:0.7;">🎮 Die For The Lich on Steam</a>',
             unsafe_allow_html=True
         )
 
