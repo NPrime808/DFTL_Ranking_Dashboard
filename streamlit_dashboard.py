@@ -631,7 +631,7 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
                 </div>
                 <div class="duel-footer-wins" style="display:none;flex-direction:column;align-items:center;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(128,128,128,0.2);">
                     <span class="duel-win-count" style="font-weight:700;font-size:1.2rem;color:{p1_color};">{p1_cumulative}</span>
-                    <span class="duel-win-label" style="font-size:0.65rem;text-transform:uppercase;font-weight:600;color:{p1_color};">Duels won</span>
+                    <span class="duel-win-label" style="font-size:0.75rem;text-transform:uppercase;font-weight:600;color:{p1_color};">Duels won</span>
                 </div>
             </div>
             <div class="duel-vs" style="display:flex;align-items:center;justify-content:center;font-size:2rem;padding-top:0.25rem;">⚔️</div>
@@ -647,7 +647,7 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
                 </div>
                 <div class="duel-footer-wins" style="display:none;flex-direction:column;align-items:center;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(128,128,128,0.2);">
                     <span class="duel-win-count" style="font-weight:700;font-size:1.2rem;color:{p2_color};">{p2_cumulative}</span>
-                    <span class="duel-win-label" style="font-size:0.65rem;text-transform:uppercase;font-weight:600;color:{p2_color};">Duels won</span>
+                    <span class="duel-win-label" style="font-size:0.75rem;text-transform:uppercase;font-weight:600;color:{p2_color};">Duels won</span>
                 </div>
             </div>
         </div>
@@ -1411,7 +1411,7 @@ CUSTOM_CSS = """
     font-family: var(--font-body) !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    font-size: 0.7rem !important;
+    font-size: 0.75rem !important;
     letter-spacing: 0.08em !important;
     background: rgba(255, 107, 107, 0.1) !important;
 }
@@ -1621,13 +1621,13 @@ CUSTOM_CSS = """
 .tab-link {
     display: flex;
     align-items: center;
-    padding: 0.5rem 0.6rem;
+    padding: 0.6rem 0.8rem;
     margin: 0;
     border: none;
     background: transparent;
     cursor: pointer;
     font-weight: 500;
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     color: var(--text-color);
     opacity: 0.6;
     border-bottom: 2px solid transparent;
@@ -1648,15 +1648,15 @@ CUSTOM_CSS = """
 /* Mobile sm (≤600px): compact tabs to fit on one row */
 @media (max-width: 600px) {
     .tab-link {
-        padding: 0.4rem 0.3rem;
-        font-size: 0.7rem;
+        padding: 0.5rem 0.5rem;
+        font-size: 0.8rem;
     }
 }
 /* Mobile xs (≤400px): tighter spacing for narrow screens */
 @media (max-width: 400px) {
     .tab-link {
-        padding: 0.35rem 0.2rem;
-        font-size: 0.65rem;
+        padding: 0.45rem 0.35rem;
+        font-size: 0.75rem;
     }
 }
 
@@ -1941,7 +1941,7 @@ CUSTOM_CSS = """
     align-items: center;
 }
 .card-rank .rank-label {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1965,7 +1965,7 @@ CUSTOM_CSS = """
     line-height: 1.2;
 }
 .card-name .rank-label {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1982,7 +1982,7 @@ CUSTOM_CSS = """
 }
 .card-rating .rating-label,
 .card-rating .rank-label {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -2266,7 +2266,7 @@ CUSTOM_CSS = """
         font-size: 1.2rem !important;
     }
     .duel-win-label {
-        font-size: 0.65rem !important;
+        font-size: 0.75rem !important;
     }
     .duel-date {
         font-size: 0.9rem !important;
@@ -2313,7 +2313,7 @@ CUSTOM_CSS = """
         font-size: 1.1rem !important;
     }
     .duel-win-label {
-        font-size: 0.6rem !important;
+        font-size: 0.75rem !important;
     }
     .duel-date {
         font-size: 0.85rem !important;
@@ -2759,7 +2759,7 @@ def main():
             }}
             .dataset-badge {{
                 font-family: system-ui, sans-serif !important;
-                font-size: 0.55rem !important;
+                font-size: 0.65rem !important;
                 font-weight: 600 !important;
                 padding: 0.15rem 0.4rem;
                 border-radius: 4px;
@@ -2793,7 +2793,7 @@ def main():
                 letter-spacing: 0.02em;
             }}
             .dashboard-subtitle {{
-                font-size: 0.55rem;
+                font-size: 0.65rem;
                 font-weight: 400;
                 line-height: 1.2;
                 color: #9CA3AF;
@@ -2816,7 +2816,7 @@ def main():
                     font-size: 0.7rem;
                 }}
                 .dataset-badge {{
-                    font-size: 0.65rem !important;
+                    font-size: 0.75rem !important;
                     padding: 0.2rem 0.5rem;
                 }}
             }}
