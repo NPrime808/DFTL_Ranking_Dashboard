@@ -16,7 +16,8 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add project root to path for direct script execution
+# Enable both `python src/elo/rivalries.py` and `python -m src.elo.rivalries` execution modes.
+# This ensures src.config imports work regardless of how the script is invoked.
 _project_root = str(Path(__file__).parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
@@ -74,7 +75,7 @@ def compute_rivalries(df_history: pd.DataFrame) -> pd.DataFrame:
 
     # Track head-to-head stats for each pair
     # Key: (player1, player2) where player1 < player2 alphabetically
-    rivalry_stats = defaultdict(lambda: {
+    rivalry_stats: defaultdict[tuple[str, str], dict] = defaultdict(lambda: {
         'encounters': 0,
         'p1_wins': 0,
         'p2_wins': 0,
@@ -84,7 +85,7 @@ def compute_rivalries(df_history: pd.DataFrame) -> pd.DataFrame:
 
     logger.info(f"Processing {len(games_by_date)} days of games...")
 
-    for date, players_ranks in games_by_date.items():
+    for _, players_ranks in games_by_date.items():
         players = list(players_ranks.keys())
 
         # Generate all pairs for this day

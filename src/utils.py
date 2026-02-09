@@ -8,7 +8,8 @@ to avoid code duplication.
 import sys
 from pathlib import Path
 
-# Add project root to path for direct script execution
+# Enable both `python src/utils.py` and `python -m src.utils` execution modes.
+# This ensures src.config imports work regardless of how the script is invoked.
 _project_root = str(Path(__file__).parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
@@ -17,7 +18,6 @@ import logging
 import tempfile
 import shutil
 import re
-from typing import List, Optional
 
 from src.config import OUTPUT_FOLDER, ALLOWED_DATASETS
 
@@ -38,7 +38,7 @@ def strip_markdown(name: str) -> str:
     return re.sub(r"[*`]", "", name).strip()
 
 # --- Logging Setup ---
-def setup_logging(name: str = None, level: int = logging.INFO) -> logging.Logger:
+def setup_logging(name: str | None = None, level: int = logging.INFO) -> logging.Logger:
     """
     Configure and return a logger with consistent formatting.
 
@@ -65,7 +65,7 @@ def setup_logging(name: str = None, level: int = logging.INFO) -> logging.Logger
 
 
 # --- File Operations ---
-def cleanup_old_files(pattern: str, keep_file: Path = None, folder: Path = None) -> List[Path]:
+def cleanup_old_files(pattern: str, keep_file: Path | None = None, folder: Path | None = None) -> list[Path]:
     """
     Remove old files matching pattern, optionally keeping one specific file.
 
@@ -125,7 +125,7 @@ def atomic_write_csv(df, path: Path, **kwargs) -> None:
         shutil.move(str(tmp_path), str(path))
         logger.debug(f"Atomically wrote {len(df)} rows to {path}")
 
-    except Exception as e:
+    except Exception:
         # Clean up temp file if it exists
         if 'tmp_path' in locals() and tmp_path.exists():
             tmp_path.unlink()

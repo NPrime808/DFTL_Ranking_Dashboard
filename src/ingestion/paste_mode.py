@@ -17,18 +17,18 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add project root to path for direct script execution
+# Enable both `python src/ingestion/paste_mode.py` and `python -m src.ingestion.paste_mode` execution modes.
+# This ensures src.config imports work regardless of how the script is invoked.
 _project_root = str(Path(__file__).parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import pandas as pd
-from datetime import datetime
-from typing import List, Optional
+from datetime import date, datetime
+from typing import Any
 
 from src.config import (
     OUTPUT_FOLDER,
-    MIN_DATE_EARLY_ACCESS,
     MAX_INPUT_SIZE,
     EXPECTED_LEADERBOARD_ROWS,
 )
@@ -97,7 +97,7 @@ def parse_leaderboard_text(text: str) -> pd.DataFrame:
                     # Parse DD/MM/YYYY format
                     date_found = datetime.strptime(date_str, "%d/%m/%Y").date()
                 except ValueError as e:
-                    raise ValidationError(f"Failed to parse date '{date_str}': {e}")
+                    raise ValidationError(f"Failed to parse date '{date_str}': {e}") from e
 
         # Extract rank 1 (crown emoji)
         m1 = RANK1_RE.search(line)
@@ -134,7 +134,7 @@ def parse_leaderboard_text(text: str) -> pd.DataFrame:
     return df
 
 
-def validate_leaderboard(df: pd.DataFrame) -> List[str]:
+def validate_leaderboard(df: pd.DataFrame) -> list[str]:
     """
     Validate parsed leaderboard data.
 
@@ -210,7 +210,7 @@ def get_existing_dates(dataset: str = "early_access") -> set:
     return set(df['date'].dt.date)
 
 
-def check_duplicate_date(date: datetime, dataset: str = "early_access") -> None:
+def check_duplicate_date(date: datetime | date, dataset: str = "early_access") -> None:
     """
     Check if a date already exists in the dataset.
 
@@ -282,7 +282,7 @@ def append_to_dataset(df_new: pd.DataFrame, dataset: str = "early_access") -> Pa
     return new_path
 
 
-def _update_full_dataset(df_new: pd.DataFrame) -> Optional[Path]:
+def _update_full_dataset(df_new: pd.DataFrame) -> Path | None:
     """
     Update the full leaderboard dataset with new data.
 
@@ -360,7 +360,7 @@ def ingest_leaderboard_text(
     # Validate dataset parameter
     validate_dataset(dataset)
 
-    result = {
+    result: dict[str, Any] = {
         'success': False,
         'date': None,
         'rows': 0,

@@ -1,16 +1,18 @@
-import math
+# --- Standard Library ---
 import base64
 import html
+import math
 import random
+from datetime import datetime
+from pathlib import Path
 from urllib.parse import quote
 
-import streamlit as st
-import pandas as pd
+# --- Third-Party ---
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from pathlib import Path
-from datetime import datetime
+import streamlit as st
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -165,15 +167,6 @@ def render_floating_share_button(current_tab_slug):
     Args:
         current_tab_slug: Current tab's URL slug (e.g., "rankings", "dailies")
     """
-    # Widget-to-param mapping for each tab
-    WIDGET_MAPS = {
-        "rankings": {"elo_ranking_date": "date"},
-        "dailies": {"dailies_date": "date"},
-        "tracker": {"tab4_player_select": "player"},
-        "duels": {"duel_player1": "player1", "duel_player2": "player2"},
-        "hall-of-fame": {},
-    }
-
     # Build share params from URL params (more reliable than session_state timing)
     share_params = {"tab": current_tab_slug}
 
@@ -214,6 +207,9 @@ def render_floating_share_button(current_tab_slug):
         st.caption("Copy this link to share:")
         st.code(share_url, language=None)
 
+
+# --- Card Generators ---
+# HTML card components for rankings, leaderboards, game history, and duels
 
 def generate_ranking_cards(df):
     """
@@ -423,15 +419,9 @@ def generate_game_history_cards(df, player_name="Player", has_active_rank=True):
         date_str = date_val.strftime('%Y-%m-%d') if hasattr(date_val, 'strftime') else str(date_val)[:10]
         date_link_html = daily_link(date_val, date_str)
 
-        # Rating with change for header middle
+        # Rating and change values
         rating = safe_str(row.get('rating'), "{:.1f}")
         change = row.get('rating_change')
-        if pd.notna(change):
-            change_class = "change-positive" if change >= 0 else "change-negative"
-            change_str = f"+{change:.1f}" if change >= 0 else f"{change:.1f}"
-            rating_display = f'{rating} <span class="{change_class}" style="font-size:0.85em;">({change_str})</span>'
-        else:
-            rating_display = rating
 
         # Daily rank for header right
         rank = row.get('rank')
@@ -658,6 +648,9 @@ def generate_duel_cards(df, player1, player2, colors=None, limit=None, last_enco
 
     return "".join(cards)
 
+
+# --- Hall of Fame ---
+# Compute and display all-time achievement statistics
 
 def compute_hall_of_fame_stats(df_history):
     """
@@ -909,6 +902,9 @@ def generate_hall_of_fame_cards(stats):
     return cards_html
 
 
+# --- Rivalries ---
+# Player rivalry computation and display components
+
 def get_player_rivals(player_name, df_rivalries, n=6, min_closeness=0.5):
     """
     Get a player's top rivals - competitive matchups ranked by encounter count.
@@ -1045,7 +1041,7 @@ def generate_rivals_html(player_name, rivals):
     """
 
     rivals_html = ""
-    for i, rival in enumerate(rivals):
+    for rival in rivals:
         # Target icon for all rivals
         icon = "🎯"
 
@@ -1096,6 +1092,9 @@ THEME_COLORS = {
     "player2_rgb": "251, 191, 36",
 }
 
+
+# --- Theme Configuration ---
+# Dynamic theme colors and CSS for light/dark mode support
 
 def get_theme_colors():
     """Get theme colors for charts and dynamic styling."""
@@ -2509,6 +2508,9 @@ button[data-testid="stBaseButton-secondary"]:focus {
 """
 
 
+# --- Chart Styling ---
+# Plotly figure styling for consistent theme-aware charts
+
 def apply_plotly_style(fig, add_gradient_fill=False):
     """Apply consistent styling to Plotly figures following the design system.
 
@@ -2527,7 +2529,6 @@ def apply_plotly_style(fig, add_gradient_fill=False):
     # Structural colors that work on both light and dark backgrounds
     grid_color = "rgba(128, 128, 128, 0.4)"  # Neutral gray grid
     line_color = "rgba(128, 128, 128, 0.3)"  # Neutral gray lines
-    legend_bg = "rgba(128, 128, 128, 0.15)"  # Semi-transparent neutral
     hover_bg = "rgba(50, 50, 50, 0.9)"  # Dark hover for readability
     hover_text = "#FFFFFF"  # White text on dark hover background
 
@@ -2912,7 +2913,7 @@ def main():
         dataset_index = 0
         if url_dataset:
             # Find the label for this prefix
-            for i, (label, prefix) in enumerate(available_datasets.items()):
+            for i, (_, prefix) in enumerate(available_datasets.items()):
                 if prefix == url_dataset:
                     dataset_index = i
                     break
@@ -3084,7 +3085,6 @@ def main():
 
             if url_date:
                 try:
-                    from datetime import datetime
                     parsed_date = datetime.strptime(url_date, '%Y-%m-%d').date()
                     if parsed_date in available_dates:
                         default_date = parsed_date
@@ -3150,7 +3150,6 @@ def main():
 
             if url_date:
                 try:
-                    from datetime import datetime
                     parsed_date = datetime.strptime(url_date, '%Y-%m-%d').date()
                     if parsed_date in available_dates:
                         default_ranking_date = parsed_date
@@ -4053,7 +4052,7 @@ def main():
                         p1_colors, p2_colors = [], []
                         p1_patterns, p2_patterns = [], []
 
-                        for i, date in enumerate(dates_sorted):
+                        for i, _ in enumerate(dates_sorted):
                             p1_score, p2_score = p1_scores_raw[i], p2_scores_raw[i]
                             p1_scores_display.append(min(p1_score, score_cap))
                             p2_scores_display.append(-min(p2_score, score_cap))

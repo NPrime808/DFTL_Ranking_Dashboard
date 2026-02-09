@@ -60,11 +60,11 @@ def scale_ratings_soft(ratings_dict, baseline=1500, target_min=900, target_max=2
 
 
 def scale_ratings_hybrid(ratings_dict, baseline=1500, target_min=900, target_max=2800,
-                         soft_target=2800, hard_ceiling=3000):
+                         hard_ceiling=3000):
     """
     Hybrid two-zone rating compression combining logarithmic and tanh functions.
 
-    Zone 1 (logarithmic): Makes reaching soft_target (2800) difficult but achievable.
+    Zone 1 (logarithmic): Makes reaching 2800 difficult but achievable.
         Uses a gentle logarithmic blend to create diminishing returns.
     Zone 2 (tanh): Compresses toward hard_ceiling (3000), the theoretical maximum.
 
@@ -85,7 +85,6 @@ def scale_ratings_hybrid(ratings_dict, baseline=1500, target_min=900, target_max
         baseline: center point (median maps here), default 1500
         target_min: lower bound for compression, default 900
         target_max: ignored, kept for API compatibility with scale_ratings_soft
-        soft_target: hard-but-achievable target, default 2800
         hard_ceiling: absolute maximum (asymptotic), default 3000
 
     Returns:

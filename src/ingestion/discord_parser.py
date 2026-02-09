@@ -13,14 +13,14 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add project root to path for direct script execution
+# Enable both `python src/ingestion/discord_parser.py` and `python -m src.ingestion.discord_parser` execution modes.
+# This ensures src.config imports work regardless of how the script is invoked.
 _project_root = str(Path(__file__).parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import json
 import pandas as pd
-from typing import List, Tuple, Optional
 
 from src.config import (
     ASSETS_FOLDER,
@@ -42,7 +42,7 @@ from src.utils import (
 logger = setup_logging(__name__)
 
 
-def parse_leaderboard_content(content: str) -> List[Tuple[Optional[str], str, int, int]]:
+def parse_leaderboard_content(content: str) -> list[tuple[str | None, str, int, int]]:
     """
     Parse one leaderboard message content into a list of rows.
 
@@ -79,7 +79,7 @@ def parse_leaderboard_content(content: str) -> List[Tuple[Optional[str], str, in
     return leaderboard_rows
 
 
-def load_json_files(data_folder: Path) -> List[Path]:
+def load_json_files(data_folder: Path) -> list[Path]:
     """
     Discover and return all JSON files in the data folder.
 
@@ -94,7 +94,7 @@ def load_json_files(data_folder: Path) -> List[Path]:
     return json_files
 
 
-def parse_json_file(json_file: Path, author_name: str) -> List[Tuple]:
+def parse_json_file(json_file: Path, author_name: str) -> list[tuple]:
     """
     Parse a single JSON file and extract leaderboard data.
 
@@ -105,9 +105,9 @@ def parse_json_file(json_file: Path, author_name: str) -> List[Tuple]:
     Returns:
         List of leaderboard row tuples
     """
-    rows = []
+    rows: list[tuple] = []
 
-    with open(json_file, "r", encoding="utf-8") as f:
+    with open(json_file, encoding="utf-8") as f:
         json_data = json.load(f)
 
     # Handle dict with "messages" key or plain list
@@ -188,7 +188,7 @@ def run_sanity_checks(dataframe: pd.DataFrame, label: str = "DataFrame") -> bool
     return True
 
 
-def create_dataframe(all_rows: List[Tuple]) -> pd.DataFrame:
+def create_dataframe(all_rows: list[tuple]) -> pd.DataFrame:
     """
     Create and clean a DataFrame from parsed rows.
 

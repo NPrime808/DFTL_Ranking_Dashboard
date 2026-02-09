@@ -17,7 +17,8 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add project root to path for direct script execution
+# Enable both `python src/elo/engine.py` and `python -m src.elo.engine` execution.
+# Required for src.config/src.utils imports to resolve correctly.
 _project_root = str(Path(__file__).parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
@@ -72,7 +73,7 @@ logger = setup_logging(__name__)
 # Fix Windows console encoding for Unicode characters
 if sys.stdout.encoding != 'utf-8':
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding='utf-8')  # type: ignore[union-attr]
     except AttributeError:
         pass  # Python < 3.7
 
@@ -386,7 +387,7 @@ def compute_elo_ratings(df):
     if USE_HYBRID_COMPRESSION:
         scaled_ratings = scale_ratings_hybrid(
             ratings, BASELINE_RATING, TARGET_MIN_RATING, TARGET_MAX_RATING,
-            soft_target=SOFT_TARGET, hard_ceiling=HARD_CEILING
+            hard_ceiling=HARD_CEILING
         )
         compression_method = f"hybrid (log→{SOFT_TARGET}, tanh→{HARD_CEILING})"
     else:
