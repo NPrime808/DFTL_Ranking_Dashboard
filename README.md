@@ -163,11 +163,11 @@ This project follows data minimization principles:
 
 ### What is Elo rating?
 
-**Elo** is a rating system originally designed for chess that measures relative skill levels. Here, I use a modified pairwise Elo system that compares players based on their daily leaderboard performance.
+**Elo** is a rating system originally designed for chess that measures relative skill levels. Here, players are compared using a customized, pairwise Elo system based on daily run performances.
 
 - **Starting Rating**: All players begin at **1500** (the baseline/median)
 - **Rating Range**: From **1000** (floor) to **3000** (theoretical ceiling)
-- **How it works**: When you finish higher than another player on the daily leaderboard, you "win" against them. Your rating increases, theirs decreases. The amount depends on the rating difference and score margin.
+- **How it works**: When you finish higher than another player on the daily leaderboard, you "win" against them. Your rating increases, theirs decreases. The amount mostly depends on the rating difference and score margin.
 
 ### What do the ratings mean?
 
@@ -206,25 +206,24 @@ Several factors:
 
 ### Why use Elo instead of other rating systems?
 
-The true answer is that I'm a former chess player and I'll always be biased in favor of the Elo system. I did consider and/or try several other rating systems though:
+Several other rating systems were assessed before settling on the current implementation:
 
 | System | Pros | Why I didn't use it |
 |--------|------|---------------------|
 | **Glicko/Glicko-2** | Popular, tracks rating uncertainty | Designed for 1v1 matches, not 30-player daily competitions |
-| **TrueSkill** | Robust skill-based matchmaking algorithm | Overkill for our use case. Also it's patented by Microsoft and I don't have "Microsoft lawyer" money |
+| **TrueSkill** | Robust skill-based matchmaking algorithm | Overkill for our use case. Also, it's patented by Microsoft. We don't have "Microsoft lawyer" money |
 | **Simple averages** | Easy to understand, easy to implement | "Underkill" for our use case. Doesn't account for opponent strength or improvement over time |
-| **ELO** | Battle-tested, intuitive | Not quite perfect without some tweaks |
+| **ELO** | Battle-tested, intuitive | Great as is, but not quite perfect without some tweaks |
 
 **Why Pairwise Elo works here:**
 - Chess proved that Elo accurately ranks players over time through repeated competition
-- My pairwise adaptation treats each daily leaderboard as 435 simultaneous "matches" (30 players = 30×29/2 pairs)
+- Each daily leaderboard is treated as 435 simultaneous "matches" (30 players = 30×29/2 pairs)
 - The system is self-correcting: beat strong players, gain more; lose to weak players, lose more
 - It's popular and intuitive: everyone understands "higher number = better"
 
 ### Why pairwise comparisons instead of just using daily rank?
 
-Skill comparisons felt important to highlight. Daily rank is simply less effective for those evaluations:
-
+**Issues with using just daily rank**
 - Finishing 1st against 29 weak players = same as 1st against 29 strong players
 - A rank of 5th tells you nothing about who you beat or lost to
 - No way to compare across different days with different player pools
@@ -236,16 +235,14 @@ Skill comparisons felt important to highlight. Daily rank is simply less effecti
 
 ### How do you handle only seeing the top 30 each day?
 
-That shaped the system design a lot actually.
-
-**The limitation:** Players ranked 31st or lower are invisible: I don't know their scores, their identities, or even how many of them there are.
+**The limitation:** Players ranked 31st or lower are invisible: we don't know their scores, their identities, or even how many of them there are.
 
 **Why this is actually fine for Elo:** The pairwise system only compares players *who both appear on the same day*. If you're in the top 30, you get compared to the other 29 players. If you're not, you simply don't participate that day.
 
 **Key implications:**
 - **No penalty for missing days**: If you don't appear, your rating stays untouched
 - **Appearing matters**: To gain or lose rating, you must show up in the top 30
-- **Bottom of top 30 is meaningful**: Rank 30 means you made it, but barely. There is still some road ahead
+- **Bottom of top 30 is meaningful**: It separates casual runners from competitive ones
 
 **What I *can't* measure:**
 - Players who never crack the top 30
@@ -258,7 +255,7 @@ Raw Elo scores are processed and then compressed using a hybrid system:
 - Below 2700: Gentle logarithmic scaling (diminishing returns)
 - Above 2700: Hyperbolic tangent compression toward the 3000 ceiling
 
-This allows the high end of the distribution curve to mimic chess Elo, in the sense that:
+This allows the high end of the distribution curve to mimic classical chess Elo, in the sense that:
 - **2800+** is genuinely elite
 - **2900** is legendary
 - **3000** is the theoretical limits of human ability
@@ -267,15 +264,7 @@ While mostly aesthetics (compared to the raw ratings), it prevents runaway ratin
 
 ### How do rivalries work?
 
-The **Rivalries** feature identifies the most significant head-to-head matchups between players. A rivalry forms when two players have competed on the same daily leaderboard at least **7 times**.
-
-**Three categories of rivalries:**
-
-| Category | What it measures |
-|----------|------------------|
-| **Most Battles** | Pairs with the most head-to-head encounters |
-| **Closest Rivals** | Pairs with the tightest win records (closest to 50-50) |
-| **Elite Showdowns** | Top players who frequently battle each other at high ranks |
+The **Rivalries** feature identifies the closest, most significant head-to-head matchups between players. A rivalry forms when two players have competed on the same daily leaderboard at least **7 times**.
 
 **How "closeness" is calculated:**
 
