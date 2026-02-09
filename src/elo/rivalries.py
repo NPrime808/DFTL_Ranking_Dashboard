@@ -25,10 +25,9 @@ import pandas as pd
 import numpy as np
 from itertools import combinations
 from collections import defaultdict
-from datetime import datetime
 
 from src.config import OUTPUT_FOLDER, EARLY_ACCESS_PATTERN, FULL_PATTERN
-from src.utils import setup_logging, atomic_write_csv
+from src.utils import setup_logging, atomic_write_csv, cleanup_old_files
 
 # --- Module Logger ---
 logger = setup_logging(__name__)
@@ -211,12 +210,16 @@ def process_rivalries(history_csv: Path, output_prefix: str, label: str) -> pd.D
         logger.warning(f"No qualifying rivalries found for {label}")
         return df_rivalries
 
-    # Export to CSV
-    date_str = datetime.now().strftime('%Y%m%d')
+    # Extract date from history filename (e.g., early_access_elo_history_20250131.csv)
+    # This ensures rivalries date matches the data's last date, not today's date
+    date_str = history_csv.stem.split('_')[-1]  # Get YYYYMMDD from filename
     output_csv = OUTPUT_FOLDER / f"{output_prefix}_rivalries_{date_str}.csv"
 
     atomic_write_csv(df_rivalries, output_csv, index=False)
     logger.info(f"Exported rivalries to: {output_csv}")
+
+    # Clean up old rivalries files (keep only the new one)
+    cleanup_old_files(f"{output_prefix}_rivalries_*.csv", keep_file=output_csv, folder=OUTPUT_FOLDER)
 
     # Log top rivalries for each category
     top = get_top_rivalries(df_rivalries, n=5)

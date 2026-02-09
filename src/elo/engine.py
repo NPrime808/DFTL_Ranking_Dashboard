@@ -620,6 +620,14 @@ def main():
     if full_ratings is not None:
         results['full'] = (full_ratings, full_history, full_all)
 
+    # Update rivalries after Elo computation
+    from src.elo.rivalries import main as rivalries_main
+    logger.info("=" * 60)
+    logger.info("Computing rivalries from updated Elo history...")
+    logger.info("=" * 60)
+    rivalries_results = rivalries_main()
+    results['rivalries'] = rivalries_results
+
     return results
 
 

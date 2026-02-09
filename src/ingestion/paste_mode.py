@@ -350,6 +350,7 @@ def ingest_leaderboard_text(
             - warnings: list of warning messages
             - csv_path: path to updated CSV (if not dry_run)
             - elo_results: Elo computation results (if run_elo=True)
+            - rivalries_results: Rivalries computation results (if run_elo=True)
 
     Raises:
         ValidationError: If validation fails
@@ -365,7 +366,8 @@ def ingest_leaderboard_text(
         'rows': 0,
         'warnings': [],
         'csv_path': None,
-        'elo_results': None
+        'elo_results': None,
+        'rivalries_results': None
     }
 
     # Step 1: Parse the text
@@ -401,12 +403,14 @@ def ingest_leaderboard_text(
     result['csv_path'] = csv_path
     logger.info(f"  Saved to {csv_path}")
 
-    # Step 5: Run Elo update
+    # Step 5: Run Elo update (includes rivalries computation)
     if run_elo:
         logger.info("Triggering Elo ranking update...")
         elo_results = run_elo_update()
         result['elo_results'] = elo_results
-        logger.info("  Elo update complete")
+        # Rivalries results are included in elo_results['rivalries']
+        result['rivalries_results'] = elo_results.get('rivalries') if elo_results else None
+        logger.info("  Elo and rivalries update complete")
 
     result['success'] = True
     logger.info(f"Ingestion complete for {result['date']}")
