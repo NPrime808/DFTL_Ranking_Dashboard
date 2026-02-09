@@ -210,7 +210,7 @@ def render_floating_share_button(current_tab_slug):
     share_url = f"{base_url}/{share_path.lstrip('/')}"
 
     # Render popover with share URL (CSS will float this)
-    with st.popover("🔗", use_container_width=False, help="Share this view"):
+    with st.popover("🔗", width='content', help="Share this view"):
         st.caption("Copy this link to share:")
         st.code(share_url, language=None)
 
@@ -3363,7 +3363,7 @@ def main():
                     annotation_text=f"Median: {df_ratings['rating'].median():.0f}",
                     annotation_font=dict(color=ACCENT_COLORS["warning"], weight=600)
                 )
-                st.plotly_chart(fig_dist, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                st.plotly_chart(fig_dist, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
 
             # Toggle to show unranked players
             show_unranked = st.toggle("Show Unranked Players", value=True, help="Players with <7 games or inactive >7 days")
@@ -3614,7 +3614,7 @@ def main():
                                 name='Peak',
                                 hovertemplate=f"<b>Peak Rating</b><br>{peak_row['rating']:.0f}<extra></extra>"
                             )
-                            st.plotly_chart(fig_rating, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                            st.plotly_chart(fig_rating, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
 
                         # --- Daily Rank History Chart (Bar Chart) ---
                         with chart_col2:
@@ -3672,7 +3672,7 @@ def main():
                                 annotation_font=dict(color="rgba(59, 130, 246, 1)", weight=600),
                                 annotation_xshift=5,  # Small shift to ensure text is in margin area
                             )
-                            st.plotly_chart(fig_rank, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                            st.plotly_chart(fig_rank, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
 
                         # --- Game History Cards ---
                         # Sort controls - column and direction combined
@@ -3789,7 +3789,7 @@ def main():
                     ),
                     dragmode=False,  # Prevent scroll hijacking on mobile
                 )
-                st.plotly_chart(fig_rank1, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                st.plotly_chart(fig_rank1, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
         else:
             st.warning("Active rank history data not available.")
 
@@ -4134,11 +4134,11 @@ def main():
                         with col_elo:
                             st.subheader("Elo Rating Comparison")
                             st.html('<p style="color: #A0A0A0; font-size: 0.75rem; font-weight: 500; margin: -0.5rem 0 0.5rem 0;">1500 = starting rating</p>')
-                            st.plotly_chart(fig_elo, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                            st.plotly_chart(fig_elo, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
                         with col_score:
                             st.subheader("Score Comparison")
                             st.html('<p style="color: #A0A0A0; font-size: 0.75rem; font-weight: 500; margin: -0.5rem 0 0.5rem 0;">Color = duel winner</p>')
-                            st.plotly_chart(fig_score, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+                            st.plotly_chart(fig_score, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
 
                         # Display the duel cards
                         st.subheader("Game-by-Game Comparison")
