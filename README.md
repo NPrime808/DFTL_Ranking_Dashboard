@@ -2,7 +2,7 @@
 
 A competitive Elo rating system and analytics dashboard for **Die For The Lich** (DFTL) Daily Run leaderboards. This project tracks player performance over time, computes skill-based rankings using an advanced Elo algorithm, and presents the data through an interactive Streamlit dashboard.
 
-![Dashboard Preview](https://raw.githubusercontent.com/NPrime808/DFTL_Ranking_Dashboard/main/images/Dashboard_preview_001_20260201.png)
+![Dashboard Preview](https://raw.githubusercontent.com/NPrime808/DFTL_Ranking_Dashboard/main/images/Dashboard_preview.png)
 
 ## Features
 
