@@ -265,6 +265,34 @@ This allows the high end of the distribution curve to mimic chess Elo, in the se
 
 While mostly aesthetics (compared to the raw ratings), it prevents runaway ratings while preserving meaningful differences.
 
+### How do rivalries work?
+
+The **Rivalries** feature identifies the most significant head-to-head matchups between players. A rivalry forms when two players have competed on the same daily leaderboard at least **7 times**.
+
+**Three categories of rivalries:**
+
+| Category | What it measures |
+|----------|------------------|
+| **Most Battles** | Pairs with the most head-to-head encounters |
+| **Closest Rivals** | Pairs with the tightest win records (closest to 50-50) |
+| **Elite Showdowns** | Top players who frequently battle each other at high ranks |
+
+**How "closeness" is calculated:**
+
+The closeness score combines two factors:
+1. **Win ratio**: How close to 50-50 is the head-to-head record? (1.0 = perfectly even)
+2. **Gap penalty**: Large absolute win gaps feel less competitive than small ones
+
+```
+closeness = (1 - |wins_diff| / total) × (1 / (1 + |wins_diff| / 20))
+```
+
+This means a 36-24 record (gap=12) scores as "closer" than 72-48 (gap=24), even though both are 60-40 ratios. The intuition: a 24-game lead feels more decisive than a 12-game lead.
+
+**Top Rivals on Player Tracker:**
+
+Each player's profile shows their top 6 rivals—opponents with competitive (closeness ≥ 0.5) head-to-head records, ranked by total encounters. The more history you share with someone, the more meaningful the rivalry.
+
 ## Glossary
 
 | Term | Definition |
@@ -286,6 +314,10 @@ While mostly aesthetics (compared to the raw ratings), it prevents runaway ratin
 | **Rating Change** | How much your Elo changed that day |
 | **Baseline** | The starting/median rating of 1500 |
 | **Compression** | System that maps raw ratings to display ratings |
+| **Rivalry** | A significant head-to-head matchup (≥7 encounters) |
+| **Encounters** | Days where both players appeared on the same leaderboard |
+| **Closeness** | How competitive a rivalry is (higher = more evenly matched) |
+| **Top Rivals** | A player's 6 most competitive frequent opponents |
 
 ## License
 
