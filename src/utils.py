@@ -15,12 +15,11 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import logging
-import tempfile
-import shutil
 import re
+import shutil
+import tempfile
 
-from src.config import OUTPUT_FOLDER, ALLOWED_DATASETS
-
+from src.config import ALLOWED_DATASETS, OUTPUT_FOLDER
 
 # --- Shared Regex Patterns for Leaderboard Parsing ---
 # Date format: date: DD/MM/YYYY (optional backticks, case-insensitive)

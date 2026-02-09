@@ -23,25 +23,26 @@ _project_root = str(Path(__file__).parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import pandas as pd
 from datetime import date, datetime
 from typing import Any
 
+import pandas as pd
+
 from src.config import (
-    OUTPUT_FOLDER,
-    MAX_INPUT_SIZE,
     EXPECTED_LEADERBOARD_ROWS,
+    MAX_INPUT_SIZE,
+    OUTPUT_FOLDER,
 )
 from src.utils import (
-    setup_logging,
-    cleanup_old_files,
-    atomic_write_csv,
-    validate_dataset,
-    validate_input_size,
     DATE_RE,
     RANK1_RE,
     RANK_RE,
+    atomic_write_csv,
+    cleanup_old_files,
+    setup_logging,
     strip_markdown,
+    validate_dataset,
+    validate_input_size,
 )
 
 # --- Module Logger ---

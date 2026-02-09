@@ -20,21 +20,22 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import json
+
 import pandas as pd
 
 from src.config import (
     ASSETS_FOLDER,
-    OUTPUT_FOLDER,
-    MIN_DATE_EARLY_ACCESS,
     AUTHOR_NAME,
+    MIN_DATE_EARLY_ACCESS,
+    OUTPUT_FOLDER,
 )
 from src.utils import (
-    setup_logging,
-    cleanup_old_files,
-    atomic_write_csv,
     DATE_RE,
     RANK1_RE,
     RANK_RE,
+    atomic_write_csv,
+    cleanup_old_files,
+    setup_logging,
     strip_markdown,
 )
 

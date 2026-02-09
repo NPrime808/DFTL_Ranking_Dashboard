@@ -25,47 +25,52 @@ if _project_root not in sys.path:
 
 import math
 import statistics
-import pandas as pd
 from collections import defaultdict
 
+import pandas as pd
+
 from src.config import (
-    OUTPUT_FOLDER,
-    BASELINE_RATING,
-    K_NORMALIZED,
-    RATING_FLOOR,
-    FLOOR_SOFT_ZONE,
-    TARGET_MIN_RATING,
-    TARGET_MAX_RATING,
-    USE_HYBRID_COMPRESSION,
-    SOFT_TARGET,
-    HARD_CEILING,
-    USE_DYNAMIC_K,
-    DYNAMIC_K_NEW_PLAYER_GAMES,
-    DYNAMIC_K_ESTABLISHED_GAMES,
-    DYNAMIC_K_NEW_MULTIPLIER,
-    DYNAMIC_K_PROVISIONAL_MULTIPLIER,
-    USE_UNCERTAINTY,
-    UNCERTAINTY_BASE,
-    UNCERTAINTY_GROWTH_RATE,
-    UNCERTAINTY_MAX,
-    UNCERTAINTY_DECAY_RATE,
-    USE_ACTIVITY_GATING,
     ACTIVITY_WINDOW_DAYS,
-    MIN_GAMES_FOR_RANKING,
-    ELO_MODEL,
-    USE_LOG_SCALING,
-    LOG_SCALE_FACTOR,
-    USE_SCORE_GAP_WEIGHTING,
-    USE_RATIO_BASED_WEIGHTING,
-    RATIO_CAP,
+    BASELINE_RATING,
     DAILY_K_FACTOR,
     DAILY_K_NEW_MULTIPLIER,
     DAILY_K_PROVISIONAL_MULTIPLIER,
+    DYNAMIC_K_ESTABLISHED_GAMES,
+    DYNAMIC_K_NEW_MULTIPLIER,
+    DYNAMIC_K_NEW_PLAYER_GAMES,
+    DYNAMIC_K_PROVISIONAL_MULTIPLIER,
     EARLY_ACCESS_PATTERN,
+    ELO_MODEL,
+    FLOOR_SOFT_ZONE,
     FULL_PATTERN,
+    HARD_CEILING,
+    K_NORMALIZED,
+    LOG_SCALE_FACTOR,
+    MIN_GAMES_FOR_RANKING,
+    OUTPUT_FOLDER,
+    RATING_FLOOR,
+    RATIO_CAP,
+    SOFT_TARGET,
+    TARGET_MAX_RATING,
+    TARGET_MIN_RATING,
+    UNCERTAINTY_BASE,
+    UNCERTAINTY_DECAY_RATE,
+    UNCERTAINTY_GROWTH_RATE,
+    UNCERTAINTY_MAX,
+    USE_ACTIVITY_GATING,
+    USE_DYNAMIC_K,
+    USE_HYBRID_COMPRESSION,
+    USE_LOG_SCALING,
+    USE_RATIO_BASED_WEIGHTING,
+    USE_SCORE_GAP_WEIGHTING,
+    USE_UNCERTAINTY,
 )
-from src.utils import setup_logging, cleanup_old_files, atomic_write_csv
-from src.elo.compression import scale_ratings_soft, scale_ratings_hybrid, create_rating_scaler
+from src.elo.compression import (
+    create_rating_scaler,
+    scale_ratings_hybrid,
+    scale_ratings_soft,
+)
+from src.utils import atomic_write_csv, cleanup_old_files, setup_logging
 
 # --- Module Logger ---
 logger = setup_logging(__name__)
