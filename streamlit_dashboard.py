@@ -1208,12 +1208,12 @@ def get_theme_css():
         """
 
 
-def create_download_link(data: str, filename: str, label: str, is_dark: bool = True) -> str:
+def create_download_link_b64(b64_data: str, filename: str, label: str, is_dark: bool = True) -> str:
     """
-    Create a styled HTML download link with full CSS control.
+    Create a styled HTML download link from pre-encoded base64 data.
 
     Args:
-        data: The CSV string data to download
+        b64_data: Pre-encoded base64 string
         filename: The filename for the download
         label: The button label text
         is_dark: Whether we're in dark mode (affects text color)
@@ -1221,24 +1221,20 @@ def create_download_link(data: str, filename: str, label: str, is_dark: bool = T
     Returns:
         HTML string with styled download link
     """
-    b64 = base64.b64encode(data.encode()).decode()
-
     # Theme-aware colors
     if is_dark:
         text_color = "#FAFAFA"
         bg_color = "rgba(38,39,48,0.8)"
         border_color = "rgba(255,255,255,0.2)"
-        hover_bg = "rgba(58,59,68,0.9)"
     else:
         text_color = "#1a1c23"
         bg_color = "rgba(255,255,255,0.95)"
         border_color = "rgba(0,0,0,0.2)"
-        hover_bg = "rgba(240,240,240,1)"
 
     # Compact single-line HTML for reliable Streamlit rendering
     style = f"display:inline-block;padding:0.5rem 1rem;background:{bg_color};color:{text_color};text-decoration:none;border:1px solid {border_color};border-radius:0.5rem;font-family:'Source Sans',sans-serif;font-weight:600;font-size:0.9rem;cursor:pointer;width:100%;text-align:center;box-sizing:border-box;"
 
-    return f'<a href="data:text/csv;base64,{b64}" download="{filename}" style="{style}">{label}</a>'
+    return f'<a href="data:text/csv;base64,{b64_data}" download="{filename}" style="{style}">{label}</a>'
 
 
 # Custom CSS for visual hierarchy and spacing
@@ -2597,7 +2593,8 @@ DATASET_OPTIONS = {
 
 
 # --- Data Loading Functions ---
-@st.cache_data(ttl=3600)
+# Using cache_resource instead of cache_data for faster cache hits (no serialization overhead)
+@st.cache_resource(ttl=3600)
 def load_leaderboard_data(dataset_prefix):
     """Load the most recent leaderboard CSV for the given dataset."""
     pattern = f"{dataset_prefix}_leaderboard_*.csv"
@@ -2608,7 +2605,7 @@ def load_leaderboard_data(dataset_prefix):
     return df
 
 
-@st.cache_data(ttl=3600)
+@st.cache_resource(ttl=3600)
 def load_ratings_data(dataset_prefix):
     """Load the most recent Elo ratings CSV for the given dataset (active players only)."""
     pattern = f"{dataset_prefix}_elo_ratings_*.csv"
@@ -2620,7 +2617,7 @@ def load_ratings_data(dataset_prefix):
     return df
 
 
-@st.cache_data(ttl=3600)
+@st.cache_resource(ttl=3600)
 def load_all_ratings_data(dataset_prefix):
     """Load the most recent Elo ratings CSV including inactive players."""
     pattern = f"{dataset_prefix}_elo_ratings_all_*.csv"
@@ -2631,7 +2628,7 @@ def load_all_ratings_data(dataset_prefix):
     return df
 
 
-@st.cache_data(ttl=3600)
+@st.cache_resource(ttl=3600)
 def load_history_data(dataset_prefix):
     """Load the most recent Elo history CSV for the given dataset."""
     pattern = f"{dataset_prefix}_elo_history_*.csv"
@@ -2642,7 +2639,7 @@ def load_history_data(dataset_prefix):
     return df
 
 
-@st.cache_data(ttl=3600)
+@st.cache_resource(ttl=3600)
 def load_rivalries_data(dataset_prefix):
     """Load the most recent rivalries CSV for the given dataset."""
     pattern = f"{dataset_prefix}_rivalries_*.csv"
@@ -2660,6 +2657,58 @@ def get_available_datasets():
         if list(OUTPUT_FOLDER.glob(f"{prefix}_leaderboard_*.csv")):
             available[label] = prefix
     return available
+
+
+# --- Export Preparation (Cached with base64) ---
+@st.cache_data(ttl=3600)
+def prepare_elo_rankings_export(dataset_prefix):
+    """Prepare base64-encoded Elo Rankings CSV for export."""
+    df = load_all_ratings_data(dataset_prefix)
+    if df is None:
+        return None
+    export_cols = ['active_rank', 'player_name', 'rating', 'games_played', 'last_seen', 'is_active']
+    df_export = df[export_cols].copy()
+    df_export = df_export.rename(columns={
+        'active_rank': 'Rank',
+        'player_name': 'Player',
+        'rating': 'Elo Rating',
+        'games_played': 'Games Played',
+        'last_seen': 'Last Active',
+        'is_active': 'Status'
+    })
+    df_export['Status'] = df_export['Status'].map({True: 'Ranked', False: 'Unranked'})
+    csv_str = df_export.to_csv(index=False)
+    return base64.b64encode(csv_str.encode()).decode()
+
+
+@st.cache_data(ttl=3600)
+def prepare_elo_history_export(dataset_prefix):
+    """Prepare base64-encoded Elo History CSV for export."""
+    df = load_history_data(dataset_prefix)
+    if df is None:
+        return None
+    history_cols = ['date', 'player_name', 'rating', 'rating_change', 'rank', 'score']
+    df_export = df[history_cols].copy()
+    df_export = df_export.rename(columns={
+        'date': 'Date',
+        'player_name': 'Player',
+        'rating': 'Elo Rating',
+        'rating_change': 'Rating Change',
+        'rank': 'Daily Rank',
+        'score': 'Daily Score'
+    })
+    csv_str = df_export.to_csv(index=False)
+    return base64.b64encode(csv_str.encode()).decode()
+
+
+@st.cache_data(ttl=3600)
+def prepare_daily_results_export(dataset_prefix):
+    """Prepare base64-encoded Daily Results CSV for export."""
+    df = load_leaderboard_data(dataset_prefix)
+    if df is None:
+        return None
+    csv_str = df.to_csv(index=False)
+    return base64.b64encode(csv_str.encode()).decode()
 
 
 # --- Main App ---
@@ -2916,25 +2965,50 @@ def main():
         st.caption(f"Data range: {min_date} to {max_date}")
         st.caption(f"Players in Dataset: {len(all_players)}")
 
-        # Export Data section
+        # Export Data section (true lazy loading - only prepares on button click)
         st.markdown("---")
-        st.markdown('<div style="padding-top: 0.3rem;"></div>', unsafe_allow_html=True)
-        st.header("📥 Export Data")
-
-        # Export leaderboard data (always use full dataset for complete data)
-        df_full_leaderboard = load_leaderboard_data("full")
-        if df_full_leaderboard is not None:
-            csv_leaderboard = df_full_leaderboard.to_csv(index=False)
-            # Custom HTML download link - full CSS control for light/dark mode
+        with st.expander("📥 Export Data", expanded=False):
             colors = get_theme_colors()
             is_dark = colors["bg_primary"] == "#0E1117"
-            download_html = create_download_link(
-                data=csv_leaderboard,
-                filename="full_leaderboard.csv",
-                label="Download Leaderboard CSV",
-                is_dark=is_dark
-            )
-            st.markdown(download_html, unsafe_allow_html=True)
+
+            # Elo Rankings export (lazy)
+            export_key_elo = f"export_elo_{dataset_prefix}"
+            if st.button("📊 Generate Elo Rankings", key=f"btn_elo_{dataset_prefix}", use_container_width=True):
+                st.session_state[export_key_elo] = prepare_elo_rankings_export(dataset_prefix)
+            if export_key_elo in st.session_state and st.session_state[export_key_elo]:
+                download_html = create_download_link_b64(
+                    b64_data=st.session_state[export_key_elo],
+                    filename="dftl_elo_rankings.csv",
+                    label="⬇️ Download Elo Rankings",
+                    is_dark=is_dark
+                )
+                st.markdown(download_html, unsafe_allow_html=True)
+
+            # Elo History export (lazy)
+            export_key_hist = f"export_history_{dataset_prefix}"
+            if st.button("📈 Generate Elo History", key=f"btn_hist_{dataset_prefix}", use_container_width=True):
+                st.session_state[export_key_hist] = prepare_elo_history_export(dataset_prefix)
+            if export_key_hist in st.session_state and st.session_state[export_key_hist]:
+                download_html = create_download_link_b64(
+                    b64_data=st.session_state[export_key_hist],
+                    filename="dftl_elo_history.csv",
+                    label="⬇️ Download Elo History",
+                    is_dark=is_dark
+                )
+                st.markdown(download_html, unsafe_allow_html=True)
+
+            # Daily Results export (lazy)
+            export_key_daily = f"export_daily_{dataset_prefix}"
+            if st.button("📅 Generate Daily Results", key=f"btn_daily_{dataset_prefix}", use_container_width=True):
+                st.session_state[export_key_daily] = prepare_daily_results_export(dataset_prefix)
+            if export_key_daily in st.session_state and st.session_state[export_key_daily]:
+                download_html = create_download_link_b64(
+                    b64_data=st.session_state[export_key_daily],
+                    filename="dftl_daily_results.csv",
+                    label="⬇️ Download Daily Results",
+                    is_dark=is_dark
+                )
+                st.markdown(download_html, unsafe_allow_html=True)
 
         # Help link
         st.markdown("---")
@@ -4066,8 +4140,9 @@ def main():
         else:
             st.warning("History data not available.")
 
-    # Floating share button (rendered after tab content for correct URL state)
-    render_floating_share_button(url_tab)
+    # Floating share button (use validated slug, not raw URL param)
+    validated_slug = TAB_SLUGS.get(active_tab, "rankings")
+    render_floating_share_button(validated_slug)
 
 if __name__ == "__main__":
     main()
