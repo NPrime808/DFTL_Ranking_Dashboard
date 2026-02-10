@@ -22,6 +22,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# --- Admin: Cache Management ---
+# Clear cache via URL param (for data refreshes without rebooting)
+# Key stored in Streamlit secrets, not in code
+if st.query_params.get("clear_cache"):
+    try:
+        if st.query_params["clear_cache"] == st.secrets["admin"]["cache_clear_key"]:
+            st.cache_resource.clear()
+            del st.query_params["clear_cache"]
+            st.rerun()
+    except (KeyError, FileNotFoundError):
+        pass  # Secrets not configured or wrong key - silently ignore
+
 # --- Design System ---
 # Theme-aware color palette (works with both light and dark modes)
 # Accent colors are the same in both themes, only text/background colors differ
