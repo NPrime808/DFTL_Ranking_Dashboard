@@ -1273,6 +1273,11 @@ CUSTOM_CSS = """
     display: none !important;
 }
 
+/* Prevent header from covering the scrollbar */
+[data-testid="stHeader"] {
+    width: calc(100% - 8px) !important;
+}
+
 /* Sidebar collapse button - ensure always visible (not just on hover) */
 [data-testid="stSidebarCollapseButton"],
 [data-testid="stSidebarCollapseButton"] button {
@@ -2200,10 +2205,16 @@ CUSTOM_CSS = """
 }
 
 /* ===== Rivals Grid (Tab 3) ===== */
-/* Responsive: 2 columns on narrow screens */
-@media (max-width: 500px) {
+/* Responsive: 2 columns when viewport is narrow */
+@media (max-width: 900px) {
     .rivals-grid {
         grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+/* Single column on very narrow screens */
+@media (max-width: 500px) {
+    .rivals-grid {
+        grid-template-columns: 1fr !important;
     }
 }
 
