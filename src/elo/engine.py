@@ -523,7 +523,7 @@ def compute_elo_ratings(df):
         played = group[group['rank'].notna()].copy()
         if len(played) < 2:
             return pd.Series(index=group.index, dtype=float)
-        played['consistency'] = played['rank'].rolling(window=14, min_periods=2).std().round(1)
+        played['consistency'] = played['rank'].rolling(window=7, min_periods=2).std(ddof=0).round(1)
         result = group[['rank']].merge(played[['consistency']], left_index=True, right_index=True, how='left')
         result['consistency'] = result['consistency'].ffill()
         return result['consistency']

@@ -302,7 +302,7 @@ Each player's profile shows their top 6 rivals—opponents with competitive (clo
 | **Daily Top10 (%)** | Top 10 rate: Daily Top10 ÷ Daily Runs × 100 |
 | **Daily Avg** | Average daily rank across all your runs |
 | **7-Game Avg** | Average daily rank over your last 7 runs |
-| **Daily Variance** | Standard deviation of your daily ranks (lower = more consistent) |
+| **7-Game StdDev** | Standard deviation of your daily ranks over your last 7 games (lower = more consistent) |
 | **Daily Rank** | Your position on a specific day's leaderboard |
 | **Rating Change** | How much your Elo changed that day |
 | **Baseline** | The starting/median rating of 1500 |
