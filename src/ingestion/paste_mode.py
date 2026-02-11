@@ -420,14 +420,28 @@ def ingest_leaderboard_text(
 
 def main():
     """CLI interface for paste-mode ingestion."""
+    import argparse
     import sys
 
-    print("=" * 60)
-    print("DFTL Paste-Mode Leaderboard Ingestion")
-    print("=" * 60)
-    print("\nPaste the Discord leaderboard message below.")
-    print("When finished, press Enter twice (empty line) to process.\n")
-    print("-" * 60)
+    parser = argparse.ArgumentParser(
+        description="Ingest a Discord leaderboard message into the DFTL dataset."
+    )
+    parser.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Skip confirmation prompt (for non-interactive/CI usage)"
+    )
+    args = parser.parse_args()
+
+    interactive = not args.yes
+
+    if interactive:
+        print("=" * 60)
+        print("DFTL Paste-Mode Leaderboard Ingestion")
+        print("=" * 60)
+        print("\nPaste the Discord leaderboard message below.")
+        print("When finished, press Enter twice (empty line) to process.\n")
+        print("-" * 60)
 
     lines = []
     empty_count = 0
@@ -449,37 +463,44 @@ def main():
     text = "\n".join(lines)
 
     if not text.strip():
-        print("\nNo input received. Exiting.")
+        if interactive:
+            print("\nNo input received. Exiting.")
         sys.exit(1)
 
-    print("-" * 60)
-    print("\nProcessing input...\n")
+    if interactive:
+        print("-" * 60)
+        print("\nProcessing input...\n")
 
     try:
         # First do a dry run to validate
-        print("Step 1: Validation (dry run)")
+        if interactive:
+            print("Step 1: Validation (dry run)")
         result = ingest_leaderboard_text(text, dry_run=True)
 
-        # Ask for confirmation
-        print(f"\nReady to ingest data for {result['date']}.")
-        confirm = input("Proceed with ingestion? [y/N]: ").strip().lower()
+        # Ask for confirmation (unless --yes)
+        if interactive:
+            print(f"\nReady to ingest data for {result['date']}.")
+            confirm = input("Proceed with ingestion? [y/N]: ").strip().lower()
 
-        if confirm != 'y':
-            print("Ingestion cancelled.")
-            sys.exit(0)
+            if confirm != 'y':
+                print("Ingestion cancelled.")
+                sys.exit(0)
+
+            print("\nStep 2: Ingestion")
 
         # Do the actual ingestion
-        print("\nStep 2: Ingestion")
         result = ingest_leaderboard_text(text, dry_run=False)
 
-        print("\n" + "=" * 60)
+        if interactive:
+            print("\n" + "=" * 60)
         print("SUCCESS!")
         print(f"  Date: {result['date']}")
         print(f"  Rows: {result['rows']}")
         print(f"  CSV: {result['csv_path']}")
         if result['warnings']:
             print(f"  Warnings: {len(result['warnings'])}")
-        print("=" * 60)
+        if interactive:
+            print("=" * 60)
 
     except ValidationError as e:
         print(f"\nVALIDATION ERROR: {e}")
