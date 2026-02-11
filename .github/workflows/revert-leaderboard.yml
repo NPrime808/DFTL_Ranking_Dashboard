@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   revert:
-    # Only run if issue title starts with "Revert:"
-    if: startsWith(github.event.issue.title, 'Revert:')
+    # Only run if issue title starts with "Revert:" AND has the 'automation' label
+    if: startsWith(github.event.issue.title, 'Revert:') && contains(github.event.issue.labels.*.name, 'automation')
     runs-on: ubuntu-latest
 
     steps:
