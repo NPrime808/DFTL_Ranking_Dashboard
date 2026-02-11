@@ -1,0 +1,67 @@
+name: Revert Leaderboard Update
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  revert:
+    # Only run if issue title starts with "Revert:"
+    if: startsWith(github.event.issue.title, 'Revert:')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10  # Need history to find commits to revert
+
+      - name: Find and revert last data commit
+        id: revert
+        run: |
+          # Find the most recent commit that modified data/
+          COMMIT=$(git log -1 --format="%H" -- data/)
+
+          if [ -z "$COMMIT" ]; then
+            echo "error=No data commits found" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          COMMIT_MSG=$(git log -1 --format="%s" $COMMIT)
+          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+          echo "commit_msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
+
+          # Revert the commit
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git revert --no-edit $COMMIT
+          git push
+
+      - name: Close issue with success comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `✅ Reverted commit: \`${{ steps.revert.outputs.commit_msg }}\`\n\nCommit hash: \`${{ steps.revert.outputs.commit }}\``
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+
+      - name: Comment on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '❌ Failed to revert. Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+            });
