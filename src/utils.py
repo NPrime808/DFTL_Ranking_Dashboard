@@ -26,7 +26,8 @@ from src.config import ALLOWED_DATASETS, OUTPUT_FOLDER
 DATE_RE = re.compile(r"`?date:\s*(\d{2}/\d{2}/\d{4})`?", re.IGNORECASE)
 
 # Rank 1: :crown_dftl: **PlayerName** - 12345 (handles optional markdown)
-RANK1_RE = re.compile(r":crown_dftl:\s*\*{0,2}(.+?)\*{0,2}\s+-\s+(\d+)\s*$")
+# Supports both desktop (:crown_dftl:) and mobile (<:crown_dftl:id>) Discord formats
+RANK1_RE = re.compile(r"(?:<:crown_dftl:\d+>|:crown_dftl:)\s*\*{0,2}(.+?)\*{0,2}\s+-\s+(\d+)\s*$")
 
 # Ranks 2-30: #N **PlayerName** - 12345 (handles optional markdown)
 RANK_RE = re.compile(r"#(\d+)\s+\*{0,2}(.+?)\*{0,2}\s+-\s+(\d+)\s*$")
