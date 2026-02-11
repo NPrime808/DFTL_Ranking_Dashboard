@@ -16,25 +16,26 @@ jobs:
         with:
           fetch-depth: 10  # Need history to find commits to revert
 
-      - name: Find and revert last data commit
+      - name: Check and revert last commit
         id: revert
         run: |
-          # Find the most recent commit that modified data/
-          COMMIT=$(git log -1 --format="%H" -- data/)
+          # Check if HEAD (the very last commit) modified data/
+          FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD -- data/)
 
-          if [ -z "$COMMIT" ]; then
-            echo "error=No data commits found" >> $GITHUB_OUTPUT
+          if [ -z "$FILES_CHANGED" ]; then
+            echo "error=Last commit did not touch data/ - nothing to revert" >> $GITHUB_OUTPUT
             exit 1
           fi
 
-          COMMIT_MSG=$(git log -1 --format="%s" $COMMIT)
+          COMMIT=$(git rev-parse HEAD)
+          COMMIT_MSG=$(git log -1 --format="%s" HEAD)
           echo "commit=$COMMIT" >> $GITHUB_OUTPUT
           echo "commit_msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
 
           # Revert the commit
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git revert --no-edit $COMMIT
+          git revert --no-edit HEAD
           git push
 
       - name: Close issue with success comment
